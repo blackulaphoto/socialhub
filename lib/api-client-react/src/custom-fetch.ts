@@ -326,6 +326,10 @@ export async function customFetch<T = unknown>(
   input = applyBaseUrl(input);
   const { responseType = "auto", headers: headersInit, ...init } = options;
 
+  if (init.credentials === undefined) {
+    init.credentials = 'include';
+  }
+
   const method = resolveMethod(input, init.method);
 
   if (init.body != null && (method === "GET" || method === "HEAD")) {

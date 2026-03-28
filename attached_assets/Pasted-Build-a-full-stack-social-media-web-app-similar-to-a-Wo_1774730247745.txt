@@ -1,0 +1,109 @@
+Build a full-stack social media web app similar to a WordPress-style social platform, with a strong focus on artist discovery and booking.
+
+GENERAL REQUIREMENTS:
+- Clean, modern UI (dark mode default, nightlife/creative aesthetic)
+- Fully functional frontend + backend
+- Simple, intuitive user experience
+- Do not overengineer or add unnecessary complexity
+
+-----------------------------------
+AUTH & USERS
+-----------------------------------
+- User signup / login
+- Profile system:
+  - profile picture
+  - bio
+  - posts
+  - followers / following
+
+- Two profile types:
+  1. Regular User
+  2. Artist
+
+-----------------------------------
+ARTIST PROFILES (CORE FEATURE)
+-----------------------------------
+Artist profiles must include:
+- Category (DJ, model, photographer, designer, etc.)
+- Location (city-based)
+- Tags (genre, style, vibe)
+- Media gallery:
+  - images
+  - video embeds
+  - audio/music embeds
+- “Book / Contact” button:
+  - opens message form
+  - sends inquiry to artist inbox
+
+-----------------------------------
+SOCIAL FEATURES
+-----------------------------------
+- Follow / unfollow users
+- Chronological feed (NO algorithm):
+  - shows posts from followed users
+- Posts:
+  - text + image support
+  - timestamps
+  - like system (simple)
+
+-----------------------------------
+MESSAGING SYSTEM
+-----------------------------------
+- Direct messaging between users
+- Booking inquiries appear in messages
+- Simple inbox layout:
+  - conversation list
+  - message thread view
+
+-----------------------------------
+SEARCH & DISCOVERY (IMPORTANT)
+-----------------------------------
+Create a search page with filters:
+- Location (city)
+- Category (artist type)
+- Tags (genre/style)
+
+Display results as clean profile cards.
+
+-----------------------------------
+UI / FRONTEND DESIGN
+-----------------------------------
+- Dark theme (default)
+- Modern, minimal, slightly edgy nightlife aesthetic
+- Clean layout similar to:
+  - Instagram profile pages
+  - simple WordPress social themes
+
+Key pages:
+- Home feed
+- Profile page
+- Artist page (enhanced profile)
+- Search / discovery page
+- Messages page
+
+-----------------------------------
+ADMIN BACKEND
+-----------------------------------
+Create a basic admin dashboard:
+- View all users
+- View all artist profiles
+- Manage posts (delete/report)
+- Basic moderation tools
+
+-----------------------------------
+TECH REQUIREMENTS
+-----------------------------------
+- Fully working web app
+- Database for users, posts, messages, profiles
+- Keep structure simple and understandable
+- Avoid unnecessary frameworks or over-complex architecture
+
+-----------------------------------
+GOAL
+-----------------------------------
+This should feel like a simple, modern social platform where:
+- users can connect
+- artists can showcase themselves
+- promoters can discover and contact talent easily
+
+Focus on usability, clarity, and real functionality over complexity.
