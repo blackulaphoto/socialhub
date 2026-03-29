@@ -5,6 +5,7 @@
  * ArtistHub Social Platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { LinkItem } from "./linkItem";
 import type { UserProfileType } from "./userProfileType";
 
 export interface User {
@@ -17,7 +18,21 @@ export interface User {
   isAdmin: boolean;
   isBanned: boolean;
   followerCount: number;
+  friendCount: number;
   followingCount: number;
   postCount: number;
   createdAt: Date;
+  bannerUrl?: string | null;
+  location?: string | null;
+  city?: string | null;
+  age?: number | null;
+  work?: string | null;
+  school?: string | null;
+  about?: string | null;
+  interests?: string[];
+  hasArtistPage?: boolean;
+  accentColor?: string | null;
+  themeName?: string | null;
+  links?: LinkItem[];
+  featuredContent?: string | null;
 }

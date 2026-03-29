@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, timestamp, pgEnum, boolean, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
@@ -10,8 +10,18 @@ export const artistProfilesTable = pgTable("artist_profiles", {
   userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }).unique(),
   category: text("category").notNull(),
   location: text("location"),
+  tagline: text("tagline"),
   tags: text("tags").array().notNull().default([]),
   bio: text("bio"),
+  influences: text("influences"),
+  availabilityStatus: text("availability_status"),
+  pronouns: text("pronouns"),
+  yearsActive: text("years_active"),
+  representedBy: text("represented_by"),
+  openForCommissions: boolean("open_for_commissions").notNull().default(false),
+  touring: boolean("touring").notNull().default(false),
+  acceptsCollaborations: boolean("accepts_collaborations").notNull().default(true),
+  customFields: jsonb("custom_fields").$type<Array<{ label: string; value: string }>>().notNull().default([]),
   bookingEmail: text("booking_email"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

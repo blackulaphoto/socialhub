@@ -5,11 +5,9 @@
  * ArtistHub Social Platform API
  * OpenAPI spec version: 0.1.0
  */
-import type { RegisterRequestProfileType } from "./registerRequestProfileType";
 
 export interface RegisterRequest {
   username: string;
   email: string;
   password: string;
-  profileType: RegisterRequestProfileType;
 }

@@ -5,11 +5,35 @@
  * ArtistHub Social Platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { ProfileCustomField } from "./profileCustomField";
 
 export interface UpdateArtistRequest {
   category?: string;
   location?: string | null;
+  tagline?: string | null;
   tags?: string[];
   bio?: string | null;
+  influences?: string | null;
+  availabilityStatus?: string | null;
+  pronouns?: string | null;
+  yearsActive?: string | null;
+  representedBy?: string | null;
+  openForCommissions?: boolean;
+  touring?: boolean;
+  acceptsCollaborations?: boolean;
+  customFields?: ProfileCustomField[];
   bookingEmail?: string | null;
+  primaryActionType?: string;
+  primaryActionLabel?: string;
+  primaryActionUrl?: string | null;
+  featuredTitle?: string | null;
+  featuredDescription?: string | null;
+  featuredUrl?: string | null;
+  featuredType?: string;
+  moodPreset?: string;
+  layoutTemplate?: string;
+  fontPreset?: string;
+  enabledModules?: string[];
+  moduleOrder?: string[];
+  pinnedPostId?: number | null;
 }

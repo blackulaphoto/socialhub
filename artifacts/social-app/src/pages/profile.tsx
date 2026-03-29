@@ -1,182 +1,469 @@
-import { useState } from "react";
 import { Link } from "wouter";
-import { 
-  useGetUser, 
-  useGetUserPosts, 
-  useFollowUser, 
-  useUnfollowUser 
+import {
+  Camera,
+  Compass,
+  ExternalLink,
+  HeartHandshake,
+  Grid,
+  Link2,
+  MapPin,
+  Settings,
+  Share2,
+  Sparkles,
+  Tag,
+} from "lucide-react";
+import {
+  useFollowUser,
+  useGetUser,
+  useGetUserPhotos,
+  useGetUserPosts,
+  useUnfollowUser,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FeedPostCard } from "@/components/feed-post-card";
 import { Spinner } from "@/components/ui/spinner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent } from "@/components/ui/card";
-import { Heart, Grid, Calendar, Settings, Compass } from "lucide-react";
+import { QueryErrorState } from "@/components/query-error-state";
+import { ReportDialog } from "@/components/report-dialog";
+import { FriendActionButton } from "@/components/friend-action-button";
+import { ProfileReactionBar } from "@/components/profile-reaction-bar";
 
 export default function Profile({ id }: { id: string }) {
-  const userId = parseInt(id);
+  const userId = parseInt(id, 10);
   const { user: currentUser } = useAuth();
   const queryClient = useQueryClient();
   const isOwnProfile = currentUser?.id === userId;
 
-  const { data: profile, isLoading: isLoadingProfile } = useGetUser(userId, {
-    query: { enabled: !!userId }
+  const {
+    data: profile,
+    isLoading: isLoadingProfile,
+    isError: isProfileError,
+    refetch: refetchProfile,
+  } = useGetUser(userId, {
+    query: { enabled: !!userId, queryKey: ["/api/users", userId] },
   });
 
-  const { data: postsData, isLoading: isLoadingPosts } = useGetUserPosts(userId, { limit: 50 }, {
-    query: { 
+  const {
+    data: postsData,
+    isLoading: isLoadingPosts,
+    isError: isPostsError,
+    refetch: refetchPosts,
+  } = useGetUserPosts(userId, { limit: 50 }, {
+    query: {
       queryKey: ["/api/users", userId, "posts"],
-      enabled: !!userId 
-    }
+      enabled: !!userId,
+    },
+  });
+  const { data: userPhotos } = useGetUserPhotos(userId, {
+    query: {
+      queryKey: ["/api/users", userId, "photos"],
+      enabled: !!userId,
+    },
   });
 
   const { mutate: follow } = useFollowUser();
   const { mutate: unfollow } = useUnfollowUser();
-
-  const handleFollowToggle = () => {
-    if (!profile) return;
-    
-    if (profile.isFollowing) {
-      unfollow({ userId }, {
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/users", userId] })
-      });
-    } else {
-      follow({ userId }, {
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/users", userId] })
-      });
+  const handleShare = async () => {
+    const url = `${window.location.origin}/profile/${userId}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: profile?.user.username || "Profile", url });
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+      }
+    } catch {
+      // no-op: share is best-effort
     }
   };
 
-  if (isLoadingProfile) {
-    return <div className="flex justify-center py-20"><Spinner size="lg" /></div>;
-  }
+  const handleFollowToggle = () => {
+    if (!profile) return;
+    const mutation = profile.isFollowing ? unfollow : follow;
+    mutation(
+      { userId },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: ["/api/users", userId] });
+          queryClient.invalidateQueries({ queryKey: ["/api/activity/summary"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+        },
+      },
+    );
+  };
 
-  if (!profile) {
-    return <div className="text-center py-20">User not found</div>;
-  }
+  if (isLoadingProfile) return <div className="flex justify-center py-20"><Spinner size="lg" /></div>;
+  if (isProfileError) return <div className="mx-auto max-w-5xl px-4 py-8"><QueryErrorState title="Could not load profile" description="The profile request failed. If the API was restarted, retry." onRetry={() => refetchProfile()} /></div>;
+  if (!profile) return <div className="py-20 text-center">User not found.</div>;
 
-  const { user, isFollowing, artistProfile } = profile;
+  const { user, isFollowing, artistProfile, creatorSettings, customFeeds, friendship, profileReactions } = profile;
+  const accent = user.accentColor || "#8b5cf6";
+  const locationLine = [user.city, user.location].filter(Boolean).join(" / ");
+  const photoPosts = (postsData?.posts || []).filter((post) => post.imageUrl || post.media?.some((media) => media.type === "image"));
 
   return (
-    <div className="w-full">
-      {/* Banner & Header */}
-      <div className="h-32 md:h-48 bg-muted relative border-b border-border/50">
-        <div className="absolute inset-0 bg-gradient-to-t from-background/90 to-transparent" />
-        <div className="max-w-4xl mx-auto px-4 relative h-full flex items-end pb-4">
-          {user.profileType === 'artist' && artistProfile?.category && (
-            <div className="absolute top-4 right-4">
-              <Link href={`/artists/${user.id}`}>
-                <Button variant="outline" size="sm" className="bg-background/50 backdrop-blur-md border-primary/30 hover:border-primary">
-                  <Compass className="w-4 h-4 mr-2 text-primary" />
-                  View Artist Page
-                </Button>
-              </Link>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="max-w-4xl mx-auto px-4 pb-12 -mt-12 md:-mt-16 relative z-10">
-        <div className="flex flex-col md:flex-row md:items-end gap-4 mb-6">
-          <Avatar className="w-24 h-24 md:w-32 md:h-32 border-4 border-background shadow-xl">
-            <AvatarImage src={user.avatarUrl || ""} />
-            <AvatarFallback className="text-3xl bg-primary/20 text-primary">
-              {user.username.substring(0, 2).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          
-          <div className="flex-1 pb-2">
-            <h1 className="text-2xl md:text-3xl font-bold">{user.username}</h1>
-            <p className="text-muted-foreground capitalize flex items-center gap-2">
-              {user.profileType} 
-              {user.profileType === 'artist' && <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block"></span>}
-            </p>
-          </div>
-          
-          <div className="flex gap-3 pb-2 w-full md:w-auto">
-            {isOwnProfile ? (
-              <Link href="/settings" className="w-full md:w-auto">
-                <Button variant="outline" className="w-full">
-                  <Settings className="w-4 h-4 mr-2" /> Edit Profile
-                </Button>
-              </Link>
-            ) : (
-              <>
-                <Button 
-                  onClick={handleFollowToggle} 
-                  variant={isFollowing ? "outline" : "default"}
-                  className="flex-1 md:flex-none"
-                >
-                  {isFollowing ? "Following" : "Follow"}
-                </Button>
-                <Link href={`/messages/${user.id}`} className="flex-1 md:flex-none">
-                  <Button variant="secondary" className="w-full">Message</Button>
-                </Link>
-              </>
-            )}
-          </div>
-        </div>
-
-        {user.bio && (
-          <div className="mb-6 max-w-2xl text-sm md:text-base">
-            <p className="whitespace-pre-wrap">{user.bio}</p>
-          </div>
+    <div className="w-full pb-14">
+      <section
+        className="relative border-b border-border/60"
+        style={{ background: `linear-gradient(135deg, ${accent}35, rgba(12,12,18,0.92) 35%, rgba(20,28,44,0.9) 100%)` }}
+      >
+        {user.bannerUrl && (
+          <div className="absolute inset-0 bg-cover bg-center opacity-35" style={{ backgroundImage: `url(${user.bannerUrl})` }} />
         )}
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-background/10" />
+        <div className="relative mx-auto flex max-w-5xl flex-col gap-8 px-4 py-12 md:py-16">
+          <div className="flex flex-col gap-6 md:flex-row md:items-end">
+            <Avatar className="h-28 w-28 border-4 border-background shadow-2xl md:h-36 md:w-36">
+              <AvatarImage src={user.avatarUrl || ""} />
+              <AvatarFallback className="text-3xl" style={{ backgroundColor: `${accent}33`, color: accent }}>
+                {user.username.substring(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
 
-        <div className="flex gap-6 mb-8 text-sm">
-          <div className="flex flex-col">
-            <span className="font-bold text-lg">{user.postCount}</span>
-            <span className="text-muted-foreground">Posts</span>
+            <div className="flex-1">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div className="mb-3 flex flex-wrap items-center gap-2">
+                    <Badge variant="outline" className="capitalize">{user.profileType}</Badge>
+                    {artistProfile?.category && <Badge variant="secondary">{artistProfile.category}</Badge>}
+                    {creatorSettings?.primaryActionLabel && artistProfile && <Badge>{creatorSettings.primaryActionLabel}</Badge>}
+                  </div>
+                  <h1 className="text-3xl font-bold md:text-5xl">{user.username}</h1>
+                  {locationLine && (
+                    <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                      <span className="inline-flex items-center">
+                        <MapPin className="mr-1.5 h-4 w-4" /> {locationLine}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  {isOwnProfile ? (
+                    <>
+                      <Link href="/settings">
+                        <Button variant="outline">
+                          <Settings className="mr-2 h-4 w-4" /> Edit Profile
+                        </Button>
+                      </Link>
+                      {!artistProfile && (
+                        <Link href="/settings">
+                          <Button variant="secondary">
+                            <Sparkles className="mr-2 h-4 w-4" /> Create Artist Page
+                          </Button>
+                        </Link>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <FriendActionButton userId={userId} friendship={friendship} invalidateKeys={[[ "/api/users", userId ]]} />
+                      <Button onClick={handleFollowToggle} variant={isFollowing ? "outline" : "default"}>
+                        {isFollowing ? "Following" : "Follow"}
+                      </Button>
+                      <Button variant="outline" onClick={handleShare}>
+                        <Share2 className="mr-2 h-4 w-4" /> Share
+                      </Button>
+                      <ReportDialog targetType="profile" targetId={user.id} variant="outline" />
+                      {artistProfile ? (
+                        <Link href={`/artists/${user.id}`}>
+                          <Button variant="secondary">
+                            <Compass className="mr-2 h-4 w-4" /> Creator Page
+                          </Button>
+                        </Link>
+                      ) : (
+                        <Link href="/messages">
+                          <Button variant="secondary">Inbox</Button>
+                        </Link>
+                      )}
+                    </>
+                  )}
+                  {artistProfile?.category && (
+                    <Link href={`/artists/${user.id}`}>
+                      <Button variant="outline">
+                        <Sparkles className="mr-2 h-4 w-4" /> View Artist Page
+                      </Button>
+                    </Link>
+                  )}
+                </div>
+              </div>
+
+              {(artistProfile?.tags?.length || user.links?.length) ? (
+                <div className="mt-5 flex flex-wrap gap-2">
+                  {artistProfile?.tags?.slice(0, 6).map((tag) => <Badge key={tag} variant="secondary">{tag}</Badge>)}
+                  {user.links?.slice(0, 2).map((link) => (
+                    <a key={`${link.label}-${link.url}`} href={link.url} target="_blank" rel="noreferrer">
+                      <Badge variant="outline" className="hover:border-primary/50">
+                        <ExternalLink className="mr-1 h-3 w-3" /> {link.label}
+                      </Badge>
+                    </a>
+                  ))}
+                </div>
+              ) : null}
+
+              {(artistProfile?.bio || user.bio) && (
+                <p className="mt-6 max-w-3xl whitespace-pre-wrap text-sm text-muted-foreground md:text-base">
+                  {artistProfile?.bio || user.bio}
+                </p>
+              )}
+            </div>
           </div>
-          <div className="flex flex-col">
-            <span className="font-bold text-lg">{user.followerCount}</span>
-            <span className="text-muted-foreground">Followers</span>
+
+          <div className="grid grid-cols-3 gap-3 md:max-w-xl">
+            <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
+              <div className="text-xs text-muted-foreground">Posts</div>
+              <div className="mt-1 text-2xl font-semibold">{user.postCount}</div>
+            </div>
+            <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
+              <div className="text-xs text-muted-foreground">Followers</div>
+              <div className="mt-1 text-2xl font-semibold">{user.followerCount}</div>
+            </div>
+            <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
+              <div className="text-xs text-muted-foreground">Following</div>
+              <div className="mt-1 text-2xl font-semibold">{user.followingCount}</div>
+            </div>
           </div>
-          <div className="flex flex-col">
-            <span className="font-bold text-lg">{user.followingCount}</span>
-            <span className="text-muted-foreground">Following</span>
-          </div>
+          {!isOwnProfile ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="inline-flex items-center rounded-2xl border border-border/50 bg-background/30 px-4 py-3 text-sm text-muted-foreground">
+                <HeartHandshake className="mr-2 h-4 w-4 text-primary" />
+                {user.friendCount} friends
+              </div>
+              <ProfileReactionBar userId={userId} summary={profileReactions} invalidateKeys={[[ "/api/users", userId ]]} />
+            </div>
+          ) : null}
         </div>
+      </section>
 
-        <Tabs defaultValue="posts" className="w-full">
-          <TabsList className="w-full justify-start border-b border-border/50 rounded-none bg-transparent h-12 p-0">
-            <TabsTrigger value="posts" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 border-primary rounded-none px-6 h-full font-medium">
-              <Grid className="w-4 h-4 mr-2" /> Posts
-            </TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="posts" className="pt-6">
-            {isLoadingPosts ? (
-              <div className="flex justify-center py-8"><Spinner /></div>
-            ) : postsData?.posts && postsData.posts.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {postsData.posts.map(post => (
-                  <Card key={post.id} className="bg-card/50 border-border/50 overflow-hidden flex flex-col">
-                    {post.imageUrl && (
-                      <div className="aspect-video w-full bg-muted relative">
-                        <img src={post.imageUrl} alt="Post" className="w-full h-full object-cover" />
+      <div className="mx-auto mt-8 grid max-w-5xl grid-cols-1 gap-6 px-4 lg:grid-cols-[1.2fr_0.8fr]">
+        <div className="space-y-6">
+          <Tabs defaultValue="posts" className="w-full">
+            <TabsList className="h-12 w-full justify-start rounded-none border-b border-border/50 bg-transparent p-0">
+              <TabsTrigger value="posts" className="h-full rounded-none border-primary px-6 font-medium data-[state=active]:border-b-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+                <Grid className="mr-2 h-4 w-4" /> Posts
+              </TabsTrigger>
+              <TabsTrigger value="photos" className="h-full rounded-none border-primary px-6 font-medium data-[state=active]:border-b-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+                <Camera className="mr-2 h-4 w-4" /> Photos
+              </TabsTrigger>
+              <TabsTrigger value="about" className="h-full rounded-none border-primary px-6 font-medium data-[state=active]:border-b-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+                About
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="posts" className="pt-6">
+              {creatorSettings?.pinnedPost && (
+                <div className="mb-4 space-y-2">
+                  <div className="text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">Pinned</div>
+                  <FeedPostCard post={creatorSettings.pinnedPost} showAuthor={false} />
+                </div>
+              )}
+              {isLoadingPosts ? (
+                <div className="flex justify-center py-8"><Spinner /></div>
+              ) : isPostsError ? (
+                <QueryErrorState title="Could not load posts" description="The profile loaded, but posts could not be fetched." onRetry={() => refetchPosts()} />
+              ) : postsData?.posts?.length ? (
+                <div className="space-y-4">
+                  {postsData.posts.map((post) => (
+                    <FeedPostCard key={post.id} post={post} showAuthor={false} />
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-border/50 bg-card/20 py-12 text-center text-muted-foreground">
+                  <Grid className="mx-auto mb-3 h-8 w-8 opacity-20" />
+                  <p>No posts yet.</p>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="photos" className="pt-6">
+              <div className="space-y-6">
+                <Card className="border-border/50 bg-card/50">
+                  <CardHeader>
+                    <CardTitle>Photo Gallery</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {userPhotos?.length ? (
+                      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                        {userPhotos.map((photo) => (
+                          <div key={photo.id} className="overflow-hidden rounded-2xl border border-border/50 bg-background/40">
+                            <img src={photo.imageUrl} alt={photo.caption || `${user.username} photo`} className="h-56 w-full object-cover" />
+                            <div className="space-y-2 p-4">
+                              {photo.caption && <div className="text-sm">{photo.caption}</div>}
+                              <div className="text-xs text-muted-foreground">{new Date(photo.createdAt).toLocaleDateString()}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-border/50 bg-card/20 py-12 text-center text-muted-foreground">
+                        No gallery photos yet.
                       </div>
                     )}
-                    <CardContent className="p-4 flex-1 flex flex-col">
-                      <p className="text-sm line-clamp-3 mb-4 flex-1">{post.content}</p>
-                      <div className="flex items-center justify-between text-xs text-muted-foreground mt-auto">
-                        <span className="flex items-center gap-1"><Heart className="w-3 h-3" /> {post.likeCount}</span>
-                        <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {new Date(post.createdAt).toLocaleDateString()}</span>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-border/50 bg-card/50">
+                  <CardHeader>
+                    <CardTitle>Photo Posts</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {photoPosts.length ? (
+                      <div className="space-y-4">
+                        {photoPosts.map((post) => (
+                          <FeedPostCard key={post.id} post={post} showAuthor={false} />
+                        ))}
                       </div>
-                    </CardContent>
-                  </Card>
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-border/50 bg-card/20 py-12 text-center text-muted-foreground">
+                        No image posts yet.
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="about" className="pt-6">
+              <Card className="border-border/50 bg-card/50">
+                <CardHeader>
+                  <CardTitle>About</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-5">
+                  {user.about ? (
+                    <p className="whitespace-pre-wrap text-sm leading-7 text-muted-foreground">{user.about}</p>
+                  ) : (
+                    <div className="text-sm text-muted-foreground">No about section added yet.</div>
+                  )}
+
+                  {(user.age || user.work || user.school) && (
+                    <div className="grid gap-3 md:grid-cols-3">
+                      {user.age ? <div className="rounded-xl border border-border/50 bg-background/40 p-4 text-sm"><div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Age</div><div className="mt-1 font-medium">{user.age}</div></div> : null}
+                      {user.work ? <div className="rounded-xl border border-border/50 bg-background/40 p-4 text-sm"><div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Work</div><div className="mt-1 font-medium">{user.work}</div></div> : null}
+                      {user.school ? <div className="rounded-xl border border-border/50 bg-background/40 p-4 text-sm"><div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">School</div><div className="mt-1 font-medium">{user.school}</div></div> : null}
+                    </div>
+                  )}
+
+                  {user.interests?.length ? (
+                    <div className="flex flex-wrap gap-2">
+                      {user.interests.map((interest) => (
+                        <Badge key={interest} variant="secondary">{interest}</Badge>
+                      ))}
+                    </div>
+                  ) : null}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        <aside className="space-y-6">
+          {(user.featuredContent || creatorSettings?.featuredTitle || creatorSettings?.featuredDescription) && (
+            <Card className="border-border/50 bg-card/50">
+              <CardHeader>
+                <CardTitle>Featured</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {creatorSettings?.featuredTitle && <div className="font-medium">{creatorSettings.featuredTitle}</div>}
+                {creatorSettings?.featuredDescription && <div className="text-sm text-muted-foreground">{creatorSettings.featuredDescription}</div>}
+                {user.featuredContent && (
+                  <div className="rounded-xl border border-border/50 bg-background/40 p-3 text-sm text-muted-foreground">
+                    {user.featuredContent}
+                  </div>
+                )}
+                {creatorSettings?.featuredUrl && (
+                  <a href={creatorSettings.featuredUrl} target="_blank" rel="noreferrer" className="inline-flex items-center text-sm text-primary hover:underline">
+                    Open featured link <ExternalLink className="ml-1 h-3.5 w-3.5" />
+                  </a>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {(user.about || user.work || user.school || user.age || user.interests?.length || user.links?.length || artistProfile?.tags?.length || artistProfile?.bookingEmail) && (
+            <Card className="border-border/50 bg-card/50">
+              <CardHeader>
+                <CardTitle>Identity</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {user.about && (
+                  <div>
+                    <div className="mb-1 text-xs uppercase tracking-[0.18em] text-muted-foreground">About</div>
+                    <div className="whitespace-pre-wrap text-sm text-muted-foreground">{user.about}</div>
+                  </div>
+                )}
+                {(user.age || user.work || user.school) && (
+                  <div className="grid gap-3">
+                    {user.age ? (
+                      <div className="text-sm text-muted-foreground">
+                        Age: <span className="text-foreground">{user.age}</span>
+                      </div>
+                    ) : null}
+                    {user.work ? (
+                      <div className="text-sm text-muted-foreground">
+                        Work: <span className="text-foreground">{user.work}</span>
+                      </div>
+                    ) : null}
+                    {user.school ? (
+                      <div className="text-sm text-muted-foreground">
+                        School: <span className="text-foreground">{user.school}</span>
+                      </div>
+                    ) : null}
+                  </div>
+                )}
+                {artistProfile?.bookingEmail && (
+                  <div className="text-sm text-muted-foreground">
+                    Booking: <span className="text-foreground">{artistProfile.bookingEmail}</span>
+                  </div>
+                )}
+                {user.interests?.length ? (
+                  <div className="flex flex-wrap gap-2">
+                    {user.interests.map((interest) => (
+                      <Badge key={interest} variant="secondary">{interest}</Badge>
+                    ))}
+                  </div>
+                ) : null}
+                {artistProfile?.tags?.length ? (
+                  <div className="flex flex-wrap gap-2">
+                    {artistProfile.tags.map((tag) => (
+                      <Badge key={tag} variant="secondary">
+                        <Tag className="mr-1 h-3 w-3" /> {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : null}
+                {user.links?.length ? (
+                  <div className="space-y-2">
+                    {user.links.map((link) => (
+                      <a key={`${link.label}-${link.url}`} href={link.url} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-xl border border-border/50 bg-background/40 px-3 py-2 text-sm hover:border-primary/40">
+                        <span className="inline-flex items-center"><Link2 className="mr-2 h-4 w-4 text-primary" /> {link.label}</span>
+                        <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                      </a>
+                    ))}
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+          )}
+
+          {isOwnProfile && customFeeds?.length ? (
+            <Card className="border-border/50 bg-card/50">
+              <CardHeader>
+                <CardTitle>Your Custom Feeds</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {customFeeds.slice(0, 4).map((feed) => (
+                  <div key={feed.id} className="rounded-xl border border-border/50 bg-background/40 px-3 py-3">
+                    <div className="font-medium">{feed.name}</div>
+                    {feed.description && <div className="mt-1 text-sm text-muted-foreground">{feed.description}</div>}
+                  </div>
                 ))}
-              </div>
-            ) : (
-              <div className="text-center py-12 text-muted-foreground bg-card/20 rounded-xl border border-dashed border-border/50">
-                <Grid className="w-8 h-8 mx-auto mb-3 opacity-20" />
-                <p>No posts yet</p>
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
+              </CardContent>
+            </Card>
+          ) : null}
+        </aside>
       </div>
     </div>
   );

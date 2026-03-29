@@ -1,103 +1,86 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link } from "wouter";
-import { useSearch } from "@workspace/api-client-react";
-import { SearchType } from "@workspace/api-client-react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent } from "@/components/ui/card";
+import { SearchType, useSearch } from "@workspace/api-client-react";
+import { MapPin, Search as SearchIcon, User, Sparkles } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Spinner } from "@/components/ui/spinner";
-import { Search as SearchIcon, User, Mic2, MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-
-function useDebounce<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue] = useState<T>(value);
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-  return debouncedValue;
-}
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
 
 export default function Search() {
   const [query, setQuery] = useState("");
   const [type, setType] = useState<SearchType>("all");
-  const debouncedQuery = useDebounce(query, 300);
+  const [location, setLocation] = useState("");
+  const [category, setCategory] = useState("");
+  const [tags, setTags] = useState("");
 
-  const { data, isLoading } = useSearch({
-    q: debouncedQuery || undefined,
-    type: type,
-  }, { 
-    query: { 
-      queryKey: ["/api/search", debouncedQuery, type],
-      enabled: debouncedQuery.length > 0 || type !== "all" 
-    } 
+  const searchParams = {
+    q: query || undefined,
+    type,
+    location: location || undefined,
+    category: category || undefined,
+    tags: tags || undefined,
+  };
+
+  const { data, isLoading } = useSearch(searchParams, {
+    query: {
+      queryKey: ["search", query, type, location, category, tags],
+      enabled: query.length > 0 || location.length > 0 || category.length > 0 || tags.length > 0,
+    },
   });
 
   return (
-    <div className="max-w-4xl mx-auto p-4 md:py-8 w-full">
-      <div className="mb-6 relative">
-        <div className="relative">
-          <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-          <Input 
-            placeholder="Search for users, artists, or tags..." 
-            className="pl-12 h-14 text-lg bg-card/50 border-border/50 shadow-sm rounded-xl"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            autoFocus
-          />
-        </div>
+    <div className="max-w-6xl mx-auto p-4 md:py-8 w-full space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">Search & Discovery</h1>
+        <p className="text-muted-foreground">Find people, creators, categories, and tags across the scene.</p>
       </div>
 
-      <Tabs value={type} onValueChange={(v) => setType(v as SearchType)} className="mb-8">
-        <TabsList className="bg-card/50 border border-border/50">
-          <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="users">Users</TabsTrigger>
-          <TabsTrigger value="artists">Artists</TabsTrigger>
-        </TabsList>
-      </Tabs>
+      <Card className="bg-card/50 border-border/50">
+        <CardContent className="p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="md:col-span-2 relative">
+            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input className="pl-9" placeholder="Search names, bios, categories..." value={query} onChange={(e) => setQuery(e.target.value)} />
+          </div>
+          <Select value={type} onValueChange={(value) => setType(value as SearchType)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="users">Users</SelectItem>
+              <SelectItem value="artists">Creators</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input placeholder="City / location" value={location} onChange={(e) => setLocation(e.target.value)} />
+          <Input placeholder="Category" value={category} onChange={(e) => setCategory(e.target.value)} />
+          <Input placeholder="Tags, comma separated" value={tags} onChange={(e) => setTags(e.target.value)} />
+        </CardContent>
+      </Card>
 
       {isLoading ? (
-        <div className="flex justify-center py-12">
-          <Spinner size="lg" />
-        </div>
-      ) : !debouncedQuery && type === "all" ? (
-        <div className="text-center py-20 text-muted-foreground">
-          <SearchIcon className="w-12 h-12 mx-auto mb-4 opacity-20" />
-          <p>Start typing to search the network</p>
-        </div>
+        <div className="flex justify-center py-12"><Spinner size="lg" /></div>
       ) : data ? (
         <div className="space-y-8">
-          {/* Artists Results */}
-          {(type === "all" || type === "artists") && data.artists.length > 0 && (
-            <div>
-              <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-                <Mic2 className="w-5 h-5 text-primary" /> Artists
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {data.artists.map(artist => (
+          {data.artists?.length > 0 && (
+            <section className="space-y-4">
+              <h2 className="text-xl font-bold">Creators</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                {data.artists.map((artist) => (
                   <Link key={artist.id} href={`/artists/${artist.userId}`}>
-                    <Card className="cursor-pointer hover:border-primary/50 transition-colors border-border/50 bg-card/50">
-                      <CardContent className="p-4 flex items-center gap-4">
-                        <Avatar className="w-14 h-14 border border-border">
+                    <Card className="cursor-pointer bg-card/60 border-border/50 hover:border-primary/40 transition-colors overflow-hidden">
+                      <div className="h-28 bg-gradient-to-r from-primary/15 via-background to-cyan-500/10" style={artist.user.bannerUrl ? { backgroundImage: `url(${artist.user.bannerUrl})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined} />
+                      <CardContent className="p-4 flex gap-4">
+                        <Avatar className="w-14 h-14 -mt-10 border-4 border-background">
                           <AvatarImage src={artist.user.avatarUrl || ""} />
-                          <AvatarFallback>{artist.user.username.substring(0, 2).toUpperCase()}</AvatarFallback>
+                          <AvatarFallback>{artist.user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
                         </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-lg truncate">{artist.user.username}</h3>
-                          <div className="flex items-center text-sm text-muted-foreground gap-2">
-                            <span className="text-primary font-medium">{artist.category}</span>
-                            {artist.location && (
-                              <>
-                                <span>•</span>
-                                <span className="flex items-center"><MapPin className="w-3 h-3 mr-0.5" />{artist.location}</span>
-                              </>
-                            )}
+                        <div className="min-w-0 flex-1">
+                          <div className="font-semibold truncate">{artist.user.username}</div>
+                          <div className="text-sm text-primary">{artist.category}</div>
+                          {artist.location && <div className="text-xs text-muted-foreground flex items-center mt-1"><MapPin className="w-3 h-3 mr-1" /> {artist.location}</div>}
+                          <div className="flex flex-wrap gap-2 mt-3">
+                            {artist.tags?.slice(0, 3).map((tag) => <Badge key={tag} variant="secondary">{tag}</Badge>)}
                           </div>
                         </div>
                       </CardContent>
@@ -105,43 +88,43 @@ export default function Search() {
                   </Link>
                 ))}
               </div>
-            </div>
+            </section>
           )}
 
-          {/* Users Results */}
-          {(type === "all" || type === "users") && data.users.length > 0 && (
-            <div>
-              <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-                <User className="w-5 h-5 text-primary" /> Users
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {data.users.map(user => (
-                  <Link key={user.id} href={`/profile/${user.id}`}>
-                    <Card className="cursor-pointer hover:border-primary/50 transition-colors border-border/50 bg-card/50">
-                      <CardContent className="p-4 flex items-center gap-3">
-                        <Avatar className="w-10 h-10 border border-border">
-                          <AvatarImage src={user.avatarUrl || ""} />
-                          <AvatarFallback>{user.username.substring(0, 2).toUpperCase()}</AvatarFallback>
+          {data.users?.length > 0 && (
+            <section className="space-y-4">
+              <h2 className="text-xl font-bold">People</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                {data.users.map((person) => (
+                  <Link key={person.id} href={`/profile/${person.id}`}>
+                    <Card className="cursor-pointer bg-card/60 border-border/50 hover:border-primary/40 transition-colors">
+                      <CardContent className="p-4 flex gap-4 items-center">
+                        <Avatar className="w-12 h-12">
+                          <AvatarImage src={person.avatarUrl || ""} />
+                          <AvatarFallback>{person.username.slice(0, 2).toUpperCase()}</AvatarFallback>
                         </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-bold truncate">{user.username}</h3>
-                          <p className="text-xs text-muted-foreground capitalize">{user.profileType}</p>
+                        <div className="min-w-0 flex-1">
+                          <div className="font-semibold truncate">{person.username}</div>
+                          <div className="text-xs text-muted-foreground">{person.hasArtistPage ? "Personal profile + artist page" : "Personal profile"}</div>
+                          {person.location && <div className="text-xs text-muted-foreground mt-1">{person.location}</div>}
                         </div>
+                        <User className="w-4 h-4 text-muted-foreground" />
                       </CardContent>
                     </Card>
                   </Link>
                 ))}
               </div>
-            </div>
-          )}
-
-          {data.users.length === 0 && data.artists.length === 0 && (
-            <div className="text-center py-20 text-muted-foreground">
-              <p>No results found for "{debouncedQuery}"</p>
-            </div>
+            </section>
           )}
         </div>
-      ) : null}
+      ) : (
+        <Card className="bg-card/40 border-dashed border-border/50">
+          <CardContent className="p-12 text-center text-muted-foreground">
+            <Sparkles className="w-10 h-10 mx-auto mb-3 opacity-25" />
+            Start searching by name, category, tag, or city.
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

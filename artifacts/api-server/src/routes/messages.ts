@@ -1,8 +1,15 @@
 import { Router } from "express";
-import { db, messagesTable, conversationsTable, usersTable, artistProfilesTable } from "@workspace/db";
-import { eq, or, and, desc, count } from "drizzle-orm";
+import {
+  conversationsTable,
+  db,
+  messageInquiriesTable,
+  messagesTable,
+  usersTable,
+} from "@workspace/db";
+import { and, desc, eq, or } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth.js";
-import { getUserSummary } from "./users.js";
+import { formatConversationForUser } from "./helpers.js";
+import { createNotification, markConversationNotificationsRead } from "../lib/notifications.js";
 
 const router = Router();
 
@@ -21,115 +28,225 @@ async function getOrCreateConversation(user1Id: number, user2Id: number) {
   return created;
 }
 
+async function createInquiryMessage(
+  senderId: number,
+  recipientId: number,
+  payload: {
+    inquiryType?: string;
+    message: string;
+    eventDate?: string;
+    eventType?: string;
+    budget?: string;
+    projectDetails?: string;
+    externalUrl?: string;
+  },
+) {
+  const {
+    inquiryType,
+    message,
+    eventDate,
+    eventType,
+    budget,
+    projectDetails,
+    externalUrl,
+  } = payload;
+
+  const header = String(inquiryType || "contact").toUpperCase().replace(/_/g, " ");
+  const lines = [
+    `INQUIRY: ${header}`,
+    eventType ? `Type: ${eventType}` : null,
+    eventDate ? `Date: ${eventDate}` : null,
+    budget ? `Budget: ${budget}` : null,
+    externalUrl ? `Link: ${externalUrl}` : null,
+    projectDetails ? `Details: ${projectDetails}` : null,
+    "",
+    message,
+  ].filter(Boolean);
+
+  const conversation = await getOrCreateConversation(senderId, recipientId);
+  const [created] = await db.insert(messagesTable).values({
+    conversationId: conversation.id,
+    senderId,
+    content: lines.join("\n"),
+    isBookingInquiry: true,
+  }).returning();
+
+  await db.insert(messageInquiriesTable).values({
+    messageId: created.id,
+    inquiryType: inquiryType || "contact",
+    budget: budget || null,
+    eventDate: eventDate || null,
+    eventType: eventType || null,
+    projectDetails: projectDetails || null,
+    externalUrl: externalUrl || null,
+  });
+
+  await db.update(conversationsTable).set({ lastMessageAt: new Date() }).where(eq(conversationsTable.id, conversation.id));
+  const [actor] = await db.select().from(usersTable).where(eq(usersTable.id, senderId)).limit(1);
+  if (actor) {
+    await createNotification({
+      userId: recipientId,
+      actorUserId: actor.id,
+      type: inquiryType === "book" ? "inquiry" : "inquiry",
+      title: "New inquiry",
+      body: `${actor.username} sent you an inquiry.`,
+      href: `/messages/${conversation.id}`,
+      entityType: "message",
+      entityId: created.id,
+      conversationId: conversation.id,
+    });
+  }
+  return { ...created, inquiry: payload };
+}
+
 router.get("/conversations", requireAuth, async (req, res) => {
   const userId = req.session.userId!;
-
   const conversations = await db.select().from(conversationsTable)
     .where(or(eq(conversationsTable.user1Id, userId), eq(conversationsTable.user2Id, userId)))
     .orderBy(desc(conversationsTable.lastMessageAt));
 
-  const enriched = await Promise.all(conversations.map(async (conv) => {
-    const otherUserId = conv.user1Id === userId ? conv.user2Id : conv.user1Id;
-    const [otherUser] = await db.select().from(usersTable).where(eq(usersTable.id, otherUserId)).limit(1);
-    if (!otherUser) return null;
-
-    const otherUserSummary = await getUserSummary(otherUser);
-
-    const [lastMsg] = await db.select().from(messagesTable)
-      .where(eq(messagesTable.conversationId, conv.id))
-      .orderBy(desc(messagesTable.createdAt))
-      .limit(1);
-
-    const [unreadResult] = await db.select({ count: count() }).from(messagesTable)
-      .where(and(
-        eq(messagesTable.conversationId, conv.id),
-        eq(messagesTable.isRead, false),
-      ));
-
-    const unreadCount = Number(unreadResult?.count ?? 0);
-
-    return {
-      id: conv.id,
-      otherUser: otherUserSummary,
-      lastMessage: lastMsg?.content ?? null,
-      lastMessageAt: lastMsg?.createdAt ?? null,
-      unreadCount,
-    };
-  }));
+  const enriched = await Promise.all(
+    conversations.map((conversation) =>
+      formatConversationForUser(
+        conversation.id,
+        userId,
+        conversation.user1Id === userId ? conversation.user2Id : conversation.user1Id,
+      ),
+    ),
+  );
 
   res.json(enriched.filter(Boolean));
 });
 
 router.get("/conversations/:conversationId", requireAuth, async (req, res) => {
-  const convId = parseInt(req.params.conversationId);
-  if (isNaN(convId)) { res.status(400).json({ error: "Invalid ID" }); return; }
+  const conversationId = Number(req.params.conversationId);
+  if (Number.isNaN(conversationId)) {
+    res.status(400).json({ error: "Invalid ID" });
+    return;
+  }
 
   const userId = req.session.userId!;
-  const [conv] = await db.select().from(conversationsTable).where(eq(conversationsTable.id, convId)).limit(1);
-  if (!conv) { res.status(404).json({ error: "Not found" }); return; }
-  if (conv.user1Id !== userId && conv.user2Id !== userId) { res.status(403).json({ error: "Forbidden" }); return; }
-
-  const page = Math.max(1, parseInt(req.query.page as string) || 1);
-  const limit = 50;
-  const offset = (page - 1) * limit;
+  const [conversation] = await db.select().from(conversationsTable).where(eq(conversationsTable.id, conversationId)).limit(1);
+  if (!conversation) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  if (conversation.user1Id !== userId && conversation.user2Id !== userId) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
 
   const messages = await db.select().from(messagesTable)
-    .where(eq(messagesTable.conversationId, convId))
-    .orderBy(desc(messagesTable.createdAt))
-    .limit(limit).offset(offset);
+    .where(eq(messagesTable.conversationId, conversationId))
+    .orderBy(desc(messagesTable.createdAt));
 
-  // Mark messages as read
   await db.update(messagesTable).set({ isRead: true })
-    .where(and(eq(messagesTable.conversationId, convId), eq(messagesTable.isRead, false)));
+    .where(and(
+      eq(messagesTable.conversationId, conversationId),
+      eq(messagesTable.isRead, false),
+      eq(messagesTable.senderId, conversation.user1Id === userId ? conversation.user2Id : conversation.user1Id),
+    ));
+  await markConversationNotificationsRead(userId, conversationId);
 
-  res.json(messages.reverse());
+  const messageIds = messages.map((message) => message.id);
+  const inquiries = messageIds.length > 0
+    ? await db.select().from(messageInquiriesTable)
+      .where(or(...messageIds.map((id) => eq(messageInquiriesTable.messageId, id))))
+    : [];
+  const inquiryMap = new Map(inquiries.map((inquiry) => [inquiry.messageId, inquiry]));
+
+  res.json(messages.reverse().map((message) => ({
+    ...message,
+    inquiry: inquiryMap.get(message.id) ?? null,
+  })));
 });
 
 router.post("/send", requireAuth, async (req, res) => {
   const { recipientId, content } = req.body;
-  if (!recipientId || !content) { res.status(400).json({ error: "recipientId and content are required" }); return; }
+  if (!recipientId || !content) {
+    res.status(400).json({ error: "recipientId and content are required" });
+    return;
+  }
 
-  const conv = await getOrCreateConversation(req.session.userId!, recipientId);
-
-  const [msg] = await db.insert(messagesTable).values({
-    conversationId: conv.id,
+  const conversation = await getOrCreateConversation(req.session.userId!, Number(recipientId));
+  const [message] = await db.insert(messagesTable).values({
+    conversationId: conversation.id,
     senderId: req.session.userId!,
     content,
     isBookingInquiry: false,
   }).returning();
 
-  await db.update(conversationsTable).set({ lastMessageAt: new Date() }).where(eq(conversationsTable.id, conv.id));
+  await db.update(conversationsTable).set({ lastMessageAt: new Date() }).where(eq(conversationsTable.id, conversation.id));
+  const [actor] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!)).limit(1);
+  if (actor) {
+    await createNotification({
+      userId: Number(recipientId),
+      actorUserId: actor.id,
+      type: "message",
+      title: "New message",
+      body: `${actor.username}: ${content}`,
+      href: `/messages/${conversation.id}`,
+      entityType: "message",
+      entityId: message.id,
+      conversationId: conversation.id,
+    });
+  }
+  res.status(201).json(message);
+});
 
-  res.status(201).json(msg);
+router.post("/inquiries/:recipientId", requireAuth, async (req, res) => {
+  const recipientId = Number(req.params.recipientId);
+  if (Number.isNaN(recipientId)) {
+    res.status(400).json({ error: "Invalid recipient" });
+    return;
+  }
+
+  const [recipient] = await db.select().from(usersTable).where(eq(usersTable.id, recipientId)).limit(1);
+  if (!recipient) {
+    res.status(404).json({ error: "Recipient not found" });
+    return;
+  }
+
+  const {
+    inquiryType,
+    message,
+    eventDate,
+    eventType,
+    budget,
+    projectDetails,
+    externalUrl,
+  } = req.body;
+
+  if (!message) {
+    res.status(400).json({ error: "Message is required" });
+    return;
+  }
+  res.status(201).json(await createInquiryMessage(req.session.userId!, recipientId, {
+    inquiryType,
+    message,
+    eventDate,
+    eventType,
+    budget,
+    projectDetails,
+    externalUrl,
+  }));
 });
 
 router.post("/book/:artistId", requireAuth, async (req, res) => {
-  const artistId = parseInt(req.params.artistId);
-  if (isNaN(artistId)) { res.status(400).json({ error: "Invalid ID" }); return; }
-
-  const { message, eventDate, eventLocation, eventType } = req.body;
-  if (!message) { res.status(400).json({ error: "Message is required" }); return; }
-
-  const inquiryText = [
-    "🎵 BOOKING INQUIRY",
-    eventType ? `Event Type: ${eventType}` : null,
-    eventDate ? `Date: ${eventDate}` : null,
-    eventLocation ? `Location: ${eventLocation}` : null,
-    `\n${message}`,
-  ].filter(Boolean).join("\n");
-
-  const conv = await getOrCreateConversation(req.session.userId!, artistId);
-
-  const [msg] = await db.insert(messagesTable).values({
-    conversationId: conv.id,
-    senderId: req.session.userId!,
-    content: inquiryText,
-    isBookingInquiry: true,
-  }).returning();
-
-  await db.update(conversationsTable).set({ lastMessageAt: new Date() }).where(eq(conversationsTable.id, conv.id));
-
-  res.status(201).json(msg);
+  const artistId = Number(req.params.artistId);
+  if (Number.isNaN(artistId) || !req.body?.message) {
+    res.status(400).json({ error: "Invalid booking request" });
+    return;
+  }
+  res.status(201).json(await createInquiryMessage(req.session.userId!, artistId, {
+    inquiryType: "book",
+    message: req.body.message,
+    eventDate: req.body.eventDate,
+    eventType: req.body.eventType,
+    budget: req.body.budget,
+    projectDetails: req.body.projectDetails,
+    externalUrl: req.body.externalUrl ?? req.body.eventLocation,
+  }));
 });
 
 export default router;

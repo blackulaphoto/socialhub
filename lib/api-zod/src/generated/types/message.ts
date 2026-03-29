@@ -5,6 +5,7 @@
  * ArtistHub Social Platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { Inquiry } from "./inquiry";
 
 export interface Message {
   id: number;
@@ -12,5 +13,7 @@ export interface Message {
   senderId: number;
   content: string;
   isBookingInquiry: boolean;
+  isRead?: boolean;
   createdAt: Date;
+  inquiry?: Inquiry | null;
 }

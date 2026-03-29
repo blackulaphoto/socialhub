@@ -6,10 +6,20 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ArtistProfile } from "./artistProfile";
+import type { CreatorSettings } from "./creatorSettings";
+import type { CustomFeed } from "./customFeed";
+import type { FriendshipState } from "./friendshipState";
+import type { ReactionSummary } from "./reactionSummary";
 import type { User } from "./user";
+import type { UserProfileDetails } from "./userProfileDetails";
 
 export interface UserProfile {
   user: User;
   isFollowing: boolean;
+  friendship: FriendshipState;
+  profileReactions: ReactionSummary;
   artistProfile?: ArtistProfile | null;
+  details?: UserProfileDetails | null;
+  creatorSettings: CreatorSettings;
+  customFeeds: CustomFeed[];
 }

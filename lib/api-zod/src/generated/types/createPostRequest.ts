@@ -5,8 +5,12 @@
  * ArtistHub Social Platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { PostMediaInput } from "./postMediaInput";
 
 export interface CreatePostRequest {
-  content: string;
+  content?: string;
   imageUrl?: string | null;
+  repostOfPostId?: number | null;
+  groupId?: number | null;
+  media?: PostMediaInput[];
 }

@@ -9,13 +9,14 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Spinner } from "@/components/ui/spinner";
 import { MapPin, Search, Mic2 } from "lucide-react";
+import { QueryErrorState } from "@/components/query-error-state";
 
 export default function Discover() {
   const [location, setLocation] = useState("");
   const [category, setCategory] = useState("all");
   const [tags, setTags] = useState("");
 
-  const { data, isLoading } = useGetArtists({
+  const { data, isLoading, isError, refetch } = useGetArtists({
     location: location || undefined,
     category: category !== "all" ? category : undefined,
     tags: tags || undefined,
@@ -70,6 +71,8 @@ export default function Discover() {
         <div className="flex justify-center py-12">
           <Spinner size="lg" />
         </div>
+      ) : isError ? (
+        <QueryErrorState title="Could not load artists" description="Check that the API server is running on port 3001, then retry." onRetry={() => refetch()} />
       ) : data?.artists && data.artists.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {data.artists.map((artist) => (

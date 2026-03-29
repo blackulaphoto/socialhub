@@ -1,9 +1,11 @@
 import express, { type Express } from "express";
 import cors from "cors";
+import path from "node:path";
 import pinoHttp from "pino-http";
 import session from "express-session";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import { getUploadRoot } from "./lib/uploads.js";
 
 const app: Express = express();
 
@@ -33,6 +35,7 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use("/uploads", express.static(path.join(getUploadRoot())));
 
 app.use(session({
   secret: process.env.SESSION_SECRET || "artisthub-secret-dev",

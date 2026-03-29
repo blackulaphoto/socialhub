@@ -13,4 +13,5 @@ export interface Conversation {
   lastMessage?: string | null;
   lastMessageAt?: Date | null;
   unreadCount: number;
+  inquiryType?: string | null;
 }

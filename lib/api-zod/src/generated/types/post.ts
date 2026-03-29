@@ -5,6 +5,10 @@
  * ArtistHub Social Platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { PostComment } from "./postComment";
+import type { PostCurrentUserReaction } from "./postCurrentUserReaction";
+import type { PostMedia } from "./postMedia";
+import type { ReactionCounts } from "./reactionCounts";
 import type { UserSummary } from "./userSummary";
 
 export interface Post {
@@ -12,8 +16,18 @@ export interface Post {
   userId: number;
   content: string;
   imageUrl?: string | null;
+  repostOfPostId?: number | null;
   likeCount: number;
   isLiked: boolean;
-  author: UserSummary;
+  reactionCounts: ReactionCounts;
+  totalReactionCount: number;
+  currentUserReaction?: PostCurrentUserReaction;
+  repostCount: number;
+  commentCount: number;
+  comments: PostComment[];
+  originalPost?: Post | null;
+  author?: UserSummary;
   createdAt: Date;
+  updatedAt?: Date;
+  media?: PostMedia[];
 }

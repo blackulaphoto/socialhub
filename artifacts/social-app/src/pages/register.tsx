@@ -1,15 +1,14 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useRegister } from "@workspace/api-client-react";
-import { RegisterRequestProfileType } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useQueryClient } from "@tanstack/react-query";
-import { Compass, User, Mic2 } from "lucide-react";
+import { Compass } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { consumeReturnTo, navigateAfterAuth } from "@/lib/auth-redirect";
 
 export default function Register() {
   const [, setLocation] = useLocation();
@@ -20,17 +19,17 @@ export default function Register() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [profileType, setProfileType] = useState<RegisterRequestProfileType>("user");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     register(
-      { data: { username, email, password, profileType } },
+      { data: { username, email, password } },
       {
         onSuccess: (data) => {
           queryClient.setQueryData(["/api/auth/me"], data.user);
+          queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
           toast({ title: "Welcome to ArtistHub!", description: "Your account has been created." });
-          setLocation("/");
+          navigateAfterAuth(consumeReturnTo());
         },
         onError: (err: any) => {
           toast({ 
@@ -54,7 +53,7 @@ export default function Register() {
           </div>
           <CardTitle className="text-3xl font-bold tracking-tight">Join ArtistHub</CardTitle>
           <CardDescription className="text-muted-foreground text-base">
-            Create an account to connect with the creative underground.
+            Create your personal account first. You can add a linked artist page later from settings.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -91,37 +90,6 @@ export default function Register() {
                 className="bg-input/50"
               />
             </div>
-            
-            <div className="space-y-3 pt-2">
-              <Label>I am joining as a...</Label>
-              <RadioGroup 
-                value={profileType} 
-                onValueChange={(val) => setProfileType(val as RegisterRequestProfileType)}
-                className="grid grid-cols-2 gap-4"
-              >
-                <div>
-                  <RadioGroupItem value="user" id="user" className="peer sr-only" />
-                  <Label
-                    htmlFor="user"
-                    className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-transparent p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/10 [&:has([data-state=checked])]:border-primary cursor-pointer transition-all"
-                  >
-                    <User className="mb-2 h-6 w-6" />
-                    Fan / Listener
-                  </Label>
-                </div>
-                <div>
-                  <RadioGroupItem value="artist" id="artist" className="peer sr-only" />
-                  <Label
-                    htmlFor="artist"
-                    className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-transparent p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/10 [&:has([data-state=checked])]:border-primary cursor-pointer transition-all"
-                  >
-                    <Mic2 className="mb-2 h-6 w-6" />
-                    Artist / Creator
-                  </Label>
-                </div>
-              </RadioGroup>
-            </div>
-
             <Button type="submit" className="w-full mt-6" disabled={isPending}>
               {isPending ? "Creating Account..." : "Create Account"}
             </Button>

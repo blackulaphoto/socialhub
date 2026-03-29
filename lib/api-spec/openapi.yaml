@@ -21,6 +21,20 @@ tags:
     description: Direct messaging
   - name: search
     description: Search and discovery
+  - name: activity
+    description: Header activity and notifications
+  - name: notifications
+    description: Persisted notifications
+  - name: reports
+    description: User reporting and moderation intake
+  - name: analytics
+    description: Lightweight analytics tracking
+  - name: uploads
+    description: Local media uploads
+  - name: groups
+    description: Groups
+  - name: events
+    description: Events
   - name: admin
     description: Admin operations
 
@@ -120,6 +134,160 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /activity/summary:
+    get:
+      operationId: getActivitySummary
+      tags: [activity]
+      summary: Get header activity summary for current user
+      responses:
+        "200":
+          description: Activity summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActivitySummary"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /notifications:
+    get:
+      operationId: getNotifications
+      tags: [notifications]
+      summary: Get notifications for current user
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NotificationItem"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /notifications/read-all:
+    post:
+      operationId: readAllNotifications
+      tags: [notifications]
+      summary: Mark all notifications as read
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /notifications/{notificationId}/read:
+    post:
+      operationId: readNotification
+      tags: [notifications]
+      summary: Mark a notification as read
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /reports:
+    post:
+      operationId: createReport
+      tags: [reports]
+      summary: Submit a moderation report
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+
+  /analytics/page-view:
+    post:
+      operationId: trackPageView
+      tags: [analytics]
+      summary: Track a page view
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PageViewRequest"
+      responses:
+        "201":
+          description: Tracked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /uploads/images:
+    post:
+      operationId: uploadImage
+      tags: [uploads]
+      summary: Upload a local image file
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, scope]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                scope:
+                  type: string
+                  enum: [avatar, banner, post, group, event, gallery, photos]
+      responses:
+        "201":
+          description: Uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadImageResponse"
+        "400":
+          description: Invalid upload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /users/{userId}:
     get:
       operationId: getUser
@@ -189,6 +357,113 @@ paths:
               schema:
                 $ref: "#/components/schemas/SuccessResponse"
 
+  /users/{userId}/friend-request:
+    post:
+      operationId: sendFriendRequest
+      tags: [users]
+      summary: Send a friend request to a user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /users/{userId}/friend-request/accept:
+    post:
+      operationId: acceptFriendRequest
+      tags: [users]
+      summary: Accept an incoming friend request
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /users/{userId}/friend:
+    delete:
+      operationId: removeFriend
+      tags: [users]
+      summary: Remove a friend or cancel a friend request
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /users/{userId}/react:
+    post:
+      operationId: reactToProfile
+      tags: [users]
+      summary: React to a user profile or linked creator page
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReactionRequest"
+      responses:
+        "200":
+          description: Updated reaction summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReactionSummary"
+
+  /users/{userId}/reaction/remove:
+    post:
+      operationId: removeProfileReaction
+      tags: [users]
+      summary: Remove current user reaction from a profile
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated reaction summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReactionSummary"
+
   /users/{userId}/unfollow:
     post:
       operationId: unfollowUser
@@ -256,6 +531,19 @@ paths:
       tags: [posts]
       summary: Get chronological feed for current user
       parameters:
+        - name: mode
+          in: query
+          schema:
+            type: string
+            enum: [following, local, discovery, custom]
+        - name: city
+          in: query
+          schema:
+            type: string
+        - name: customFeedId
+          in: query
+          schema:
+            type: integer
         - name: page
           in: query
           schema:
@@ -272,7 +560,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PostsResponse"
+                $ref: "#/components/schemas/FeedResponse"
 
   /posts:
     post:
@@ -367,6 +655,147 @@ paths:
               schema:
                 $ref: "#/components/schemas/SuccessResponse"
 
+  /posts/{postId}/react:
+    post:
+      operationId: reactToPost
+      tags: [posts]
+      summary: React to a post with the standard reaction set
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReactionRequest"
+      responses:
+        "200":
+          description: Updated post
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+
+  /posts/{postId}/reaction/remove:
+    post:
+      operationId: removePostReaction
+      tags: [posts]
+      summary: Remove current user reaction from a post
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated post
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+
+  /posts/{postId}/repost:
+    post:
+      operationId: repostPost
+      tags: [posts]
+      summary: Repost an existing post to the current user's feed
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RepostRequest"
+      responses:
+        "201":
+          description: Reposted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+
+  /posts/{postId}/comments:
+    get:
+      operationId: getPostComments
+      tags: [posts]
+      summary: Get comments for a post
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Comments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PostComment"
+    post:
+      operationId: createPostComment
+      tags: [posts]
+      summary: Comment on a post
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePostCommentRequest"
+      responses:
+        "201":
+          description: Updated comments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PostComment"
+
+  /posts/{postId}/comments/{commentId}:
+    delete:
+      operationId: deletePostComment
+      tags: [posts]
+      summary: Delete a post comment
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated comments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PostComment"
+
   /users/{userId}/posts:
     get:
       operationId: getUserPosts
@@ -395,6 +824,74 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PostsResponse"
+
+  /users/{userId}/photos:
+    get:
+      operationId: getUserPhotos
+      tags: [users]
+      summary: Get personal photo gallery for a user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: User photo gallery
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserPhotoItem"
+    post:
+      operationId: addUserPhoto
+      tags: [users]
+      summary: Add a photo to the user's personal gallery
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserPhotoItemRequest"
+      responses:
+        "201":
+          description: Photo added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserPhotoItem"
+
+  /users/{userId}/photos/{photoId}:
+    delete:
+      operationId: deleteUserPhoto
+      tags: [users]
+      summary: Delete a photo from the user's personal gallery
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: photoId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Photo deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
 
   /artists:
     get:
@@ -652,6 +1149,330 @@ paths:
               schema:
                 $ref: "#/components/schemas/SearchResponse"
 
+  /users/{userId}/creator-settings:
+    post:
+      operationId: updateCreatorSettings
+      tags: [users]
+      summary: Update creator profile settings
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCreatorSettingsRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /users/{userId}/media:
+    get:
+      operationId: getUserMedia
+      tags: [users]
+      summary: Get user media
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: User media
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PostMedia"
+
+  /users/{userId}/custom-feeds:
+    get:
+      operationId: getUserCustomFeeds
+      tags: [users]
+      summary: Get user custom feeds
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Custom feeds
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CustomFeed"
+
+  /custom-feeds:
+    get:
+      operationId: getCustomFeeds
+      tags: [posts]
+      summary: Get current user custom feeds
+      responses:
+        "200":
+          description: Custom feeds
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CustomFeed"
+    post:
+      operationId: createCustomFeed
+      tags: [posts]
+      summary: Create custom feed
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomFeedRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomFeed"
+
+  /custom-feeds/{feedId}:
+    post:
+      operationId: updateCustomFeed
+      tags: [posts]
+      summary: Update custom feed
+      parameters:
+        - name: feedId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomFeedRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomFeed"
+    delete:
+      operationId: deleteCustomFeed
+      tags: [posts]
+      summary: Delete custom feed
+      parameters:
+        - name: feedId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /groups:
+    get:
+      operationId: getGroups
+      tags: [groups]
+      summary: List groups
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: location
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Groups
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Group"
+    post:
+      operationId: createGroup
+      tags: [groups]
+      summary: Create group
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGroupRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Group"
+
+  /groups/{groupId}:
+    get:
+      operationId: getGroup
+      tags: [groups]
+      summary: Get group
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Group detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupDetail"
+
+  /groups/{groupId}/join:
+    post:
+      operationId: joinGroup
+      tags: [groups]
+      summary: Join group
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Joined
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /groups/{groupId}/leave:
+    post:
+      operationId: leaveGroup
+      tags: [groups]
+      summary: Leave group
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Left
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /events:
+    get:
+      operationId: getEvents
+      tags: [events]
+      summary: List events
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: city
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Event"
+    post:
+      operationId: createEvent
+      tags: [events]
+      summary: Create event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEventRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+
+  /events/{eventId}:
+    get:
+      operationId: getEvent
+      tags: [events]
+      summary: Get event
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Event
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+
+  /messages/inquiries/{recipientId}:
+    post:
+      operationId: sendInquiry
+      tags: [messages]
+      summary: Send creator inquiry
+      parameters:
+        - name: recipientId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InquiryRequest"
+      responses:
+        "201":
+          description: Inquiry sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+
   /admin/users:
     get:
       operationId: adminGetUsers
@@ -700,6 +1521,64 @@ paths:
               schema:
                 $ref: "#/components/schemas/PostsResponse"
 
+  /admin/groups:
+    get:
+      operationId: adminGetGroups
+      tags: [admin]
+      summary: Admin - list groups
+      responses:
+        "200":
+          description: Groups list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Group"
+
+  /admin/events:
+    get:
+      operationId: adminGetEvents
+      tags: [admin]
+      summary: Admin - list events
+      responses:
+        "200":
+          description: Events list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Event"
+
+  /admin/reports:
+    get:
+      operationId: adminGetReports
+      tags: [admin]
+      summary: Admin - list moderation reports
+      responses:
+        "200":
+          description: Reports
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminReport"
+
+  /admin/analytics:
+    get:
+      operationId: adminGetAnalytics
+      tags: [admin]
+      summary: Admin - platform analytics summary
+      responses:
+        "200":
+          description: Analytics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminAnalytics"
+
   /admin/posts/{postId}:
     delete:
       operationId: adminDeletePost
@@ -707,6 +1586,44 @@ paths:
       summary: Admin - delete a post
       parameters:
         - name: postId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /admin/groups/{groupId}:
+    delete:
+      operationId: adminDeleteGroup
+      tags: [admin]
+      summary: Admin - delete a group
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /admin/events/{eventId}:
+    delete:
+      operationId: adminDeleteEvent
+      tags: [admin]
+      summary: Admin - delete an event
+      parameters:
+        - name: eventId
           in: path
           required: true
           schema:
@@ -757,6 +1674,31 @@ paths:
               schema:
                 $ref: "#/components/schemas/SuccessResponse"
 
+  /admin/reports/{reportId}/status:
+    post:
+      operationId: adminUpdateReportStatus
+      tags: [admin]
+      summary: Admin - update report status
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportStatusRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -793,10 +1735,7 @@ components:
           type: string
         password:
           type: string
-        profileType:
-          type: string
-          enum: [user, artist]
-      required: [username, email, password, profileType]
+      required: [username, email, password]
 
     LoginRequest:
       type: object
@@ -815,6 +1754,47 @@ components:
         message:
           type: string
       required: [user]
+
+    NotificationItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        isUnread:
+          type: boolean
+        readAt:
+          type: string
+          format: date-time
+          nullable: true
+        href:
+          type: string
+        actor:
+          anyOf:
+            - $ref: "#/components/schemas/UserSummary"
+            - type: "null"
+      required: [id, type, title, body, createdAt, isUnread, href]
+
+    ActivitySummary:
+      type: object
+      properties:
+        unreadMessages:
+          type: integer
+        unreadNotifications:
+          type: integer
+        recentItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotificationItem"
+      required: [unreadMessages, unreadNotifications, recentItems]
 
     User:
       type: object
@@ -840,6 +1820,8 @@ components:
           type: boolean
         followerCount:
           type: integer
+        friendCount:
+          type: integer
         followingCount:
           type: integer
         postCount:
@@ -847,7 +1829,65 @@ components:
         createdAt:
           type: string
           format: date-time
-      required: [id, username, email, profileType, isAdmin, isBanned, followerCount, followingCount, postCount, createdAt]
+        bannerUrl:
+          type: string
+          nullable: true
+        location:
+          type: string
+          nullable: true
+        city:
+          type: string
+          nullable: true
+        age:
+          type: integer
+          nullable: true
+        work:
+          type: string
+          nullable: true
+        school:
+          type: string
+          nullable: true
+        about:
+          type: string
+          nullable: true
+        interests:
+          type: array
+          items:
+            type: string
+        hasArtistPage:
+          type: boolean
+        accentColor:
+          type: string
+          nullable: true
+        themeName:
+          type: string
+          nullable: true
+        links:
+          type: array
+          items:
+            $ref: "#/components/schemas/LinkItem"
+        featuredContent:
+          type: string
+          nullable: true
+      required: [id, username, email, profileType, isAdmin, isBanned, followerCount, friendCount, followingCount, postCount, createdAt]
+
+    LinkItem:
+      type: object
+      properties:
+        label:
+          type: string
+        url:
+          type: string
+      required: [label, url]
+
+    ProfileCustomField:
+      type: object
+      properties:
+        label:
+          type: string
+        value:
+          type: string
+      required: [label, value]
 
     UserSummary:
       type: object
@@ -867,7 +1907,50 @@ components:
           enum: [user, artist]
         followerCount:
           type: integer
-      required: [id, username, profileType, followerCount]
+        friendCount:
+          type: integer
+        bannerUrl:
+          type: string
+          nullable: true
+        location:
+          type: string
+          nullable: true
+        city:
+          type: string
+          nullable: true
+        age:
+          type: integer
+          nullable: true
+        work:
+          type: string
+          nullable: true
+        school:
+          type: string
+          nullable: true
+        about:
+          type: string
+          nullable: true
+        interests:
+          type: array
+          items:
+            type: string
+        hasArtistPage:
+          type: boolean
+        accentColor:
+          type: string
+          nullable: true
+        links:
+          type: array
+          items:
+            $ref: "#/components/schemas/LinkItem"
+        category:
+          type: string
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+      required: [id, username, profileType, followerCount, friendCount]
 
     UserProfile:
       type: object
@@ -876,10 +1959,113 @@ components:
           $ref: "#/components/schemas/User"
         isFollowing:
           type: boolean
+        friendship:
+          $ref: "#/components/schemas/FriendshipState"
+        profileReactions:
+          $ref: "#/components/schemas/ReactionSummary"
         artistProfile:
           $ref: "#/components/schemas/ArtistProfile"
           nullable: true
-      required: [user, isFollowing]
+        details:
+          $ref: "#/components/schemas/UserProfileDetails"
+          nullable: true
+        creatorSettings:
+          $ref: "#/components/schemas/CreatorSettings"
+        customFeeds:
+          type: array
+          items:
+            $ref: "#/components/schemas/CustomFeed"
+      required: [user, isFollowing, friendship, profileReactions, creatorSettings, customFeeds]
+
+    UserProfileDetails:
+      type: object
+      properties:
+        userId:
+          type: integer
+        bannerUrl:
+          type: string
+          nullable: true
+        location:
+          type: string
+          nullable: true
+        city:
+          type: string
+          nullable: true
+        age:
+          type: integer
+          nullable: true
+        work:
+          type: string
+          nullable: true
+        school:
+          type: string
+          nullable: true
+        about:
+          type: string
+          nullable: true
+        interests:
+          type: array
+          items:
+            type: string
+        accentColor:
+          type: string
+          nullable: true
+        themeName:
+          type: string
+          nullable: true
+        links:
+          type: array
+          items:
+            $ref: "#/components/schemas/LinkItem"
+        featuredContent:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreatorSettings:
+      type: object
+      properties:
+        primaryActionType:
+          type: string
+        primaryActionLabel:
+          type: string
+        primaryActionUrl:
+          type: string
+          nullable: true
+        featuredTitle:
+          type: string
+          nullable: true
+        featuredDescription:
+          type: string
+          nullable: true
+        featuredUrl:
+          type: string
+          nullable: true
+        featuredType:
+          type: string
+        moodPreset:
+          type: string
+        layoutTemplate:
+          type: string
+        fontPreset:
+          type: string
+        enabledModules:
+          type: array
+          items:
+            type: string
+        moduleOrder:
+          type: array
+          items:
+            type: string
+        pinnedPost:
+          $ref: "#/components/schemas/Post"
+          nullable: true
+      required: [primaryActionType, primaryActionLabel, featuredType, moodPreset, layoutTemplate, fontPreset, enabledModules, moduleOrder]
 
     UpdateProfileRequest:
       type: object
@@ -889,6 +2075,83 @@ components:
           nullable: true
         avatarUrl:
           type: string
+          nullable: true
+        bannerUrl:
+          type: string
+          nullable: true
+        location:
+          type: string
+          nullable: true
+        city:
+          type: string
+          nullable: true
+        age:
+          type: integer
+          nullable: true
+        work:
+          type: string
+          nullable: true
+        school:
+          type: string
+          nullable: true
+        about:
+          type: string
+          nullable: true
+        interests:
+          type: array
+          items:
+            type: string
+        accentColor:
+          type: string
+          nullable: true
+        themeName:
+          type: string
+          nullable: true
+        featuredContent:
+          type: string
+          nullable: true
+        links:
+          type: array
+          items:
+            $ref: "#/components/schemas/LinkItem"
+
+    UpdateCreatorSettingsRequest:
+      type: object
+      properties:
+        primaryActionType:
+          type: string
+        primaryActionLabel:
+          type: string
+        primaryActionUrl:
+          type: string
+          nullable: true
+        featuredTitle:
+          type: string
+          nullable: true
+        featuredDescription:
+          type: string
+          nullable: true
+        featuredUrl:
+          type: string
+          nullable: true
+        featuredType:
+          type: string
+        moodPreset:
+          type: string
+        layoutTemplate:
+          type: string
+        fontPreset:
+          type: string
+        enabledModules:
+          type: array
+          items:
+            type: string
+        moduleOrder:
+          type: array
+          items:
+            type: string
+        pinnedPostId:
+          type: integer
           nullable: true
 
     Post:
@@ -903,16 +2166,46 @@ components:
         imageUrl:
           type: string
           nullable: true
+        repostOfPostId:
+          type: integer
+          nullable: true
         likeCount:
           type: integer
         isLiked:
           type: boolean
+        reactionCounts:
+          $ref: "#/components/schemas/ReactionCounts"
+        totalReactionCount:
+          type: integer
+        currentUserReaction:
+          type: string
+          nullable: true
+          enum: [like, heart, wow, angry]
+        repostCount:
+          type: integer
+        commentCount:
+          type: integer
+        comments:
+          type: array
+          items:
+            $ref: "#/components/schemas/PostComment"
+        originalPost:
+          allOf:
+            - $ref: "#/components/schemas/Post"
+          nullable: true
         author:
           $ref: "#/components/schemas/UserSummary"
         createdAt:
           type: string
           format: date-time
-      required: [id, userId, content, likeCount, isLiked, author, createdAt]
+        updatedAt:
+          type: string
+          format: date-time
+        media:
+          type: array
+          items:
+            $ref: "#/components/schemas/PostMedia"
+      required: [id, userId, content, likeCount, isLiked, reactionCounts, totalReactionCount, repostCount, commentCount, comments, createdAt]
 
     CreatePostRequest:
       type: object
@@ -922,7 +2215,141 @@ components:
         imageUrl:
           type: string
           nullable: true
+        repostOfPostId:
+          type: integer
+          nullable: true
+        groupId:
+          type: integer
+          nullable: true
+        media:
+          type: array
+          items:
+            $ref: "#/components/schemas/PostMediaInput"
+      required: []
+
+    RepostRequest:
+      type: object
+      properties:
+        content:
+          type: string
+
+    ReactionRequest:
+      type: object
+      properties:
+        reactionType:
+          type: string
+          enum: [like, heart, wow, angry]
+      required: [reactionType]
+
+    ReactionCounts:
+      type: object
+      properties:
+        like:
+          type: integer
+        heart:
+          type: integer
+        wow:
+          type: integer
+        angry:
+          type: integer
+      required: [like, heart, wow, angry]
+
+    ReactionSummary:
+      type: object
+      properties:
+        total:
+          type: integer
+        counts:
+          $ref: "#/components/schemas/ReactionCounts"
+        currentUserReaction:
+          type: string
+          nullable: true
+          enum: [like, heart, wow, angry]
+      required: [total, counts]
+
+    PostComment:
+      type: object
+      properties:
+        id:
+          type: integer
+        postId:
+          type: integer
+        userId:
+          type: integer
+        parentCommentId:
+          type: integer
+          nullable: true
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        author:
+          $ref: "#/components/schemas/UserSummary"
+          nullable: true
+      required: [id, postId, userId, content, createdAt, updatedAt]
+
+    CreatePostCommentRequest:
+      type: object
+      properties:
+        content:
+          type: string
+        parentCommentId:
+          type: integer
+          nullable: true
       required: [content]
+
+    FriendshipState:
+      type: object
+      properties:
+        id:
+          type: integer
+          nullable: true
+        status:
+          type: string
+          enum: [self, none, outgoing, incoming, friends]
+        isFriend:
+          type: boolean
+      required: [status, isFriend]
+
+    PostMediaInput:
+      type: object
+      properties:
+        type:
+          type: string
+        url:
+          type: string
+        title:
+          type: string
+          nullable: true
+        thumbnailUrl:
+          type: string
+          nullable: true
+
+    PostMedia:
+      type: object
+      properties:
+        id:
+          type: integer
+        postId:
+          type: integer
+        type:
+          type: string
+        url:
+          type: string
+        title:
+          type: string
+          nullable: true
+        thumbnailUrl:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, postId, type, url, createdAt]
 
     PostsResponse:
       type: object
@@ -939,6 +2366,15 @@ components:
           type: integer
       required: [posts, total, page, totalPages]
 
+    FeedResponse:
+      allOf:
+        - $ref: "#/components/schemas/PostsResponse"
+        - type: object
+          properties:
+            mode:
+              type: string
+          required: [mode]
+
     ArtistProfile:
       type: object
       properties:
@@ -951,6 +2387,9 @@ components:
         location:
           type: string
           nullable: true
+        tagline:
+          type: string
+          nullable: true
         tags:
           type: array
           items:
@@ -958,6 +2397,31 @@ components:
         bio:
           type: string
           nullable: true
+        influences:
+          type: string
+          nullable: true
+        availabilityStatus:
+          type: string
+          nullable: true
+        pronouns:
+          type: string
+          nullable: true
+        yearsActive:
+          type: string
+          nullable: true
+        representedBy:
+          type: string
+          nullable: true
+        openForCommissions:
+          type: boolean
+        touring:
+          type: boolean
+        acceptsCollaborations:
+          type: boolean
+        customFields:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProfileCustomField"
         bookingEmail:
           type: string
           nullable: true
@@ -967,7 +2431,42 @@ components:
             $ref: "#/components/schemas/GalleryItem"
         user:
           $ref: "#/components/schemas/UserSummary"
-      required: [id, userId, category, tags, gallery, user]
+        primaryActionType:
+          type: string
+        primaryActionLabel:
+          type: string
+        primaryActionUrl:
+          type: string
+          nullable: true
+        featuredTitle:
+          type: string
+          nullable: true
+        featuredDescription:
+          type: string
+          nullable: true
+        featuredUrl:
+          type: string
+          nullable: true
+        featuredType:
+          type: string
+        moodPreset:
+          type: string
+        layoutTemplate:
+          type: string
+        fontPreset:
+          type: string
+        enabledModules:
+          type: array
+          items:
+            type: string
+        moduleOrder:
+          type: array
+          items:
+            type: string
+        pinnedPost:
+          $ref: "#/components/schemas/Post"
+          nullable: true
+      required: [id, userId, category, tags, gallery, user, primaryActionType, primaryActionLabel, openForCommissions, touring, acceptsCollaborations, customFields, featuredType, moodPreset, layoutTemplate, fontPreset, enabledModules, moduleOrder]
 
     UpdateArtistRequest:
       type: object
@@ -977,6 +2476,9 @@ components:
         location:
           type: string
           nullable: true
+        tagline:
+          type: string
+          nullable: true
         tags:
           type: array
           items:
@@ -984,8 +2486,68 @@ components:
         bio:
           type: string
           nullable: true
+        influences:
+          type: string
+          nullable: true
+        availabilityStatus:
+          type: string
+          nullable: true
+        pronouns:
+          type: string
+          nullable: true
+        yearsActive:
+          type: string
+          nullable: true
+        representedBy:
+          type: string
+          nullable: true
+        openForCommissions:
+          type: boolean
+        touring:
+          type: boolean
+        acceptsCollaborations:
+          type: boolean
+        customFields:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProfileCustomField"
         bookingEmail:
           type: string
+          nullable: true
+        primaryActionType:
+          type: string
+        primaryActionLabel:
+          type: string
+        primaryActionUrl:
+          type: string
+          nullable: true
+        featuredTitle:
+          type: string
+          nullable: true
+        featuredDescription:
+          type: string
+          nullable: true
+        featuredUrl:
+          type: string
+          nullable: true
+        featuredType:
+          type: string
+        moodPreset:
+          type: string
+        layoutTemplate:
+          type: string
+        fontPreset:
+          type: string
+        enabledModules:
+          type: array
+          items:
+            type: string
+        moduleOrder:
+          type: array
+          items:
+            type: string
+        pinnedPostId:
+          type: integer
           nullable: true
 
     GalleryItem:
@@ -1021,6 +2583,36 @@ components:
           nullable: true
       required: [type, url]
 
+    UserPhotoItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        imageUrl:
+          type: string
+        caption:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, userId, imageUrl, createdAt, updatedAt]
+
+    UserPhotoItemRequest:
+      type: object
+      properties:
+        imageUrl:
+          type: string
+        caption:
+          type: string
+          nullable: true
+      required: [imageUrl]
+
     ArtistsResponse:
       type: object
       properties:
@@ -1052,6 +2644,9 @@ components:
           nullable: true
         unreadCount:
           type: integer
+        inquiryType:
+          type: string
+          nullable: true
       required: [id, otherUser, unreadCount]
 
     Message:
@@ -1067,9 +2662,14 @@ components:
           type: string
         isBookingInquiry:
           type: boolean
+        isRead:
+          type: boolean
         createdAt:
           type: string
           format: date-time
+        inquiry:
+          $ref: "#/components/schemas/Inquiry"
+          nullable: true
       required: [id, conversationId, senderId, content, isBookingInquiry, createdAt]
 
     SendMessageRequest:
@@ -1097,6 +2697,51 @@ components:
           type: string
       required: [message]
 
+    InquiryRequest:
+      type: object
+      properties:
+        inquiryType:
+          type: string
+        eventDate:
+          type: string
+          nullable: true
+        eventType:
+          type: string
+          nullable: true
+        budget:
+          type: string
+          nullable: true
+        projectDetails:
+          type: string
+          nullable: true
+        externalUrl:
+          type: string
+          nullable: true
+        message:
+          type: string
+      required: [message]
+
+    Inquiry:
+      type: object
+      properties:
+        inquiryType:
+          type: string
+        eventDate:
+          type: string
+          nullable: true
+        eventType:
+          type: string
+          nullable: true
+        budget:
+          type: string
+          nullable: true
+        projectDetails:
+          type: string
+          nullable: true
+        externalUrl:
+          type: string
+          nullable: true
+
     SearchResponse:
       type: object
       properties:
@@ -1112,6 +2757,223 @@ components:
           type: integer
       required: [users, artists, total]
 
+    CustomFeed:
+      type: object
+      properties:
+        id:
+          type: integer
+        ownerId:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        includedUserIds:
+          type: array
+          items:
+            type: integer
+        categories:
+          type: array
+          items:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+        locations:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, ownerId, name, includedUserIds, categories, tags, locations, createdAt, updatedAt]
+
+    CustomFeedRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        includedUserIds:
+          type: array
+          items:
+            type: integer
+        categories:
+          type: array
+          items:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+        locations:
+          type: array
+          items:
+            type: string
+      required: [name]
+
+    Group:
+      type: object
+      properties:
+        id:
+          type: integer
+        ownerId:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+        coverImageUrl:
+          type: string
+          nullable: true
+        visibility:
+          type: string
+        category:
+          type: string
+          nullable: true
+        location:
+          type: string
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        owner:
+          $ref: "#/components/schemas/UserSummary"
+          nullable: true
+        memberCount:
+          type: integer
+        postCount:
+          type: integer
+        isMember:
+          type: boolean
+        membersPreview:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserSummary"
+      required: [id, ownerId, name, slug, description, visibility, tags, createdAt, updatedAt, memberCount, postCount, isMember, membersPreview]
+
+    GroupDetail:
+      type: object
+      properties:
+        group:
+          $ref: "#/components/schemas/Group"
+        posts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Post"
+      required: [group, posts]
+
+    CreateGroupRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        coverImageUrl:
+          type: string
+          nullable: true
+        visibility:
+          type: string
+        category:
+          type: string
+          nullable: true
+        location:
+          type: string
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+      required: [name, description]
+
+    Event:
+      type: object
+      properties:
+        id:
+          type: integer
+        hostUserId:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        startsAt:
+          type: string
+          format: date-time
+        location:
+          type: string
+        city:
+          type: string
+          nullable: true
+        imageUrl:
+          type: string
+          nullable: true
+        lineupTags:
+          type: array
+          items:
+            type: string
+        visibility:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        host:
+          $ref: "#/components/schemas/UserSummary"
+          nullable: true
+        artists:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserSummary"
+      required: [id, hostUserId, title, description, startsAt, location, lineupTags, visibility, createdAt, updatedAt, artists]
+
+    CreateEventRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        startsAt:
+          type: string
+          format: date-time
+        location:
+          type: string
+        city:
+          type: string
+          nullable: true
+        imageUrl:
+          type: string
+          nullable: true
+        lineupArtistIds:
+          type: array
+          items:
+            type: integer
+        lineupTags:
+          type: array
+          items:
+            type: string
+      required: [title, description, startsAt, location]
+
     AdminUsersResponse:
       type: object
       properties:
@@ -1126,3 +2988,142 @@ components:
         totalPages:
           type: integer
       required: [users, total, page, totalPages]
+
+    ReportRequest:
+      type: object
+      properties:
+        targetType:
+          type: string
+        targetId:
+          type: integer
+        reason:
+          type: string
+        details:
+          type: string
+          nullable: true
+      required: [targetType, targetId, reason]
+
+    Report:
+      type: object
+      properties:
+        id:
+          type: integer
+        reporterUserId:
+          type: integer
+        targetType:
+          type: string
+        targetId:
+          type: integer
+        reason:
+          type: string
+        details:
+          type: string
+          nullable: true
+        status:
+          type: string
+        adminNote:
+          type: string
+          nullable: true
+        reviewedByUserId:
+          type: integer
+          nullable: true
+        reviewedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, reporterUserId, targetType, targetId, reason, status, createdAt, updatedAt]
+
+    AdminReport:
+      allOf:
+        - $ref: "#/components/schemas/Report"
+        - type: object
+          properties:
+            reporter:
+              $ref: "#/components/schemas/User"
+              nullable: true
+            reviewer:
+              $ref: "#/components/schemas/User"
+              nullable: true
+
+    ReportStatusRequest:
+      type: object
+      properties:
+        status:
+          type: string
+        adminNote:
+          type: string
+          nullable: true
+      required: [status]
+
+    PageViewRequest:
+      type: object
+      properties:
+        path:
+          type: string
+        referrer:
+          type: string
+          nullable: true
+      required: [path]
+
+    UploadImageResponse:
+      type: object
+      properties:
+        url:
+          type: string
+        path:
+          type: string
+        fileName:
+          type: string
+        scope:
+          type: string
+        mimeType:
+          type: string
+        size:
+          type: integer
+      required: [url, path, fileName, scope, mimeType, size]
+
+    AnalyticsTopPath:
+      type: object
+      properties:
+        path:
+          type: string
+        views:
+          type: integer
+      required: [path, views]
+
+    AdminAnalytics:
+      type: object
+      properties:
+        totals:
+          type: object
+          properties:
+            users:
+              type: integer
+            posts:
+              type: integer
+            groups:
+              type: integer
+            events:
+              type: integer
+            openReports:
+              type: integer
+          required: [users, posts, groups, events, openReports]
+        traffic:
+          type: object
+          properties:
+            pageViews24h:
+              type: integer
+            activeUsers7d:
+              type: integer
+            topPaths:
+              type: array
+              items:
+                $ref: "#/components/schemas/AnalyticsTopPath"
+          required: [pageViews24h, activeUsers7d, topPaths]
+      required: [totals, traffic]

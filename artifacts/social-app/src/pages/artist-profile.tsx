@@ -1,363 +1,756 @@
-import { useState } from "react";
-import { Link } from "wouter";
-import { 
-  useGetUser, 
-  useSendBookingInquiry,
-  useFollowUser,
-  useUnfollowUser
-} from "@workspace/api-client-react";
-import { useAuth } from "@/hooks/useAuth";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Spinner } from "@/components/ui/spinner";
-import { useQueryClient } from "@tanstack/react-query";
-import { Card } from "@/components/ui/card";
-import { 
-  MapPin, 
-  Mail, 
-  CalendarClock, 
-  Tag, 
-  Play, 
-  Image as ImageIcon, 
-  Music,
-  ExternalLink
+import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { Link, useLocation } from "wouter";
+import {
+  CalendarClock,
+  CalendarRange,
+  ExternalLink,
+  HeartHandshake,
+  Heart,
+  Image as ImageIcon,
+  Link2,
+  Mail,
+  MapPin,
+  MessageSquare,
+  Mic2,
+  Palette,
+  Pin,
+  Share2,
+  Sparkles,
+  Tag,
+  Video,
 } from "lucide-react";
+import {
+  useFollowUser,
+  useGetEvents,
+  useGetUser,
+  useGetUserPosts,
+  useSendInquiry,
+  useUnfollowUser,
+} from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogFooter,
 } from "@/components/ui/dialog";
+import { FeedPostCard } from "@/components/feed-post-card";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MediaEmbed } from "@/components/media-embed";
+import { QueryErrorState } from "@/components/query-error-state";
+import { ReportDialog } from "@/components/report-dialog";
+import { cn } from "@/lib/utils";
+import { FriendActionButton } from "@/components/friend-action-button";
+import { ProfileReactionBar } from "@/components/profile-reaction-bar";
+import { useAuth } from "@/hooks/useAuth";
 
-export default function ArtistProfile({ id }: { id: string }) {
-  const userId = parseInt(id);
-  const { user: currentUser } = useAuth();
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const [isBookModalOpen, setIsBookModalOpen] = useState(false);
+const ACTION_HELPERS: Record<string, { title: string; fields: string[]; hint: string }> = {
+  book: { title: "Send booking inquiry", fields: ["eventType", "eventDate", "budget", "location"], hint: "Share date, budget, and event context." },
+  hire: { title: "Send hire request", fields: ["eventType", "eventDate", "budget", "location"], hint: "Tell them what the project is and what support you need." },
+  contact: { title: "Send message", fields: ["projectDetails"], hint: "This goes straight into the artist inbox." },
+  collaborate: { title: "Start collaboration", fields: ["projectDetails", "timeframe"], hint: "Outline the concept, timing, and what you want to build together." },
+  shop: { title: "Ask about this work", fields: ["projectDetails"], hint: "Use this for product or commission inquiries." },
+  store: { title: "Visit store", fields: [], hint: "If they have a store link it will open directly." },
+  commission: { title: "Request a commission", fields: ["projectDetails", "budget", "timeframe"], hint: "Share the brief, budget, and delivery window." },
+};
 
-  // Booking form state
-  const [eventDate, setEventDate] = useState("");
-  const [eventLocation, setEventLocation] = useState("");
-  const [eventType, setEventType] = useState("");
-  const [message, setMessage] = useState("");
+const MODULE_LABELS: Record<string, string> = {
+  featured: "Featured",
+  about: "About",
+  media: "Media Modules",
+  posts: "Posts and Updates",
+  events: "Events",
+  contact: "Contact",
+};
 
-  const { data: profile, isLoading } = useGetUser(userId, {
-    query: { enabled: !!userId }
-  });
+const MOOD_STYLES: Record<string, { shell: string; glow: string }> = {
+  sleek: { shell: "from-slate-900/95 via-slate-950/88 to-cyan-950/65", glow: "from-cyan-400/15 via-transparent to-transparent" },
+  underground: { shell: "from-zinc-950/95 via-stone-950/88 to-red-950/65", glow: "from-red-500/18 via-transparent to-transparent" },
+  dreamy: { shell: "from-slate-950/95 via-indigo-950/86 to-sky-900/65", glow: "from-sky-400/16 via-transparent to-transparent" },
+  luxe: { shell: "from-neutral-950/95 via-zinc-950/88 to-amber-950/65", glow: "from-amber-400/18 via-transparent to-transparent" },
+  gritty: { shell: "from-zinc-950/95 via-neutral-900/90 to-stone-900/70", glow: "from-orange-500/16 via-transparent to-transparent" },
+  minimal: { shell: "from-slate-950/95 via-slate-900/90 to-slate-800/65", glow: "from-white/10 via-transparent to-transparent" },
+  neon: { shell: "from-slate-950/95 via-fuchsia-950/86 to-cyan-950/65", glow: "from-fuchsia-500/20 via-transparent to-transparent" },
+  vintage: { shell: "from-stone-950/95 via-amber-950/82 to-rose-950/65", glow: "from-amber-300/15 via-transparent to-transparent" },
+};
 
-  const { mutate: bookArtist, isPending: isBooking } = useSendBookingInquiry();
-  const { mutate: follow } = useFollowUser();
-  const { mutate: unfollow } = useUnfollowUser();
+const FONT_PRESET_CLASSES: Record<string, string> = {
+  modern: "",
+  editorial: "font-serif",
+  mono: "font-mono",
+};
 
-  const handleFollowToggle = () => {
-    if (!profile) return;
-    
-    if (profile.isFollowing) {
-      unfollow({ userId }, {
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/users", userId] })
-      });
-    } else {
-      follow({ userId }, {
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/users", userId] })
-      });
+const DEFAULT_MODULE_ORDER = ["featured", "about", "media", "posts", "events", "contact"];
+
+function useSavedCreatorPages() {
+  const storageKey = "artist-page-favorites";
+  const [savedIds, setSavedIds] = useState<number[]>([]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(storageKey);
+      const parsed = raw ? JSON.parse(raw) : [];
+      setSavedIds(Array.isArray(parsed) ? parsed.map(Number).filter(Boolean) : []);
+    } catch {
+      setSavedIds([]);
     }
+  }, []);
+
+  const toggle = (userId: number) => {
+    setSavedIds((current) => {
+      const next = current.includes(userId)
+        ? current.filter((id) => id !== userId)
+        : [...current, userId];
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(storageKey, JSON.stringify(next));
+      }
+      return next;
+    });
   };
 
-  const handleBookingSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!message.trim() || !profile?.artistProfile) return;
+  return { savedIds, toggle };
+}
 
-    bookArtist(
-      { 
-        artistId: profile.artistProfile.userId,
-        data: {
-          eventDate,
-          eventLocation,
-          eventType,
-          message
-        }
+export default function ArtistProfile({ id }: { id: string }) {
+  const { user: currentUser } = useAuth();
+  const userId = Number(id);
+  const { toast } = useToast();
+  const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({
+    message: "",
+    eventType: "",
+    eventDate: "",
+    budget: "",
+    projectDetails: "",
+    timeframe: "",
+    location: "",
+  });
+  const { savedIds, toggle } = useSavedCreatorPages();
+
+  const { data: profile, isLoading, isError, refetch } = useGetUser(userId, {
+    query: { queryKey: ["profile", userId], enabled: Number.isFinite(userId) },
+  });
+
+  const { data: events } = useGetEvents(undefined, {
+    query: { queryKey: ["/api/events", "artist-page"], enabled: Number.isFinite(userId) },
+  });
+
+  const { data: postsData } = useGetUserPosts(userId, { limit: 24 }, {
+    query: { queryKey: ["/api/users", userId, "artist-page-posts"], enabled: Number.isFinite(userId) },
+  });
+
+  const follow = useFollowUser();
+  const unfollow = useUnfollowUser();
+  const inquiry = useSendInquiry({
+    mutation: {
+      onSuccess: (message) => {
+        setOpen(false);
+        setForm({ message: "", eventType: "", eventDate: "", budget: "", projectDetails: "", timeframe: "", location: "" });
+        queryClient.invalidateQueries({ queryKey: ["/api/messages/conversations"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/activity/summary"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+        toast({ title: "Inquiry sent", description: "The message was routed into direct messages." });
+        refetch();
+        if (message?.conversationId) setLocation(`/messages/${message.conversationId}`);
       },
+    },
+  });
+
+  const upcomingEvents = useMemo(() => {
+    const now = Date.now();
+    return (events || [])
+      .filter((event) => {
+        const eventTime = new Date(event.startsAt).getTime();
+        const linkedArtist = event.artists?.some((artist) => artist.id === userId);
+        const isHost = event.host?.id === userId;
+        return eventTime >= now && (linkedArtist || isHost);
+      })
+      .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+  }, [events, userId]);
+
+  const pastEvents = useMemo(() => {
+    const now = Date.now();
+    return (events || [])
+      .filter((event) => {
+        const eventTime = new Date(event.startsAt).getTime();
+        const linkedArtist = event.artists?.some((artist) => artist.id === userId);
+        const isHost = event.host?.id === userId;
+        return eventTime < now && (linkedArtist || isHost);
+      })
+      .sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime())
+      .slice(0, 4);
+  }, [events, userId]);
+
+  if (isLoading) return <div className="flex justify-center py-20"><Spinner size="lg" /></div>;
+  if (isError) return <div className="mx-auto max-w-6xl px-4 py-8"><QueryErrorState title="Could not load artist page" description="The artist profile request failed. Check the API and retry." onRetry={() => refetch()} /></div>;
+  if (!profile?.artistProfile) return <div className="p-8">Artist profile not found.</div>;
+
+  const creator = profile.creatorSettings;
+  const artist = profile.artistProfile;
+  const actionType = creator?.primaryActionType || "contact";
+  const actionLabel = creator?.primaryActionLabel || "Contact Me";
+  const actionMeta = ACTION_HELPERS[actionType] || ACTION_HELPERS.contact;
+  const accent = profile.user.accentColor || "#8b5cf6";
+  const moodPreset = creator?.moodPreset || "sleek";
+  const layoutTemplate = creator?.layoutTemplate || "portfolio";
+  const fontPreset = creator?.fontPreset || "modern";
+  const enabledModules = creator?.enabledModules?.length ? creator.enabledModules : DEFAULT_MODULE_ORDER;
+  const moduleOrder = (creator?.moduleOrder?.length ? creator.moduleOrder : DEFAULT_MODULE_ORDER).filter((item) => enabledModules.includes(item));
+  const saved = savedIds.includes(userId);
+  const posts = postsData?.posts || [];
+  const gallery = artist.gallery || [];
+  const imageGallery = gallery.filter((item) => item.type === "image");
+  const videoGallery = gallery.filter((item) => item.type === "video");
+  const audioGallery = gallery.filter((item) => item.type === "audio");
+  const aboutFacts = [
+    artist.availabilityStatus ? { label: "Availability", value: artist.availabilityStatus } : null,
+    artist.pronouns ? { label: "Pronouns", value: artist.pronouns } : null,
+    artist.yearsActive ? { label: "Years active", value: artist.yearsActive } : null,
+    artist.representedBy ? { label: "Representation", value: artist.representedBy } : null,
+  ].filter(Boolean) as Array<{ label: string; value: string }>;
+  const capabilityFlags = [
+    artist.openForCommissions ? "Open for commissions" : null,
+    artist.touring ? "Touring" : null,
+    artist.acceptsCollaborations ? "Accepts collaborations" : null,
+  ].filter(Boolean) as string[];
+  const storeLinks = (profile.user.links || []).filter((link) => /shop|store/i.test(link.label) || /shop|store/i.test(link.url));
+  const mood = MOOD_STYLES[moodPreset] || MOOD_STYLES.sleek;
+  const fontClass = FONT_PRESET_CLASSES[fontPreset] || "";
+  const heroTagline = artist.tagline || artist.bio || profile.user.bio || "Creator page";
+
+  const handleFollowToggle = () => {
+    const mutation = profile.isFollowing ? unfollow : follow;
+    mutation.mutate(
+      { userId },
       {
         onSuccess: () => {
-          setIsBookModalOpen(false);
-          toast({ title: "Inquiry Sent", description: "Your booking request has been sent to the artist." });
-          // Reset form
-          setEventDate("");
-          setEventLocation("");
-          setEventType("");
-          setMessage("");
+          queryClient.invalidateQueries({ queryKey: ["profile", userId] });
+          queryClient.invalidateQueries({ queryKey: ["/api/activity/summary"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
         },
-        onError: () => {
-          toast({ title: "Error", description: "Failed to send booking inquiry.", variant: "destructive" });
-        }
-      }
+      },
     );
   };
 
-  const getYoutubeEmbedUrl = (url: string) => {
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-    const match = url.match(regExp);
-    return (match && match[2].length === 11) ? `https://www.youtube.com/embed/${match[2]}` : url;
+  const handleSaveToggle = () => {
+    toggle(userId);
+    toast({ title: saved ? "Removed from favorites" : "Saved creator page" });
   };
 
-  const getVimeoEmbedUrl = (url: string) => {
-    const regExp = /vimeo.*\/(\d+)/i;
-    const match = url.match(regExp);
-    return match ? `https://player.vimeo.com/video/${match[1]}` : url;
+  const handleShare = async () => {
+    const url = typeof window !== "undefined" ? window.location.href : `/artists/${userId}`;
+    try {
+      if (typeof navigator !== "undefined" && navigator.share) {
+        await navigator.share({ title: profile.user.username, url });
+      } else if (typeof navigator !== "undefined" && navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+      }
+      toast({ title: "Page shared", description: "Creator page link is ready to send." });
+    } catch {
+      toast({ title: "Could not share page", variant: "destructive" });
+    }
   };
 
-  if (isLoading) {
-    return <div className="flex justify-center py-20"><Spinner size="lg" /></div>;
-  }
+  const renderFeatured = () => (
+    <Card className="overflow-hidden border-border/50 bg-card/60">
+      <CardHeader className="pb-3">
+        <div className="flex items-center gap-2 text-sm uppercase tracking-[0.22em] text-muted-foreground">
+          <Pin className="h-4 w-4 text-primary" /> Featured
+        </div>
+        <CardTitle className="text-2xl">{creator?.featuredTitle || "Lead with what matters most"}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {creator?.featuredDescription && <p className="max-w-3xl text-sm text-muted-foreground">{creator.featuredDescription}</p>}
+        {creator?.pinnedPost ? (
+          <FeedPostCard post={creator.pinnedPost} showAuthor={false} />
+        ) : creator?.featuredUrl ? (
+          <a href={creator.featuredUrl} target="_blank" rel="noreferrer" className="block rounded-2xl border border-border/50 bg-background/40 p-5 transition-colors hover:border-primary/40">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="text-sm text-muted-foreground">Featured destination</div>
+                <div className="mt-1 font-medium">{creator.featuredUrl}</div>
+              </div>
+              <ExternalLink className="h-5 w-5 text-primary" />
+            </div>
+          </a>
+        ) : profile.user.featuredContent ? (
+          <div className="rounded-2xl border border-border/50 bg-background/40 p-5 text-sm text-muted-foreground">
+            {profile.user.featuredContent}
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
 
-  if (!profile || !profile.artistProfile) {
-    return <div className="text-center py-20">Artist profile not found</div>;
-  }
+  const renderAbout = () => (
+    <Card className="border-border/50 bg-card/60">
+      <CardHeader><CardTitle>About</CardTitle></CardHeader>
+      <CardContent className="space-y-5">
+        <p className="whitespace-pre-wrap text-sm leading-7 text-muted-foreground">
+          {artist.bio || profile.user.bio || "No bio added yet."}
+        </p>
 
-  const { user, isFollowing, artistProfile } = profile;
-
-  return (
-    <div className="w-full pb-20">
-      {/* Header/Hero Section */}
-      <div className="relative border-b border-border">
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-background z-0" />
-        {artistProfile.gallery?.find(g => g.type === 'image') && (
-          <div className="absolute inset-0 z-0 opacity-20 bg-cover bg-center" 
-               style={{ backgroundImage: `url(${artistProfile.gallery.find(g => g.type === 'image')?.url})` }} />
+        {artist.influences && (
+          <div>
+            <div className="mb-2 text-xs uppercase tracking-[0.22em] text-muted-foreground">Influences</div>
+            <div className="rounded-2xl border border-border/50 bg-background/40 p-4 text-sm text-muted-foreground">
+              {artist.influences}
+            </div>
+          </div>
         )}
-        
-        <div className="max-w-5xl mx-auto px-4 py-12 md:py-20 relative z-10 flex flex-col md:flex-row items-center md:items-start gap-8">
-          <Avatar className="w-32 h-32 md:w-48 md:h-48 border-4 border-background shadow-2xl">
-            <AvatarImage src={user.avatarUrl || ""} />
-            <AvatarFallback className="text-4xl bg-primary/20 text-primary">{user.username.substring(0, 2).toUpperCase()}</AvatarFallback>
-          </Avatar>
-          
-          <div className="flex-1 text-center md:text-left">
-            <div className="flex flex-col md:flex-row md:items-center gap-4 mb-4 justify-center md:justify-start">
-              <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">{user.username}</h1>
-              <Badge className="bg-primary hover:bg-primary text-primary-foreground text-sm px-3 py-1 self-center w-max uppercase tracking-wider">
-                {artistProfile.category}
-              </Badge>
-            </div>
-            
-            <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-muted-foreground mb-6 text-sm">
-              {artistProfile.location && (
-                <span className="flex items-center"><MapPin className="w-4 h-4 mr-1.5" /> {artistProfile.location}</span>
-              )}
-              <span className="flex items-center"><Tag className="w-4 h-4 mr-1.5" /> {user.followerCount} Followers</span>
-              <Link href={`/profile/${user.id}`} className="hover:text-primary flex items-center transition-colors">
-                <ExternalLink className="w-4 h-4 mr-1.5" /> Standard Profile
-              </Link>
-            </div>
 
-            {artistProfile.tags && artistProfile.tags.length > 0 && (
-              <div className="flex flex-wrap justify-center md:justify-start gap-2 mb-8">
-                {artistProfile.tags.map(tag => (
-                  <Badge key={tag} variant="secondary" className="bg-secondary/50 border border-border/50 text-xs px-3 py-1">
-                    {tag}
-                  </Badge>
-                ))}
+        <div className="grid gap-3 md:grid-cols-2">
+          {aboutFacts.map((fact) => (
+            <div key={fact.label} className="rounded-2xl border border-border/50 bg-background/40 p-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{fact.label}</div>
+              <div className="mt-1 text-sm font-medium">{fact.value}</div>
+            </div>
+          ))}
+          {(artist.location || profile.user.city || profile.user.location) && (
+            <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Base</div>
+              <div className="mt-1 text-sm font-medium">{artist.location || profile.user.city || profile.user.location}</div>
+            </div>
+          )}
+        </div>
+
+        {capabilityFlags.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {capabilityFlags.map((flag) => <Badge key={flag} variant="secondary">{flag}</Badge>)}
+          </div>
+        )}
+
+        {artist.customFields?.length > 0 && (
+          <div className="grid gap-3 md:grid-cols-2">
+            {artist.customFields.map((field) => (
+              <div key={`${field.label}-${field.value}`} className="rounded-2xl border border-border/50 bg-background/40 p-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{field.label}</div>
+                <div className="mt-1 text-sm">{field.value}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {artist.tags?.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {artist.tags.map((tag: string) => <Badge key={tag} variant="secondary"><Tag className="mr-1 h-3 w-3" /> {tag}</Badge>)}
+          </div>
+        )}
+
+        {(profile.user.links?.length || artist.bookingEmail) && (
+          <div className="space-y-3">
+            {artist.bookingEmail && (
+              <div className="rounded-2xl border border-border/50 bg-background/40 px-4 py-3 text-sm">
+                Booking: <span className="text-muted-foreground">{artist.bookingEmail}</span>
               </div>
             )}
+            {profile.user.links?.map((link) => (
+              <a key={`${link.label}-${link.url}`} href={link.url} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-2xl border border-border/50 bg-background/40 px-4 py-3 text-sm transition-colors hover:border-primary/40">
+                <span className="inline-flex items-center"><Link2 className="mr-2 h-4 w-4 text-primary" /> {link.label}</span>
+                <ExternalLink className="h-4 w-4 text-muted-foreground" />
+              </a>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start w-full sm:w-auto">
-              <Dialog open={isBookModalOpen} onOpenChange={setIsBookModalOpen}>
-                <DialogTrigger asChild>
-                  <Button size="lg" className="w-full sm:w-auto font-bold px-8 shadow-[0_0_15px_rgba(var(--primary),0.5)]">
-                    <CalendarClock className="w-5 h-5 mr-2" /> Book / Contact
+  const renderMedia = () => (
+    <div className="space-y-5">
+      <div className="flex items-center gap-2">
+        <Palette className="h-5 w-5 text-primary" />
+        <h2 className="text-2xl font-bold">Media Modules</h2>
+      </div>
+
+      {imageGallery.length > 0 && (
+        <Card className="border-border/50 bg-card/60">
+          <CardHeader><CardTitle>Image Gallery</CardTitle></CardHeader>
+          <CardContent className="grid gap-4 md:grid-cols-2">
+            {imageGallery.map((item) => (
+              <Card key={item.id} className="overflow-hidden border-border/50 bg-background/40">
+                <MediaEmbed type={item.type} url={item.url} title={item.caption} className="aspect-square w-full object-cover" />
+                {item.caption && <div className="p-4 text-sm text-muted-foreground">{item.caption}</div>}
+              </Card>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {videoGallery.length > 0 && (
+        <Card className="border-border/50 bg-card/60">
+          <CardHeader><CardTitle>Video</CardTitle></CardHeader>
+          <CardContent className="grid gap-4">
+            {videoGallery.map((item) => (
+              <div key={item.id} className="overflow-hidden rounded-2xl border border-border/50 bg-background/40">
+                <div className="flex items-center gap-2 border-b border-border/50 px-4 py-3 text-sm font-medium">
+                  <Video className="h-4 w-4 text-primary" />
+                  {item.caption || "Featured video"}
+                </div>
+                <MediaEmbed type={item.type} url={item.url} title={item.caption} className="aspect-video w-full border-0" />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {audioGallery.length > 0 && (
+        <Card className="border-border/50 bg-card/60">
+          <CardHeader><CardTitle>Audio</CardTitle></CardHeader>
+          <CardContent className="grid gap-4">
+            {audioGallery.map((item) => (
+              <div key={item.id} className="overflow-hidden rounded-2xl border border-border/50 bg-background/40">
+                <div className="flex items-center gap-2 border-b border-border/50 px-4 py-3 text-sm font-medium">
+                  <Mic2 className="h-4 w-4 text-primary" />
+                  {item.caption || "Featured audio"}
+                </div>
+                <MediaEmbed type={item.type} url={item.url} title={item.caption} className="h-40 w-full border-0" />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {(storeLinks.length > 0 || creator?.primaryActionUrl) && (
+        <Card className="border-border/50 bg-card/60">
+          <CardHeader><CardTitle>Store and Product Links</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            {creator?.primaryActionUrl && (actionType === "shop" || actionType === "store") && (
+              <a href={creator.primaryActionUrl} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-2xl border border-border/50 bg-background/40 px-4 py-3 text-sm transition-colors hover:border-primary/40">
+                <span>{actionLabel}</span>
+                <ExternalLink className="h-4 w-4 text-primary" />
+              </a>
+            )}
+            {storeLinks.map((link) => (
+              <a key={`${link.label}-${link.url}`} href={link.url} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-2xl border border-border/50 bg-background/40 px-4 py-3 text-sm transition-colors hover:border-primary/40">
+                <span>{link.label}</span>
+                <ExternalLink className="h-4 w-4 text-primary" />
+              </a>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {!imageGallery.length && !videoGallery.length && !audioGallery.length && !storeLinks.length && !creator?.primaryActionUrl && (
+        <Card className="border-dashed border-border/50 bg-card/40">
+          <CardContent className="p-12 text-center text-muted-foreground">
+            <ImageIcon className="mx-auto mb-3 h-10 w-10 opacity-25" />
+            No media modules are turned on yet.
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+
+  const renderPosts = () => (
+    <div className="space-y-5">
+      <div className="flex items-center gap-2">
+        <Sparkles className="h-5 w-5 text-primary" />
+        <h2 className="text-2xl font-bold">Posts and Updates</h2>
+      </div>
+      {posts.length > 0 ? (
+        <div className="space-y-4">
+          {posts.map((post) => <FeedPostCard key={post.id} post={post} showAuthor={false} />)}
+        </div>
+      ) : (
+        <Card className="border-dashed border-border/50 bg-card/40">
+          <CardContent className="p-12 text-center text-muted-foreground">
+            This page has no posts yet.
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+
+  const renderEvents = () => (
+    <div className="space-y-5">
+      <div className="flex items-center gap-2">
+        <CalendarRange className="h-5 w-5 text-primary" />
+        <h2 className="text-2xl font-bold">Events and Appearances</h2>
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-2">
+        <Card className="border-border/50 bg-card/60">
+          <CardHeader><CardTitle>Upcoming</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            {upcomingEvents.length ? upcomingEvents.map((event) => (
+              <Link key={event.id} href={`/events/${event.id}`}>
+                <div className="rounded-2xl border border-border/50 bg-background/40 p-4 transition-colors hover:border-primary/40">
+                  <div className="font-medium">{event.title}</div>
+                  <div className="mt-1 text-sm text-muted-foreground">
+                    {new Date(event.startsAt).toLocaleString()} / {event.location}
+                  </div>
+                  {event.lineupTags?.length ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {event.lineupTags.slice(0, 4).map((tag) => <Badge key={tag} variant="secondary">{tag}</Badge>)}
+                    </div>
+                  ) : null}
+                </div>
+              </Link>
+            )) : (
+              <div className="rounded-2xl border border-dashed border-border/50 bg-background/30 p-6 text-sm text-muted-foreground">
+                No upcoming appearances linked yet.
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/50 bg-card/60">
+          <CardHeader><CardTitle>Past Appearances</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            {pastEvents.length ? pastEvents.map((event) => (
+              <Link key={event.id} href={`/events/${event.id}`}>
+                <div className="rounded-2xl border border-border/50 bg-background/40 p-4 transition-colors hover:border-primary/40">
+                  <div className="font-medium">{event.title}</div>
+                  <div className="mt-1 text-sm text-muted-foreground">
+                    {new Date(event.startsAt).toLocaleDateString()} / {event.location}
+                  </div>
+                </div>
+              </Link>
+            )) : (
+              <div className="rounded-2xl border border-dashed border-border/50 bg-background/30 p-6 text-sm text-muted-foreground">
+                No past events linked yet.
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+
+  const renderContact = () => (
+    <Card className="border-border/50 bg-card/60">
+      <CardHeader><CardTitle>Contact and Action</CardTitle></CardHeader>
+      <CardContent className="space-y-4">
+        <div className="rounded-2xl border border-border/50 bg-background/40 p-5">
+          <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Primary call to action</div>
+          <div className="mt-2 text-2xl font-semibold">{actionLabel}</div>
+          <p className="mt-3 text-sm text-muted-foreground">{actionMeta.hint}</p>
+        </div>
+        {artist.bookingEmail && (
+          <div className="rounded-2xl border border-border/50 bg-background/40 p-4 text-sm">
+            Booking email: <span className="text-muted-foreground">{artist.bookingEmail}</span>
+          </div>
+        )}
+        <div className="flex flex-wrap gap-3">
+          <Button onClick={() => setOpen(true)}>
+            <Mail className="mr-2 h-4 w-4" /> {actionLabel}
+          </Button>
+          <Link href="/messages">
+            <Button variant="outline">
+              <MessageSquare className="mr-2 h-4 w-4" /> Message
+            </Button>
+          </Link>
+          <Button variant="outline" onClick={handleShare}>
+            <Share2 className="mr-2 h-4 w-4" /> Share Page
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const sections: Record<string, ReactNode> = {
+    featured: renderFeatured(),
+    about: renderAbout(),
+    media: renderMedia(),
+    posts: renderPosts(),
+    events: renderEvents(),
+    contact: renderContact(),
+  };
+
+  const visibleSections = moduleOrder.filter((key) => sections[key]);
+  const rightRailKeys = layoutTemplate === "music"
+    ? ["featured", "events", "contact"]
+    : layoutTemplate === "performer"
+      ? ["events", "contact", "featured"]
+      : layoutTemplate === "shop"
+        ? ["featured", "media", "contact"]
+        : layoutTemplate === "editorial"
+          ? ["about", "featured", "contact"]
+          : ["featured", "about", "contact"];
+
+  const primaryKeys = visibleSections.filter((key) => !rightRailKeys.includes(key));
+  const secondaryKeys = visibleSections.filter((key) => rightRailKeys.includes(key));
+  const pageGridClass = layoutTemplate === "editorial"
+    ? "lg:grid-cols-[1.1fr_0.9fr]"
+    : layoutTemplate === "music"
+      ? "lg:grid-cols-[1.2fr_0.8fr]"
+      : "lg:grid-cols-[0.95fr_1.05fr]";
+
+  return (
+    <div className={cn("w-full pb-20", fontClass)}>
+      <section className="relative overflow-hidden border-b border-border">
+        {profile.user.bannerUrl && (
+          <div className="absolute inset-0 bg-cover bg-center opacity-35" style={{ backgroundImage: `url(${profile.user.bannerUrl})` }} />
+        )}
+        <div className={cn("absolute inset-0 bg-gradient-to-br", mood.shell)} />
+        <div className={cn("absolute inset-0 bg-[radial-gradient(circle_at_top_left,var(--tw-gradient-stops))]", mood.glow)} />
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/55 to-background/10" />
+
+        <div className="relative z-10 mx-auto max-w-7xl px-4 py-12 md:py-16">
+          <div className="grid gap-8 lg:grid-cols-[auto_1fr]">
+            <Avatar className="h-32 w-32 border-4 border-background/80 shadow-2xl md:h-40 md:w-40">
+              <AvatarImage src={profile.user.avatarUrl || ""} />
+              <AvatarFallback>{profile.user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+            </Avatar>
+
+            <div className="space-y-6">
+              <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+                <div className="max-w-4xl">
+                  <div className="mb-4 flex flex-wrap gap-2">
+                    <Badge variant="secondary">{artist.category}</Badge>
+                    {(profile.user.city || artist.location) && <Badge variant="outline">{profile.user.city || artist.location}</Badge>}
+                    <Badge variant="outline">{MODULE_LABELS[visibleSections[0] || "featured"] || "Creator Page"}</Badge>
+                  </div>
+                  <h1 className="text-4xl font-bold md:text-6xl">{profile.user.username}</h1>
+                  <p className="mt-4 max-w-3xl text-lg text-muted-foreground">{heroTagline}</p>
+                  <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                    {(artist.location || profile.user.city || profile.user.location) && (
+                      <span className="inline-flex items-center"><MapPin className="mr-1.5 h-4 w-4" /> {artist.location || profile.user.city || profile.user.location}</span>
+                    )}
+                    <span>{profile.user.followerCount} followers</span>
+                    <span>{profile.user.followingCount} following</span>
+                    <span>{upcomingEvents.length} upcoming events</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-3 xl:max-w-md xl:justify-end">
+                  <Button onClick={handleFollowToggle} variant={profile.isFollowing ? "outline" : "default"}>
+                    {profile.isFollowing ? "Following" : "Follow"}
                   </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[500px] border-border/50 bg-card/95 backdrop-blur-xl">
-                  <DialogHeader>
-                    <DialogTitle className="text-2xl">Book {user.username}</DialogTitle>
-                    <DialogDescription>
-                      Send an inquiry for a performance, collaboration, or commission.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={handleBookingSubmit} className="space-y-4 mt-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="eventType">Event/Project Type</Label>
-                        <Select value={eventType} onValueChange={setEventType}>
-                          <SelectTrigger className="bg-background/50">
-                            <SelectValue placeholder="Select type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Live Performance">Live Performance</SelectItem>
-                            <SelectItem value="DJ Set">DJ Set</SelectItem>
-                            <SelectItem value="Exhibition">Exhibition</SelectItem>
-                            <SelectItem value="Commission">Commission</SelectItem>
-                            <SelectItem value="Collaboration">Collaboration</SelectItem>
-                            <SelectItem value="Other">Other</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="date">Date (Optional)</Label>
-                        <Input 
-                          id="date" 
-                          type="date" 
-                          value={eventDate}
-                          onChange={(e) => setEventDate(e.target.value)}
-                          className="bg-background/50" 
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="location">Location / Venue (Optional)</Label>
-                      <Input 
-                        id="location" 
-                        placeholder="e.g. Berghain, Berlin" 
-                        value={eventLocation}
-                        onChange={(e) => setEventLocation(e.target.value)}
-                        className="bg-background/50" 
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="message">Message *</Label>
-                      <Textarea 
-                        id="message" 
-                        placeholder="Describe your event, budget, and requirements..." 
-                        required 
-                        className="min-h-[120px] bg-background/50"
-                        value={message}
-                        onChange={(e) => setMessage(e.target.value)}
-                      />
-                    </div>
-                    <DialogFooter className="mt-6">
-                      <Button type="submit" disabled={isBooking || !message.trim()} className="w-full">
-                        {isBooking ? <Spinner className="mr-2" size="sm" /> : <Mail className="w-4 h-4 mr-2" />}
-                        Send Inquiry
-                      </Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
-              
-              {currentUser?.id !== user.id && (
-                <Button 
-                  size="lg" 
-                  variant={isFollowing ? "outline" : "secondary"} 
-                  onClick={handleFollowToggle}
-                  className="w-full sm:w-auto"
-                >
-                  {isFollowing ? "Following" : "Follow"}
-                </Button>
-              )}
+                  <FriendActionButton userId={userId} friendship={profile.friendship} invalidateKeys={[["profile", userId], ["/api/users", userId]]} />
+                  <Link href={`/profile/${profile.user.id}`}>
+                    <Button variant="outline">Personal Profile</Button>
+                  </Link>
+                  <Link href="/messages">
+                    <Button variant="outline"><MessageSquare className="mr-2 h-4 w-4" /> Message</Button>
+                  </Link>
+                  {creator?.primaryActionUrl && (actionType === "shop" || actionType === "store") ? (
+                    <a href={creator.primaryActionUrl} target="_blank" rel="noreferrer">
+                      <Button><ExternalLink className="mr-2 h-4 w-4" /> {actionLabel}</Button>
+                    </a>
+                  ) : (
+                    <Dialog open={open} onOpenChange={setOpen}>
+                      <DialogTrigger asChild>
+                        <Button><CalendarClock className="mr-2 h-4 w-4" /> {actionLabel}</Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>{actionMeta.title}</DialogTitle>
+                          <DialogDescription>{actionMeta.hint}</DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          {actionMeta.fields.includes("eventType") && (
+                            <div className="space-y-2">
+                              <Label>Event or project type</Label>
+                              <Input value={form.eventType} onChange={(e) => setForm({ ...form, eventType: e.target.value })} />
+                            </div>
+                          )}
+                          {actionMeta.fields.includes("eventDate") && (
+                            <div className="space-y-2">
+                              <Label>Date</Label>
+                              <Input type="date" value={form.eventDate} onChange={(e) => setForm({ ...form, eventDate: e.target.value })} />
+                            </div>
+                          )}
+                          {actionMeta.fields.includes("budget") && (
+                            <div className="space-y-2">
+                              <Label>Budget</Label>
+                              <Input value={form.budget} onChange={(e) => setForm({ ...form, budget: e.target.value })} placeholder="$500 - $1500" />
+                            </div>
+                          )}
+                          {actionMeta.fields.includes("location") && (
+                            <div className="space-y-2">
+                              <Label>Location</Label>
+                              <Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="City / venue / remote" />
+                            </div>
+                          )}
+                          {actionMeta.fields.includes("timeframe") && (
+                            <div className="space-y-2">
+                              <Label>Timeframe</Label>
+                              <Input value={form.timeframe} onChange={(e) => setForm({ ...form, timeframe: e.target.value })} placeholder="2 weeks / summer / open-ended" />
+                            </div>
+                          )}
+                          {actionMeta.fields.includes("projectDetails") && (
+                            <div className="space-y-2">
+                              <Label>Project details</Label>
+                              <Input value={form.projectDetails} onChange={(e) => setForm({ ...form, projectDetails: e.target.value })} />
+                            </div>
+                          )}
+                          <div className="space-y-2">
+                            <Label>Message</Label>
+                            <Textarea value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} className="min-h-32" />
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button
+                            onClick={() =>
+                              inquiry.mutate({
+                                recipientId: userId,
+                                data: {
+                                  inquiryType: actionType,
+                                  eventType: form.eventType || undefined,
+                                  eventDate: form.eventDate || undefined,
+                                  budget: form.budget || undefined,
+                                  projectDetails: [form.projectDetails, form.timeframe, form.location].filter(Boolean).join(" / ") || undefined,
+                                  message: form.message,
+                                },
+                              })
+                            }
+                            disabled={inquiry.isPending || !form.message.trim()}
+                          >
+                            <Mail className="mr-2 h-4 w-4" /> Send Inquiry
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  )}
+                  <Button variant={saved ? "default" : "outline"} onClick={handleSaveToggle}>
+                    <Heart className={cn("mr-2 h-4 w-4", saved && "fill-current")} /> {saved ? "Saved" : "Save"}
+                  </Button>
+                  <Button variant="outline" onClick={handleShare}>
+                    <Share2 className="mr-2 h-4 w-4" /> Share
+                  </Button>
+                  <ReportDialog targetType="profile" targetId={profile.user.id} variant="outline" />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {artist.tags?.map((tag: string) => <Badge key={tag} variant="secondary">{tag}</Badge>)}
+              </div>
+              {currentUser?.id !== userId ? (
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="inline-flex items-center rounded-2xl border border-border/50 bg-background/30 px-4 py-3 text-sm text-muted-foreground">
+                    <HeartHandshake className="mr-2 h-4 w-4 text-primary" />
+                    {profile.user.friendCount} friends
+                  </div>
+                  <ProfileReactionBar userId={userId} summary={profile.profileReactions} invalidateKeys={[["profile", userId], ["/api/users", userId]]} />
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="max-w-5xl mx-auto px-4 mt-12 grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column: Bio & Info */}
-        <div className="lg:col-span-1 space-y-6">
-          <Card className="border-border/50 bg-card/30 backdrop-blur-sm">
-            <div className="p-6">
-              <h3 className="text-lg font-bold mb-4 border-b border-border/50 pb-2">About</h3>
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
-                {artistProfile.bio || user.bio || "No bio available."}
-              </p>
-              
-              {artistProfile.bookingEmail && (
-                <div className="mt-6 pt-4 border-t border-border/50 flex items-center gap-3 text-sm">
-                  <div className="bg-primary/10 p-2 rounded-full text-primary">
-                    <Mail className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Direct Contact</p>
-                    <a href={`mailto:${artistProfile.bookingEmail}`} className="font-medium hover:underline">
-                      {artistProfile.bookingEmail}
-                    </a>
-                  </div>
-                </div>
-              )}
-            </div>
-          </Card>
+      <div className={cn("mx-auto mt-8 grid max-w-7xl gap-6 px-4", pageGridClass)}>
+        <div className="space-y-6">
+          {primaryKeys.map((key) => <div key={key}>{sections[key]}</div>)}
         </div>
-
-        {/* Right Column: Gallery */}
-        <div className="lg:col-span-2">
-          <h2 className="text-2xl font-bold mb-6">Showcase</h2>
-          
-          {artistProfile.gallery && artistProfile.gallery.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {artistProfile.gallery.map(item => (
-                <Card key={item.id} className="overflow-hidden border-border/50 bg-card/30 group">
-                  {item.type === 'image' && (
-                    <div className="aspect-square relative overflow-hidden bg-muted">
-                      <img 
-                        src={item.url} 
-                        alt={item.caption || "Gallery item"} 
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
-                      />
-                      <div className="absolute top-3 left-3 bg-background/80 backdrop-blur-md p-1.5 rounded-md shadow-sm">
-                        <ImageIcon className="w-4 h-4 text-foreground" />
-                      </div>
-                    </div>
-                  )}
-                  
-                  {item.type === 'video' && (
-                    <div className="aspect-video relative bg-black">
-                      <iframe 
-                        src={item.url.includes('youtube') || item.url.includes('youtu.be') ? getYoutubeEmbedUrl(item.url) : 
-                             item.url.includes('vimeo') ? getVimeoEmbedUrl(item.url) : item.url} 
-                        className="absolute inset-0 w-full h-full border-0"
-                        allowFullScreen 
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      />
-                      <div className="absolute top-3 left-3 bg-background/80 backdrop-blur-md p-1.5 rounded-md shadow-sm z-10 pointer-events-none">
-                        <Play className="w-4 h-4 text-foreground" />
-                      </div>
-                    </div>
-                  )}
-                  
-                  {item.type === 'audio' && (
-                    <div className="p-4 bg-secondary/30 h-full min-h-[160px] flex flex-col">
-                      <div className="flex items-center gap-2 mb-4">
-                        <div className="bg-primary/20 p-2 rounded-full text-primary">
-                          <Music className="w-5 h-5" />
-                        </div>
-                        <span className="font-medium text-sm">Audio Track</span>
-                      </div>
-                      {item.url.includes('soundcloud') || item.url.includes('spotify') ? (
-                        <iframe 
-                          src={item.url} 
-                          className="w-full h-[152px] border-0 rounded-md mt-auto" 
-                          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                        />
-                      ) : (
-                        <a href={item.url} target="_blank" rel="noreferrer" className="mt-auto text-primary hover:underline text-sm break-all">
-                          {item.url}
-                        </a>
-                      )}
-                    </div>
-                  )}
-                  
-                  {item.caption && (
-                    <div className="p-3 border-t border-border/30 bg-card/50">
-                      <p className="text-sm text-muted-foreground truncate">{item.caption}</p>
-                    </div>
-                  )}
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-20 text-muted-foreground border border-dashed border-border/50 rounded-xl bg-card/10">
-              <ImageIcon className="w-12 h-12 mx-auto mb-4 opacity-20" />
-              <p>This artist hasn't uploaded any work yet.</p>
-            </div>
-          )}
+        <div className="space-y-6">
+          {secondaryKeys.map((key) => <div key={key}>{sections[key]}</div>)}
         </div>
       </div>
     </div>

@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { GalleryItem } from "./galleryItem";
+import type { Post } from "./post";
+import type { ProfileCustomField } from "./profileCustomField";
 import type { UserSummary } from "./userSummary";
 
 export interface ArtistProfile {
@@ -13,9 +15,32 @@ export interface ArtistProfile {
   userId: number;
   category: string;
   location?: string | null;
+  tagline?: string | null;
   tags: string[];
   bio?: string | null;
+  influences?: string | null;
+  availabilityStatus?: string | null;
+  pronouns?: string | null;
+  yearsActive?: string | null;
+  representedBy?: string | null;
+  openForCommissions: boolean;
+  touring: boolean;
+  acceptsCollaborations: boolean;
+  customFields: ProfileCustomField[];
   bookingEmail?: string | null;
   gallery: GalleryItem[];
   user: UserSummary;
+  primaryActionType: string;
+  primaryActionLabel: string;
+  primaryActionUrl?: string | null;
+  featuredTitle?: string | null;
+  featuredDescription?: string | null;
+  featuredUrl?: string | null;
+  featuredType: string;
+  moodPreset: string;
+  layoutTemplate: string;
+  fontPreset: string;
+  enabledModules: string[];
+  moduleOrder: string[];
+  pinnedPost?: Post | null;
 }

@@ -5,8 +5,12 @@
  * ArtistHub Social Platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { GetFeedMode } from "./getFeedMode";
 
 export type GetFeedParams = {
+  mode?: GetFeedMode;
+  city?: string;
+  customFeedId?: number;
   page?: number;
   limit?: number;
 };

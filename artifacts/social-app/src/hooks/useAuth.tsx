@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useGetMe } from "@workspace/api-client-react";
 import { User } from "@workspace/api-client-react";
 import { Spinner } from "@/components/ui/spinner";
+import { consumeReturnTo, rememberReturnTo } from "@/lib/auth-redirect";
 
 interface AuthContextType {
   user: User | null;
@@ -16,7 +17,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [location, setLocation] = useLocation();
   const { data: user, isLoading, isError } = useGetMe({
     query: {
+      queryKey: ["/api/auth/me"],
       retry: false,
+      staleTime: 60_000,
+      refetchOnWindowFocus: false,
     }
   });
 
@@ -25,9 +29,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!isLoading) {
       if (isError && !isAuthRoute) {
+        rememberReturnTo(location);
         setLocation("/login");
       } else if (user && isAuthRoute) {
-        setLocation("/");
+        setLocation(consumeReturnTo());
       }
     }
   }, [isLoading, isError, user, location, isAuthRoute, setLocation]);

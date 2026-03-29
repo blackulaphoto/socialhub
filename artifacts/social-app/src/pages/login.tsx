@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useQueryClient } from "@tanstack/react-query";
 import { Compass } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { consumeReturnTo, navigateAfterAuth } from "@/lib/auth-redirect";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -25,8 +26,9 @@ export default function Login() {
       {
         onSuccess: (data) => {
           queryClient.setQueryData(["/api/auth/me"], data.user);
+          queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
           toast({ title: "Welcome back!", description: "Successfully logged in." });
-          setLocation("/");
+          navigateAfterAuth(consumeReturnTo());
         },
         onError: (err: any) => {
           toast({ 
@@ -52,6 +54,9 @@ export default function Login() {
           <CardDescription className="text-muted-foreground text-base">
             Enter the underground. Discover the scene.
           </CardDescription>
+          <div className="rounded-2xl border border-border/50 bg-background/50 px-4 py-3 text-left text-sm text-muted-foreground">
+            Demo admin: <span className="text-foreground">admin@socialhub.local</span> / <span className="text-foreground">admin123</span>
+          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

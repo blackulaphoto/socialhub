@@ -5,8 +5,21 @@
  * ArtistHub Social Platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { LinkItem } from "./linkItem";
 
 export interface UpdateProfileRequest {
   bio?: string | null;
   avatarUrl?: string | null;
+  bannerUrl?: string | null;
+  location?: string | null;
+  city?: string | null;
+  age?: number | null;
+  work?: string | null;
+  school?: string | null;
+  about?: string | null;
+  interests?: string[];
+  accentColor?: string | null;
+  themeName?: string | null;
+  featuredContent?: string | null;
+  links?: LinkItem[];
 }

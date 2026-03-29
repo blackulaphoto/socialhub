@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "hello": "tsx ./src/hello.ts",
-    "seed": "tsx ./src/seed.ts",
+    "migrate": "pnpm --filter @workspace/db run migrate",
+    "seed": "pnpm --filter @workspace/db run migrate && tsx ./src/seed.ts",
+    "smoke:auth": "tsx ./src/smoke-auth.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

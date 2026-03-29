@@ -19,19 +19,10 @@ export interface ErrorResponse {
   message?: string;
 }
 
-export type RegisterRequestProfileType =
-  (typeof RegisterRequestProfileType)[keyof typeof RegisterRequestProfileType];
-
-export const RegisterRequestProfileType = {
-  user: "user",
-  artist: "artist",
-} as const;
-
 export interface RegisterRequest {
   username: string;
   email: string;
   password: string;
-  profileType: RegisterRequestProfileType;
 }
 
 export interface LoginRequest {
@@ -47,6 +38,11 @@ export const UserProfileType = {
   artist: "artist",
 } as const;
 
+export interface LinkItem {
+  label: string;
+  url: string;
+}
+
 export interface User {
   id: number;
   username: string;
@@ -57,9 +53,23 @@ export interface User {
   isAdmin: boolean;
   isBanned: boolean;
   followerCount: number;
+  friendCount: number;
   followingCount: number;
   postCount: number;
   createdAt: string;
+  bannerUrl?: string | null;
+  location?: string | null;
+  city?: string | null;
+  age?: number | null;
+  work?: string | null;
+  school?: string | null;
+  about?: string | null;
+  interests?: string[];
+  hasArtistPage?: boolean;
+  accentColor?: string | null;
+  themeName?: string | null;
+  links?: LinkItem[];
+  featuredContent?: string | null;
 }
 
 export interface AuthResponse {
@@ -82,6 +92,84 @@ export interface UserSummary {
   bio?: string | null;
   profileType: UserSummaryProfileType;
   followerCount: number;
+  friendCount: number;
+  bannerUrl?: string | null;
+  location?: string | null;
+  city?: string | null;
+  age?: number | null;
+  work?: string | null;
+  school?: string | null;
+  about?: string | null;
+  interests?: string[];
+  hasArtistPage?: boolean;
+  accentColor?: string | null;
+  links?: LinkItem[];
+  category?: string | null;
+  tags?: string[];
+}
+
+export interface NotificationItem {
+  id: number;
+  type: string;
+  title: string;
+  body: string;
+  createdAt: string;
+  isUnread: boolean;
+  readAt?: string | null;
+  href: string;
+  actor?: UserSummary | null;
+}
+
+export interface ActivitySummary {
+  unreadMessages: number;
+  unreadNotifications: number;
+  recentItems: NotificationItem[];
+}
+
+export interface ProfileCustomField {
+  label: string;
+  value: string;
+}
+
+export type FriendshipStateStatus =
+  (typeof FriendshipStateStatus)[keyof typeof FriendshipStateStatus];
+
+export const FriendshipStateStatus = {
+  self: "self",
+  none: "none",
+  outgoing: "outgoing",
+  incoming: "incoming",
+  friends: "friends",
+} as const;
+
+export interface FriendshipState {
+  id?: number | null;
+  status: FriendshipStateStatus;
+  isFriend: boolean;
+}
+
+export interface ReactionCounts {
+  like: number;
+  heart: number;
+  wow: number;
+  angry: number;
+}
+
+export type ReactionSummaryCurrentUserReaction =
+  | (typeof ReactionSummaryCurrentUserReaction)[keyof typeof ReactionSummaryCurrentUserReaction]
+  | null;
+
+export const ReactionSummaryCurrentUserReaction = {
+  like: "like",
+  heart: "heart",
+  wow: "wow",
+  angry: "angry",
+} as const;
+
+export interface ReactionSummary {
+  total: number;
+  counts: ReactionCounts;
+  currentUserReaction?: ReactionSummaryCurrentUserReaction;
 }
 
 export type GalleryItemType =
@@ -102,27 +190,36 @@ export interface GalleryItem {
   createdAt: string;
 }
 
-export interface ArtistProfile {
+export type PostCurrentUserReaction =
+  | (typeof PostCurrentUserReaction)[keyof typeof PostCurrentUserReaction]
+  | null;
+
+export const PostCurrentUserReaction = {
+  like: "like",
+  heart: "heart",
+  wow: "wow",
+  angry: "angry",
+} as const;
+
+export interface PostComment {
   id: number;
+  postId: number;
   userId: number;
-  category: string;
-  location?: string | null;
-  tags: string[];
-  bio?: string | null;
-  bookingEmail?: string | null;
-  gallery: GalleryItem[];
-  user: UserSummary;
+  parentCommentId?: number | null;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  author?: UserSummary | null;
 }
 
-export interface UserProfile {
-  user: User;
-  isFollowing: boolean;
-  artistProfile?: ArtistProfile | null;
-}
-
-export interface UpdateProfileRequest {
-  bio?: string | null;
-  avatarUrl?: string | null;
+export interface PostMedia {
+  id: number;
+  postId: number;
+  type: string;
+  url: string;
+  title?: string | null;
+  thumbnailUrl?: string | null;
+  createdAt: string;
 }
 
 export interface Post {
@@ -130,15 +227,184 @@ export interface Post {
   userId: number;
   content: string;
   imageUrl?: string | null;
+  repostOfPostId?: number | null;
   likeCount: number;
   isLiked: boolean;
-  author: UserSummary;
+  reactionCounts: ReactionCounts;
+  totalReactionCount: number;
+  currentUserReaction?: PostCurrentUserReaction;
+  repostCount: number;
+  commentCount: number;
+  comments: PostComment[];
+  originalPost?: Post | null;
+  author?: UserSummary;
   createdAt: string;
+  updatedAt?: string;
+  media?: PostMedia[];
+}
+
+export interface ArtistProfile {
+  id: number;
+  userId: number;
+  category: string;
+  location?: string | null;
+  tagline?: string | null;
+  tags: string[];
+  bio?: string | null;
+  influences?: string | null;
+  availabilityStatus?: string | null;
+  pronouns?: string | null;
+  yearsActive?: string | null;
+  representedBy?: string | null;
+  openForCommissions: boolean;
+  touring: boolean;
+  acceptsCollaborations: boolean;
+  customFields: ProfileCustomField[];
+  bookingEmail?: string | null;
+  gallery: GalleryItem[];
+  user: UserSummary;
+  primaryActionType: string;
+  primaryActionLabel: string;
+  primaryActionUrl?: string | null;
+  featuredTitle?: string | null;
+  featuredDescription?: string | null;
+  featuredUrl?: string | null;
+  featuredType: string;
+  moodPreset: string;
+  layoutTemplate: string;
+  fontPreset: string;
+  enabledModules: string[];
+  moduleOrder: string[];
+  pinnedPost?: Post | null;
+}
+
+export interface UserProfileDetails {
+  userId?: number;
+  bannerUrl?: string | null;
+  location?: string | null;
+  city?: string | null;
+  age?: number | null;
+  work?: string | null;
+  school?: string | null;
+  about?: string | null;
+  interests?: string[];
+  accentColor?: string | null;
+  themeName?: string | null;
+  links?: LinkItem[];
+  featuredContent?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreatorSettings {
+  primaryActionType: string;
+  primaryActionLabel: string;
+  primaryActionUrl?: string | null;
+  featuredTitle?: string | null;
+  featuredDescription?: string | null;
+  featuredUrl?: string | null;
+  featuredType: string;
+  moodPreset: string;
+  layoutTemplate: string;
+  fontPreset: string;
+  enabledModules: string[];
+  moduleOrder: string[];
+  pinnedPost?: Post | null;
+}
+
+export interface CustomFeed {
+  id: number;
+  ownerId: number;
+  name: string;
+  description?: string | null;
+  includedUserIds: number[];
+  categories: string[];
+  tags: string[];
+  locations: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UserProfile {
+  user: User;
+  isFollowing: boolean;
+  friendship: FriendshipState;
+  profileReactions: ReactionSummary;
+  artistProfile?: ArtistProfile | null;
+  details?: UserProfileDetails | null;
+  creatorSettings: CreatorSettings;
+  customFeeds: CustomFeed[];
+}
+
+export interface UpdateProfileRequest {
+  bio?: string | null;
+  avatarUrl?: string | null;
+  bannerUrl?: string | null;
+  location?: string | null;
+  city?: string | null;
+  age?: number | null;
+  work?: string | null;
+  school?: string | null;
+  about?: string | null;
+  interests?: string[];
+  accentColor?: string | null;
+  themeName?: string | null;
+  featuredContent?: string | null;
+  links?: LinkItem[];
+}
+
+export interface UpdateCreatorSettingsRequest {
+  primaryActionType?: string;
+  primaryActionLabel?: string;
+  primaryActionUrl?: string | null;
+  featuredTitle?: string | null;
+  featuredDescription?: string | null;
+  featuredUrl?: string | null;
+  featuredType?: string;
+  moodPreset?: string;
+  layoutTemplate?: string;
+  fontPreset?: string;
+  enabledModules?: string[];
+  moduleOrder?: string[];
+  pinnedPostId?: number | null;
+}
+
+export interface PostMediaInput {
+  type?: string;
+  url?: string;
+  title?: string | null;
+  thumbnailUrl?: string | null;
 }
 
 export interface CreatePostRequest {
-  content: string;
+  content?: string;
   imageUrl?: string | null;
+  repostOfPostId?: number | null;
+  groupId?: number | null;
+  media?: PostMediaInput[];
+}
+
+export interface RepostRequest {
+  content?: string;
+}
+
+export type ReactionRequestReactionType =
+  (typeof ReactionRequestReactionType)[keyof typeof ReactionRequestReactionType];
+
+export const ReactionRequestReactionType = {
+  like: "like",
+  heart: "heart",
+  wow: "wow",
+  angry: "angry",
+} as const;
+
+export interface ReactionRequest {
+  reactionType: ReactionRequestReactionType;
+}
+
+export interface CreatePostCommentRequest {
+  content: string;
+  parentCommentId?: number | null;
 }
 
 export interface PostsResponse {
@@ -148,12 +414,39 @@ export interface PostsResponse {
   totalPages: number;
 }
 
+export type FeedResponse = PostsResponse & {
+  mode: string;
+};
+
 export interface UpdateArtistRequest {
   category?: string;
   location?: string | null;
+  tagline?: string | null;
   tags?: string[];
   bio?: string | null;
+  influences?: string | null;
+  availabilityStatus?: string | null;
+  pronouns?: string | null;
+  yearsActive?: string | null;
+  representedBy?: string | null;
+  openForCommissions?: boolean;
+  touring?: boolean;
+  acceptsCollaborations?: boolean;
+  customFields?: ProfileCustomField[];
   bookingEmail?: string | null;
+  primaryActionType?: string;
+  primaryActionLabel?: string;
+  primaryActionUrl?: string | null;
+  featuredTitle?: string | null;
+  featuredDescription?: string | null;
+  featuredUrl?: string | null;
+  featuredType?: string;
+  moodPreset?: string;
+  layoutTemplate?: string;
+  fontPreset?: string;
+  enabledModules?: string[];
+  moduleOrder?: string[];
+  pinnedPostId?: number | null;
 }
 
 export type GalleryItemRequestType =
@@ -171,6 +464,20 @@ export interface GalleryItemRequest {
   caption?: string | null;
 }
 
+export interface UserPhotoItem {
+  id: number;
+  userId: number;
+  imageUrl: string;
+  caption?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UserPhotoItemRequest {
+  imageUrl: string;
+  caption?: string | null;
+}
+
 export interface ArtistsResponse {
   artists: ArtistProfile[];
   total: number;
@@ -184,6 +491,16 @@ export interface Conversation {
   lastMessage?: string | null;
   lastMessageAt?: string | null;
   unreadCount: number;
+  inquiryType?: string | null;
+}
+
+export interface Inquiry {
+  inquiryType?: string;
+  eventDate?: string | null;
+  eventType?: string | null;
+  budget?: string | null;
+  projectDetails?: string | null;
+  externalUrl?: string | null;
 }
 
 export interface Message {
@@ -192,7 +509,9 @@ export interface Message {
   senderId: number;
   content: string;
   isBookingInquiry: boolean;
+  isRead?: boolean;
   createdAt: string;
+  inquiry?: Inquiry | null;
 }
 
 export interface SendMessageRequest {
@@ -207,10 +526,92 @@ export interface BookingInquiryRequest {
   message: string;
 }
 
+export interface InquiryRequest {
+  inquiryType?: string;
+  eventDate?: string | null;
+  eventType?: string | null;
+  budget?: string | null;
+  projectDetails?: string | null;
+  externalUrl?: string | null;
+  message: string;
+}
+
 export interface SearchResponse {
   users: UserSummary[];
   artists: ArtistProfile[];
   total: number;
+}
+
+export interface CustomFeedRequest {
+  name: string;
+  description?: string | null;
+  includedUserIds?: number[];
+  categories?: string[];
+  tags?: string[];
+  locations?: string[];
+}
+
+export interface Group {
+  id: number;
+  ownerId: number;
+  name: string;
+  slug: string;
+  description: string;
+  coverImageUrl?: string | null;
+  visibility: string;
+  category?: string | null;
+  location?: string | null;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+  owner?: UserSummary | null;
+  memberCount: number;
+  postCount: number;
+  isMember: boolean;
+  membersPreview: UserSummary[];
+}
+
+export interface GroupDetail {
+  group: Group;
+  posts: Post[];
+}
+
+export interface CreateGroupRequest {
+  name: string;
+  description: string;
+  coverImageUrl?: string | null;
+  visibility?: string;
+  category?: string | null;
+  location?: string | null;
+  tags?: string[];
+}
+
+export interface Event {
+  id: number;
+  hostUserId: number;
+  title: string;
+  description: string;
+  startsAt: string;
+  location: string;
+  city?: string | null;
+  imageUrl?: string | null;
+  lineupTags: string[];
+  visibility: string;
+  createdAt: string;
+  updatedAt: string;
+  host?: UserSummary | null;
+  artists: UserSummary[];
+}
+
+export interface CreateEventRequest {
+  title: string;
+  description: string;
+  startsAt: string;
+  location: string;
+  city?: string | null;
+  imageUrl?: string | null;
+  lineupArtistIds?: number[];
+  lineupTags?: string[];
 }
 
 export interface AdminUsersResponse {
@@ -220,10 +621,114 @@ export interface AdminUsersResponse {
   totalPages: number;
 }
 
+export interface ReportRequest {
+  targetType: string;
+  targetId: number;
+  reason: string;
+  details?: string | null;
+}
+
+export interface Report {
+  id: number;
+  reporterUserId: number;
+  targetType: string;
+  targetId: number;
+  reason: string;
+  details?: string | null;
+  status: string;
+  adminNote?: string | null;
+  reviewedByUserId?: number | null;
+  reviewedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type AdminReport = Report & {
+  reporter?: User | null;
+  reviewer?: User | null;
+};
+
+export interface ReportStatusRequest {
+  status: string;
+  adminNote?: string | null;
+}
+
+export interface PageViewRequest {
+  path: string;
+  referrer?: string | null;
+}
+
+export interface UploadImageResponse {
+  url: string;
+  path: string;
+  fileName: string;
+  scope: string;
+  mimeType: string;
+  size: number;
+}
+
+export interface AnalyticsTopPath {
+  path: string;
+  views: number;
+}
+
+export type AdminAnalyticsTotals = {
+  users: number;
+  posts: number;
+  groups: number;
+  events: number;
+  openReports: number;
+};
+
+export type AdminAnalyticsTraffic = {
+  pageViews24h: number;
+  activeUsers7d: number;
+  topPaths: AnalyticsTopPath[];
+};
+
+export interface AdminAnalytics {
+  totals: AdminAnalyticsTotals;
+  traffic: AdminAnalyticsTraffic;
+}
+
+export type GetNotificationsParams = {
+  limit?: number;
+};
+
+export type UploadImageBodyScope =
+  (typeof UploadImageBodyScope)[keyof typeof UploadImageBodyScope];
+
+export const UploadImageBodyScope = {
+  avatar: "avatar",
+  banner: "banner",
+  post: "post",
+  group: "group",
+  event: "event",
+  gallery: "gallery",
+  photos: "photos",
+} as const;
+
+export type UploadImageBody = {
+  file: Blob;
+  scope: UploadImageBodyScope;
+};
+
 export type GetFeedParams = {
+  mode?: GetFeedMode;
+  city?: string;
+  customFeedId?: number;
   page?: number;
   limit?: number;
 };
+
+export type GetFeedMode = (typeof GetFeedMode)[keyof typeof GetFeedMode];
+
+export const GetFeedMode = {
+  following: "following",
+  local: "local",
+  discovery: "discovery",
+  custom: "custom",
+} as const;
 
 export type GetUserPostsParams = {
   page?: number;
@@ -257,6 +762,16 @@ export const SearchType = {
   users: "users",
   artists: "artists",
 } as const;
+
+export type GetGroupsParams = {
+  q?: string;
+  location?: string;
+};
+
+export type GetEventsParams = {
+  q?: string;
+  city?: string;
+};
 
 export type AdminGetUsersParams = {
   page?: number;
