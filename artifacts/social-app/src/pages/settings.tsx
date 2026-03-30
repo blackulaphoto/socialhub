@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -32,7 +32,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useActiveIdentity } from "@/hooks/useActiveIdentity";
 import { uploadImage } from "@/lib/upload-image";
 import { cn } from "@/lib/utils";
-import { Image as ImageIcon, UploadCloud } from "lucide-react";
+import { Check, Image as ImageIcon, Loader2, UploadCloud } from "lucide-react";
 
 const ACTION_OPTIONS = [
   "Book Me",
@@ -61,6 +61,24 @@ const THEME_OPTIONS = [
   { value: "ember", label: "Ember" },
   { value: "afterhours", label: "After Hours" },
 ];
+
+const PROFILE_THEME_STYLES: Record<string, { shell: string; card: string; label: string }> = {
+  nocturne: {
+    shell: "from-slate-950 via-slate-900 to-indigo-950",
+    card: "bg-slate-950/80 border-white/10",
+    label: "Cool, dark, polished",
+  },
+  ember: {
+    shell: "from-stone-950 via-red-950 to-orange-900",
+    card: "bg-stone-950/80 border-orange-200/10",
+    label: "Warm, dramatic, nightlife",
+  },
+  afterhours: {
+    shell: "from-zinc-950 via-fuchsia-950 to-cyan-950",
+    card: "bg-zinc-950/80 border-cyan-200/10",
+    label: "Neon, late-night, electric",
+  },
+};
 
 const MOOD_OPTIONS = ["sleek", "underground", "dreamy", "luxe", "gritty", "minimal", "neon", "vintage"];
 const LAYOUT_OPTIONS = ["portfolio", "music", "performer", "shop", "editorial"];
@@ -91,6 +109,25 @@ const CREATOR_FONT_PREVIEW_CLASSES: Record<string, string> = {
   editorial: "font-serif",
   mono: "font-mono",
 };
+
+const CREATOR_MOOD_LIVE_STYLES: Record<string, { shell: string; glow: string }> = {
+  sleek: { shell: "from-slate-900/95 via-slate-950/88 to-cyan-950/65", glow: "from-cyan-400/15 via-transparent to-transparent" },
+  underground: { shell: "from-zinc-950/95 via-stone-950/88 to-red-950/65", glow: "from-red-500/18 via-transparent to-transparent" },
+  dreamy: { shell: "from-slate-950/95 via-indigo-950/86 to-sky-900/65", glow: "from-sky-400/16 via-transparent to-transparent" },
+  luxe: { shell: "from-neutral-950/95 via-zinc-950/88 to-amber-950/65", glow: "from-amber-400/18 via-transparent to-transparent" },
+  gritty: { shell: "from-zinc-950/95 via-neutral-900/90 to-stone-900/70", glow: "from-orange-500/16 via-transparent to-transparent" },
+  minimal: { shell: "from-slate-950/95 via-slate-900/90 to-slate-800/65", glow: "from-white/10 via-transparent to-transparent" },
+  neon: { shell: "from-slate-950/95 via-fuchsia-950/86 to-cyan-950/65", glow: "from-fuchsia-500/20 via-transparent to-transparent" },
+  vintage: { shell: "from-stone-950/95 via-amber-950/82 to-rose-950/65", glow: "from-amber-300/15 via-transparent to-transparent" },
+};
+
+function formatPlace(parts: Array<string | null | undefined>) {
+  const normalized = parts
+    .map((part) => part?.trim())
+    .filter(Boolean) as string[];
+
+  return normalized.filter((part, index) => normalized.findIndex((item) => item.toLowerCase() === part.toLowerCase()) === index).join(", ");
+}
 
 function actionTypeFromLabel(label: string) {
   const lowered = label.toLowerCase();
@@ -127,6 +164,16 @@ export default function Settings() {
   const [photoForm, setPhotoForm] = useState({ imageUrl: "", caption: "" });
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
   const [isUploadingPhotoBatch, setIsUploadingPhotoBatch] = useState(false);
+  const [saveState, setSaveState] = useState<{
+    profile: "idle" | "saving" | "saved";
+    artistPage: "idle" | "saving" | "saved";
+    creatorConfig: "idle" | "saving" | "saved";
+  }>({
+    profile: "idle",
+    artistPage: "idle",
+    creatorConfig: "idle",
+  });
+  const saveTimers = useRef<Partial<Record<"profile" | "artistPage" | "creatorConfig", number>>>({});
   const [uploading, setUploading] = useState({
     avatar: false,
     banner: false,
@@ -300,6 +347,27 @@ export default function Settings() {
     },
   });
 
+  const markSaved = (key: "profile" | "artistPage" | "creatorConfig") => {
+    if (typeof window !== "undefined" && saveTimers.current[key]) {
+      window.clearTimeout(saveTimers.current[key]);
+    }
+    setSaveState((current) => ({ ...current, [key]: "saved" }));
+    if (typeof window !== "undefined") {
+      saveTimers.current[key] = window.setTimeout(() => {
+        setSaveState((current) => ({ ...current, [key]: "idle" }));
+      }, 1600);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (typeof window === "undefined") return;
+      Object.values(saveTimers.current).forEach((timer) => {
+        if (timer) window.clearTimeout(timer);
+      });
+    };
+  }, []);
+
   const handleImageUpload = async (
     file: File | null,
     scope: "avatar" | "banner" | "gallery" | "photos",
@@ -393,8 +461,9 @@ export default function Settings() {
   const headerAvatarUrl = useCreatorIdentityPreview ? artist.avatarUrl : basic.avatarUrl;
   const headerName = useCreatorIdentityPreview ? (artist.displayName || "Artist page name") : user.username;
   const headerLocation = useCreatorIdentityPreview
-    ? [artist.location].filter(Boolean).join(" / ")
-    : [basic.city, basic.location].filter(Boolean).join(" / ");
+    ? formatPlace([artist.location])
+    : formatPlace([basic.city, basic.location]);
+  const selectedProfileTheme = PROFILE_THEME_STYLES[basic.themeName || "nocturne"] || PROFILE_THEME_STYLES.nocturne;
   const creatorPreviewMoodClass = CREATOR_MOOD_PREVIEW_STYLES[creator.moodPreset || "sleek"] || CREATOR_MOOD_PREVIEW_STYLES.sleek;
   const creatorPreviewFontClass = CREATOR_FONT_PREVIEW_CLASSES[creator.fontPreset || "modern"] || "";
   const creatorPreviewLayoutClass = creator.layoutTemplate === "editorial"
@@ -406,6 +475,12 @@ export default function Settings() {
         : creator.layoutTemplate === "shop"
           ? "lg:grid-cols-[1fr_1fr]"
           : "lg:grid-cols-[1.15fr_0.85fr]";
+  const creatorPreviewLiveMood = CREATOR_MOOD_LIVE_STYLES[creator.moodPreset || "sleek"] || CREATOR_MOOD_LIVE_STYLES.sleek;
+  const creatorPreviewHeadingClass = creator.fontPreset === "editorial"
+    ? "font-serif tracking-tight"
+    : creator.fontPreset === "mono"
+      ? "font-mono uppercase tracking-[0.08em]"
+      : "";
 
   return (
     <div className="mx-auto w-full max-w-6xl p-4 md:py-8">
@@ -508,15 +583,15 @@ export default function Settings() {
                   <Input id="headline" placeholder="What should people understand about you immediately?" value={basic.bio || ""} onChange={(e) => setBasic({ ...basic, bio: e.target.value })} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="location">Location</Label>
-                  <Input id="location" placeholder="Los Angeles, CA" value={basic.location || ""} onChange={(e) => setBasic({ ...basic, location: e.target.value })} />
+                  <Label htmlFor="location">State / region</Label>
+                  <Input id="location" placeholder="California" value={basic.location || ""} onChange={(e) => setBasic({ ...basic, location: e.target.value })} />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div className="space-y-2">
-                  <Label htmlFor="city">City / region</Label>
-                  <Input id="city" placeholder="San Diego" value={basic.city || ""} onChange={(e) => setBasic({ ...basic, city: e.target.value })} />
+                  <Label htmlFor="city">City</Label>
+                  <Input id="city" placeholder="Los Angeles" value={basic.city || ""} onChange={(e) => setBasic({ ...basic, city: e.target.value })} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="age">Age</Label>
@@ -530,6 +605,30 @@ export default function Settings() {
                       {THEME_OPTIONS.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                  <p className="text-sm text-muted-foreground">This changes the look of your personal profile header and cards.</p>
+                  <div className="grid gap-3 pt-2 md:grid-cols-3">
+                    {THEME_OPTIONS.map((theme) => {
+                      const preview = PROFILE_THEME_STYLES[theme.value];
+                      const active = (basic.themeName || "nocturne") === theme.value;
+                      return (
+                        <button
+                          key={theme.value}
+                          type="button"
+                          onClick={() => setBasic({ ...basic, themeName: theme.value })}
+                          className={cn("overflow-hidden rounded-2xl border text-left transition-all", active ? "border-primary ring-2 ring-primary/20" : "border-border/50 hover:border-primary/30")}
+                        >
+                          <div className={cn("bg-gradient-to-br p-4 text-white", preview.shell)}>
+                            <div className="text-sm font-semibold">{theme.label}</div>
+                            <div className="mt-1 text-xs text-white/75">{preview.label}</div>
+                            <div className={cn("mt-4 rounded-xl border p-3", preview.card)}>
+                              <div className="text-sm font-medium">{user.username}</div>
+                              <div className="mt-1 text-xs text-white/70">{formatPlace([basic.city, basic.location]) || "Los Angeles, California"}</div>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
@@ -583,30 +682,46 @@ export default function Settings() {
               )}
 
               <Button
-                onClick={() =>
-                  saveBasic.mutate({
-                    userId: user.id,
-                    data: {
-                      ...basic,
-                      age: basic.age ? Number(basic.age) : null,
-                      interests: String(basic.interests || "")
-                        .split(",")
-                        .map((item) => item.trim())
-                        .filter(Boolean),
-                      links: String(basic.links || "")
-                        .split("\n")
-                        .map((line) => line.trim())
-                        .filter(Boolean)
-                        .map((line) => {
-                          const [label, url] = line.split("|");
-                          return { label: label?.trim() || "Link", url: url?.trim() || label?.trim() || "" };
-                        }),
-                    },
-                  })
-                }
+                onClick={async () => {
+                  setSaveState((current) => ({ ...current, profile: "saving" }));
+                  try {
+                    await saveBasic.mutateAsync({
+                      userId: user.id,
+                      data: {
+                        ...basic,
+                        age: basic.age ? Number(basic.age) : null,
+                        interests: String(basic.interests || "")
+                          .split(",")
+                          .map((item) => item.trim())
+                          .filter(Boolean),
+                        links: String(basic.links || "")
+                          .split("\n")
+                          .map((line) => line.trim())
+                          .filter(Boolean)
+                          .map((line) => {
+                            const [label, url] = line.split("|");
+                            return { label: label?.trim() || "Link", url: url?.trim() || label?.trim() || "" };
+                          }),
+                      },
+                    });
+                    markSaved("profile");
+                  } catch {
+                    setSaveState((current) => ({ ...current, profile: "idle" }));
+                  }
+                }}
                 disabled={saveBasic.isPending || uploading.avatar || uploading.banner}
               >
-                Save Profile
+                {saveState.profile === "saving" ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
+                  </>
+                ) : saveState.profile === "saved" ? (
+                  <>
+                    <Check className="mr-2 h-4 w-4" /> Saved
+                  </>
+                ) : (
+                  "Save Profile"
+                )}
               </Button>
 
               {!hasArtistPage && (
@@ -1028,118 +1143,147 @@ export default function Settings() {
 
                   <div className="flex flex-wrap gap-3">
                     <Button
-                      onClick={() => {
-                        saveBasic.mutate({
-                          userId: user.id,
-                          data: {
-                            avatarUrl: basic.avatarUrl || undefined,
-                            bannerUrl: basic.bannerUrl || undefined,
-                            bio: basic.bio || undefined,
-                            location: basic.location || undefined,
-                            city: basic.city || undefined,
-                            age: basic.age ? Number(basic.age) : undefined,
-                            work: basic.work || undefined,
-                            school: basic.school || undefined,
-                            about: basic.about || undefined,
-                            interests: String(basic.interests || "").split(",").map((item) => item.trim()).filter(Boolean),
-                            accentColor: basic.accentColor || undefined,
-                            themeName: basic.themeName || undefined,
-                            featuredContent: basic.featuredContent || undefined,
-                            links: String(basic.links || "")
-                              .split("\n")
-                              .map((line) => line.trim())
-                              .filter(Boolean)
-                              .map((line) => {
-                                const [label, url] = line.split("|");
-                                return { label: label?.trim() || url?.trim() || "Link", url: url?.trim() || label?.trim() || "" };
-                              })
-                              .filter((link) => link.url),
-                          },
-                        });
-                        saveArtist.mutate({
-                          userId: user.id,
-                          data: {
-                            category: artist.category,
-                            displayName: artist.displayName || undefined,
-                            avatarUrl: artist.avatarUrl || undefined,
-                            bannerUrl: artist.bannerUrl || undefined,
-                            location: artist.location || undefined,
-                            tagline: artist.tagline || undefined,
-                            tags: String(artist.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean),
-                            bio: artist.bio || undefined,
-                            influences: artist.influences || undefined,
-                            availabilityStatus: artist.availabilityStatus || undefined,
-                            pronouns: artist.pronouns || undefined,
-                            yearsActive: artist.yearsActive || undefined,
-                            representedBy: artist.representedBy || undefined,
-                            openForCommissions: creator.openForCommissions === "true",
-                            touring: creator.touring === "true",
-                            acceptsCollaborations: creator.acceptsCollaborations !== "false",
-                            customFields: String(artist.customFields || "")
-                              .split("\n")
-                              .map((line) => line.trim())
-                              .filter(Boolean)
-                              .map((line) => {
-                                const [label, value] = line.split("|");
-                                return { label: label?.trim() || "Field", value: value?.trim() || "" };
-                              })
-                              .filter((field) => field.value),
-                            bookingEmail: artist.bookingEmail || undefined,
-                            primaryActionType: creator.primaryActionType,
-                            primaryActionLabel: creator.primaryActionLabel,
-                            primaryActionUrl: creator.primaryActionUrl || undefined,
-                            featuredTitle: creator.featuredTitle || undefined,
-                            featuredDescription: creator.featuredDescription || undefined,
-                            featuredUrl: creator.featuredUrl || undefined,
-                            featuredType: creator.featuredType || "highlight",
-                            moodPreset: creator.moodPreset || "sleek",
-                            layoutTemplate: creator.layoutTemplate || "portfolio",
-                            fontPreset: creator.fontPreset || "modern",
-                            enabledModules: pageModules.enabledModules,
-                            moduleOrder: pageModules.moduleOrder,
-                            pinnedPostId: creator.pinnedPostId ? Number(creator.pinnedPostId) : null,
-                          },
-                        }, {
-                          onSuccess: () => {
-                            setActiveTab("creator");
-                            setActiveIdentity("artist");
-                            setLocation(`/artists/${user.id}`);
-                            toast({
-                              title: isStarterCreatorSetup ? "Artist page created" : "Artist page updated",
-                              description: "You are now viewing the public creator page.",
-                            });
-                          },
-                        });
+                      onClick={async () => {
+                        setSaveState((current) => ({ ...current, artistPage: "saving" }));
+                        try {
+                          await saveBasic.mutateAsync({
+                            userId: user.id,
+                            data: {
+                              avatarUrl: basic.avatarUrl || undefined,
+                              bannerUrl: basic.bannerUrl || undefined,
+                              bio: basic.bio || undefined,
+                              location: basic.location || undefined,
+                              city: basic.city || undefined,
+                              age: basic.age ? Number(basic.age) : undefined,
+                              work: basic.work || undefined,
+                              school: basic.school || undefined,
+                              about: basic.about || undefined,
+                              interests: String(basic.interests || "").split(",").map((item) => item.trim()).filter(Boolean),
+                              accentColor: basic.accentColor || undefined,
+                              themeName: basic.themeName || undefined,
+                              featuredContent: basic.featuredContent || undefined,
+                              links: String(basic.links || "")
+                                .split("\n")
+                                .map((line) => line.trim())
+                                .filter(Boolean)
+                                .map((line) => {
+                                  const [label, url] = line.split("|");
+                                  return { label: label?.trim() || url?.trim() || "Link", url: url?.trim() || label?.trim() || "" };
+                                })
+                                .filter((link) => link.url),
+                            },
+                          });
+                          await saveArtist.mutateAsync({
+                            userId: user.id,
+                            data: {
+                              category: artist.category,
+                              displayName: artist.displayName || undefined,
+                              avatarUrl: artist.avatarUrl || undefined,
+                              bannerUrl: artist.bannerUrl || undefined,
+                              location: artist.location || undefined,
+                              tagline: artist.tagline || undefined,
+                              tags: String(artist.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean),
+                              bio: artist.bio || undefined,
+                              influences: artist.influences || undefined,
+                              availabilityStatus: artist.availabilityStatus || undefined,
+                              pronouns: artist.pronouns || undefined,
+                              yearsActive: artist.yearsActive || undefined,
+                              representedBy: artist.representedBy || undefined,
+                              openForCommissions: creator.openForCommissions === "true",
+                              touring: creator.touring === "true",
+                              acceptsCollaborations: creator.acceptsCollaborations !== "false",
+                              customFields: String(artist.customFields || "")
+                                .split("\n")
+                                .map((line) => line.trim())
+                                .filter(Boolean)
+                                .map((line) => {
+                                  const [label, value] = line.split("|");
+                                  return { label: label?.trim() || "Field", value: value?.trim() || "" };
+                                })
+                                .filter((field) => field.value),
+                              bookingEmail: artist.bookingEmail || undefined,
+                              primaryActionType: creator.primaryActionType,
+                              primaryActionLabel: creator.primaryActionLabel,
+                              primaryActionUrl: creator.primaryActionUrl || undefined,
+                              featuredTitle: creator.featuredTitle || undefined,
+                              featuredDescription: creator.featuredDescription || undefined,
+                              featuredUrl: creator.featuredUrl || undefined,
+                              featuredType: creator.featuredType || "highlight",
+                              moodPreset: creator.moodPreset || "sleek",
+                              layoutTemplate: creator.layoutTemplate || "portfolio",
+                              fontPreset: creator.fontPreset || "modern",
+                              enabledModules: pageModules.enabledModules,
+                              moduleOrder: pageModules.moduleOrder,
+                              pinnedPostId: creator.pinnedPostId ? Number(creator.pinnedPostId) : null,
+                            },
+                          });
+                          setActiveTab("creator");
+                          setActiveIdentity("artist");
+                          setLocation(`/artists/${user.id}`);
+                          markSaved("artistPage");
+                          toast({
+                            title: isStarterCreatorSetup ? "Artist page created" : "Artist page updated",
+                            description: "You are now viewing the public creator page.",
+                          });
+                        } catch {
+                          setSaveState((current) => ({ ...current, artistPage: "idle" }));
+                        }
                       }}
                       disabled={saveArtist.isPending || (!isStarterCreatorSetup && !creator.primaryActionLabel?.trim())}
                     >
-                      {isStarterCreatorSetup ? "Create Artist Page" : "Save And View Artist Page"}
+                      {saveState.artistPage === "saving" ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
+                        </>
+                      ) : saveState.artistPage === "saved" ? (
+                        <>
+                          <Check className="mr-2 h-4 w-4" /> Saved
+                        </>
+                      ) : (
+                        isStarterCreatorSetup ? "Create Artist Page" : "Save And View Artist Page"
+                      )}
                     </Button>
                     {!isStarterCreatorSetup && <Button
                       variant="outline"
-                      onClick={() =>
-                        saveCreator.mutate({
-                          userId: user.id,
-                          data: {
-                            primaryActionType: creator.primaryActionType,
-                            primaryActionLabel: creator.primaryActionLabel,
-                            primaryActionUrl: creator.primaryActionUrl || undefined,
-                            featuredTitle: creator.featuredTitle || undefined,
-                            featuredDescription: creator.featuredDescription || undefined,
-                            featuredUrl: creator.featuredUrl || undefined,
-                            featuredType: creator.featuredType || "highlight",
-                            moodPreset: creator.moodPreset || "sleek",
-                            layoutTemplate: creator.layoutTemplate || "portfolio",
-                            fontPreset: creator.fontPreset || "modern",
-                            enabledModules: pageModules.enabledModules,
-                            moduleOrder: pageModules.moduleOrder,
-                            pinnedPostId: creator.pinnedPostId ? Number(creator.pinnedPostId) : null,
-                          },
-                        })
-                      }
+                      onClick={async () => {
+                        setSaveState((current) => ({ ...current, creatorConfig: "saving" }));
+                        try {
+                          await saveCreator.mutateAsync({
+                            userId: user.id,
+                            data: {
+                              primaryActionType: creator.primaryActionType,
+                              primaryActionLabel: creator.primaryActionLabel,
+                              primaryActionUrl: creator.primaryActionUrl || undefined,
+                              featuredTitle: creator.featuredTitle || undefined,
+                              featuredDescription: creator.featuredDescription || undefined,
+                              featuredUrl: creator.featuredUrl || undefined,
+                              featuredType: creator.featuredType || "highlight",
+                              moodPreset: creator.moodPreset || "sleek",
+                              layoutTemplate: creator.layoutTemplate || "portfolio",
+                              fontPreset: creator.fontPreset || "modern",
+                              enabledModules: pageModules.enabledModules,
+                              moduleOrder: pageModules.moduleOrder,
+                              pinnedPostId: creator.pinnedPostId ? Number(creator.pinnedPostId) : null,
+                            },
+                          });
+                          markSaved("creatorConfig");
+                        } catch {
+                          setSaveState((current) => ({ ...current, creatorConfig: "idle" }));
+                        }
+                      }}
                       disabled={saveCreator.isPending || !creator.primaryActionLabel?.trim()}
                     >
-                      Save Action + Featured
+                      {saveState.creatorConfig === "saving" ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
+                        </>
+                      ) : saveState.creatorConfig === "saved" ? (
+                        <>
+                          <Check className="mr-2 h-4 w-4" /> Saved
+                        </>
+                      ) : (
+                        "Save Action + Featured"
+                      )}
                     </Button>}
                   </div>
                 </CardContent>
@@ -1148,65 +1292,68 @@ export default function Settings() {
               {!isStarterCreatorSetup && <Card className="border-border/50 bg-card/50">
                 <CardHeader>
                   <CardTitle>Creator Preview</CardTitle>
-                  <CardDescription>This mirrors the visible identity people see on your artist page.</CardDescription>
+                  <CardDescription>This now uses the same mood, font, and live artist-page hero rules as the public page.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div
                     className={cn("overflow-hidden rounded-2xl border border-border/50 bg-background/40", creatorPreviewFontClass)}
                     style={{
-                      backgroundImage: artist.bannerUrl ? `linear-gradient(rgba(10,10,14,0.45), rgba(10,10,14,0.8)), url(${artist.bannerUrl})` : undefined,
+                      backgroundImage: artist.bannerUrl ? `url(${artist.bannerUrl})` : undefined,
                       backgroundSize: "cover",
                       backgroundPosition: "center",
                     }}
                   >
-                    <div className={cn("bg-gradient-to-br p-5 text-white", creatorPreviewMoodClass)}>
-                    <div className="mb-4 flex items-center gap-4">
-                      <Avatar className="h-16 w-16 border-2 border-background/90 shadow-xl">
-                        <AvatarImage src={artist.avatarUrl || ""} />
-                        <AvatarFallback>{(artist.displayName || user.username).slice(0, 2).toUpperCase()}</AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0">
-                        <div className="text-xs uppercase tracking-[0.2em] text-foreground/70">Page identity</div>
-                        <div className="truncate text-lg font-semibold">{artist.displayName || "Artist page name"}</div>
-                      </div>
-                    </div>
-                    <div className="mb-3 flex flex-wrap gap-2">
-                      <Badge variant="secondary">{artist.category || "General Creator"}</Badge>
-                      <Badge>{creator.primaryActionLabel || "Contact Me"}</Badge>
-                      <Badge variant="outline">{creator.moodPreset || "sleek"}</Badge>
-                    </div>
-                    <div className="text-2xl font-bold">{artist.displayName || "Artist page name"}</div>
-                    <div className="mt-2 text-sm font-medium text-foreground/75">{artist.location || basic.city || "Location preview"}</div>
-                    <div className="mt-4 text-base font-medium">{artist.tagline || "Creator homepage headline preview."}</div>
-                    <div className="mt-4 whitespace-pre-wrap text-sm text-foreground/75">{artist.bio || "Creator bio preview."}</div>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {String(artist.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean).slice(0, 5).map((tag) => <Badge key={tag} variant="secondary">{tag}</Badge>)}
-                    </div>
-                    <div className="mt-4 text-xs uppercase tracking-[0.2em] text-foreground/60">
-                      Layout: {creator.layoutTemplate || "portfolio"} / Font: {creator.fontPreset || "modern"}
-                    </div>
-                    <div className={cn("mt-5 grid gap-3", creatorPreviewLayoutClass)}>
-                      <div className="rounded-2xl border border-white/15 bg-white/8 p-4 backdrop-blur">
-                        <div className="text-xs uppercase tracking-[0.18em] text-white/60">Lead module</div>
-                        <div className="mt-2 text-sm font-medium">
-                          {creator.layoutTemplate === "music"
-                            ? "Featured release, player, and upcoming shows"
-                            : creator.layoutTemplate === "performer"
-                              ? "Showcase reel, bookings, and event lineup"
-                              : creator.layoutTemplate === "shop"
-                                ? "Featured product, gallery, and shop CTA"
-                                : creator.layoutTemplate === "editorial"
-                                  ? "Story-driven intro with polished modules"
-                                  : "Balanced portfolio with featured work first"}
+                    <div className="relative overflow-hidden">
+                      <div className={cn("absolute inset-0 bg-gradient-to-br", creatorPreviewLiveMood.shell)} />
+                      <div className={cn("absolute inset-0 bg-[radial-gradient(circle_at_top_left,var(--tw-gradient-stops))]", creatorPreviewLiveMood.glow)} />
+                      <div className="absolute inset-0 bg-gradient-to-t from-background via-background/78 to-background/18" />
+                      <div className="absolute inset-0 bg-black/12 dark:bg-black/22" />
+                      <div className="relative z-10 p-5 text-white">
+                        <div className="mb-4 flex items-center gap-4">
+                          <Avatar className="h-16 w-16 border-2 border-background/90 shadow-xl">
+                            <AvatarImage src={artist.avatarUrl || ""} />
+                            <AvatarFallback>{(artist.displayName || user.username).slice(0, 2).toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0">
+                            <div className="truncate text-lg font-semibold">{artist.displayName || "Artist page name"}</div>
+                            <div className="mt-1 text-sm text-white/75">{formatPlace([artist.location, basic.city, basic.location]) || "Location preview"}</div>
+                          </div>
+                        </div>
+                        <div className="mb-3 flex flex-wrap gap-2">
+                          <Badge variant="secondary">{artist.category || "General Creator"}</Badge>
+                          <Badge>{creator.primaryActionLabel || "Contact Me"}</Badge>
+                          <Badge variant="outline">{creator.layoutTemplate || "portfolio"}</Badge>
+                          <Badge variant="outline">{creator.fontPreset || "modern"}</Badge>
+                        </div>
+                        <div className={cn("text-2xl font-bold", creatorPreviewHeadingClass)}>{artist.displayName || "Artist page name"}</div>
+                        <div className="mt-4 text-base font-medium">{artist.tagline || "Creator homepage headline preview."}</div>
+                        <div className="mt-4 whitespace-pre-wrap text-sm text-white/75">{artist.bio || "Creator bio preview."}</div>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          {String(artist.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean).slice(0, 5).map((tag) => <Badge key={tag} variant="secondary">{tag}</Badge>)}
+                        </div>
+                        <div className={cn("mt-5 grid gap-3", creatorPreviewLayoutClass)}>
+                          <div className="rounded-2xl border border-white/15 bg-white/8 p-4 backdrop-blur">
+                            <div className="text-xs uppercase tracking-[0.18em] text-white/60">Primary area</div>
+                            <div className="mt-2 text-sm font-medium">
+                              {creator.layoutTemplate === "music"
+                                ? "Featured release, player, and upcoming shows"
+                                : creator.layoutTemplate === "performer"
+                                  ? "Showcase reel, bookings, and event lineup"
+                                  : creator.layoutTemplate === "shop"
+                                    ? "Featured product, gallery, and shop CTA"
+                                    : creator.layoutTemplate === "editorial"
+                                      ? "Story-first hero with stronger reading flow"
+                                      : "Balanced featured content and creator story"}
+                            </div>
+                          </div>
+                          <div className="rounded-2xl border border-white/15 bg-black/20 p-4 backdrop-blur">
+                            <div className="text-xs uppercase tracking-[0.18em] text-white/60">Secondary area</div>
+                            <div className="mt-2 text-sm text-white/85">
+                              Font and layout choices now match the live artist page instead of a generic mock card.
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      <div className="rounded-2xl border border-white/15 bg-black/20 p-4 backdrop-blur">
-                        <div className="text-xs uppercase tracking-[0.18em] text-white/60">Side module</div>
-                        <div className="mt-2 text-sm text-white/85">
-                          Mood and layout now change the public artist-page structure, not just the saved data.
-                        </div>
-                      </div>
-                    </div>
                     </div>
                   </div>
                 </CardContent>

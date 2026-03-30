@@ -6,11 +6,11 @@ import {
   Link2,
   Newspaper,
   Plus,
-  Radio,
   Save,
   Send,
   SlidersHorizontal,
   Sparkles,
+  Video,
   X,
 } from "lucide-react";
 import {
@@ -116,6 +116,26 @@ export default function Home() {
       return response.json() as Promise<{ artists: Array<{ userId: number; displayName?: string | null; avatarUrl?: string | null; category: string; location?: string | null; tagline?: string | null; tags?: string[]; user: { username: string; avatarUrl?: string | null } }> }>;
     },
   });
+  const { data: followingPreview, isLoading: isLoadingFollowingPreview } = useQuery({
+    queryKey: ["/api/users", user?.id, "following"],
+    enabled: !!user?.id,
+    queryFn: async () => {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/users/${user!.id}/following`, {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw new Error("Could not load following list");
+      }
+      return response.json() as Promise<Array<{
+        id: number;
+        username: string;
+        avatarUrl?: string | null;
+        hasArtistPage?: boolean;
+        location?: string | null;
+        city?: string | null;
+      }>>;
+    },
+  });
 
   const { data: customFeeds } = useGetCustomFeeds({
     query: {
@@ -160,6 +180,7 @@ export default function Home() {
     () => data?.pages.flatMap((page) => page.posts) || [],
     [data],
   );
+  const followingCount = followingPreview?.length || 0;
 
   const handlePostImageUpload = async (file: File | null) => {
     if (!file) return;
@@ -381,20 +402,73 @@ export default function Home() {
                 <DialogContent className="max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>Create Post</DialogTitle>
-                    <DialogDescription>Post into {activeFeedLabel(mode, selectedFeed?.name)}.</DialogDescription>
+                    <DialogDescription>Start with the update. Add media after.</DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="outline" className="rounded-full">
-                        <Radio className="mr-1 h-3 w-3" />
-                        Posting into {activeFeedLabel(mode, selectedFeed?.name)}
-                      </Badge>
-                      <Badge variant={activeIdentity === "artist" ? "default" : "secondary"} className="rounded-full">
-                        {activeIdentity === "artist" ? "Posting as artist page" : "Posting as personal"}
-                      </Badge>
-                      {city && <Badge variant="secondary">{city}</Badge>}
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">What&apos;s happening?</div>
+                      <Textarea
+                        data-testid="post-composer-textarea"
+                        placeholder="Share a release, drop, collab, or update..."
+                        value={postForm.content}
+                        onChange={(e) => setPostForm({ ...postForm, content: e.target.value })}
+                        className="min-h-44 rounded-2xl border border-border bg-background px-4 py-4 text-base shadow-sm focus-visible:ring-2 focus-visible:ring-primary/25"
+                      />
                     </div>
-                    {canUseArtistIdentity && (
+                    <div className="space-y-3 rounded-2xl border border-border/60 bg-background/40 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-medium">Add media</div>
+                          <div className="mt-1 text-xs text-muted-foreground">Attach an image or paste a video or link.</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button type="button" variant="ghost" size="icon" className="rounded-full" onClick={() => fileInputRef.current?.click()}>
+                            <ImageIcon className="h-5 w-5 text-primary" />
+                          </Button>
+                          <Button type="button" variant="ghost" size="icon" className="rounded-full" onClick={() => setShowLinkField(true)}>
+                            <Video className="h-5 w-5 text-foreground/70" />
+                          </Button>
+                          <Button type="button" variant="ghost" size="icon" className="rounded-full" onClick={() => setShowLinkField((current) => !current)}>
+                            <Link2 className="h-5 w-5 text-foreground/70" />
+                          </Button>
+                        </div>
+                      </div>
+                      {(postForm.imageUrl || postForm.linkUrl) ? (
+                        <div className="flex flex-wrap gap-2">
+                          {postForm.imageUrl ? (
+                            <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/50 px-3 py-2 text-xs">
+                              <ImageIcon className="h-3.5 w-3.5 text-primary" />
+                              Image attached
+                              <button type="button" onClick={() => setPostForm((current) => ({ ...current, imageUrl: "" }))}>
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ) : null}
+                          {postForm.linkUrl ? (
+                            <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-border/60 bg-background/50 px-3 py-2 text-xs">
+                              <Link2 className="h-3.5 w-3.5 text-primary" />
+                              <span className="truncate">{postForm.linkUrl}</span>
+                              <button type="button" onClick={() => setPostForm((current) => ({ ...current, linkUrl: "" }))}>
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+                      {showLinkField ? (
+                        <div className="space-y-2">
+                          <Input placeholder="Paste a video, article, audio, or link" value={postForm.linkUrl} onChange={(e) => setPostForm({ ...postForm, linkUrl: e.target.value })} />
+                          <div className="flex justify-end">
+                            <Button variant="ghost" size="sm" onClick={() => setShowLinkField(false)}>Done</Button>
+                          </div>
+                        </div>
+                      ) : null}
+                      <div className="text-xs text-muted-foreground">
+                        Paste a normal link. YouTube, Vimeo, Spotify, SoundCloud, and generic links are detected automatically.
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">Post as</div>
                       <div className="flex items-center gap-2 rounded-2xl border border-border/60 bg-background/40 p-2">
                         <Button
                           type="button"
@@ -411,12 +485,21 @@ export default function Home() {
                           size="sm"
                           className="rounded-full"
                           onClick={() => setActiveIdentity("artist")}
+                          disabled={!canUseArtistIdentity}
                         >
                           Artist Page
                         </Button>
                       </div>
-                    )}
-                    <div className="space-y-2">
+                    </div>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handlePostImageUpload(e.target.files?.[0] || null)}
+                      disabled={isUploadingPostImage}
+                    />
+                    <div className="space-y-2 rounded-2xl border border-border/50 bg-background/25 p-4">
                       <div className="text-sm font-medium">Who can see this?</div>
                       <Select value={postForm.visibility} onValueChange={(value) => setPostForm((current) => ({ ...current, visibility: value as "public" | "friends" | "private" }))}>
                         <SelectTrigger>
@@ -429,69 +512,8 @@ export default function Home() {
                         </SelectContent>
                       </Select>
                       <div className="text-xs text-muted-foreground">
-                        Public posts show everywhere. Friends-only posts are limited to accepted friends. Private posts only show on your own profile.
+                        Posting to {activeFeedLabel(mode, selectedFeed?.name)}{city ? ` / ${city}` : ""}.
                       </div>
-                    </div>
-                      <Textarea
-                        data-testid="post-composer-textarea"
-                        placeholder="Share a release, appearance, drop, call-for-collab, or update..."
-                        value={postForm.content}
-                        onChange={(e) => setPostForm({ ...postForm, content: e.target.value })}
-                      className="min-h-40 border-0 bg-background/20 px-0 text-base shadow-none focus-visible:ring-0"
-                    />
-                    {(postForm.imageUrl || postForm.linkUrl) ? (
-                      <div className="flex flex-wrap gap-2">
-                        {postForm.imageUrl ? (
-                          <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/50 px-3 py-2 text-xs">
-                            <ImageIcon className="h-3.5 w-3.5 text-primary" />
-                            Image attached
-                            <button type="button" onClick={() => setPostForm((current) => ({ ...current, imageUrl: "" }))}>
-                              <X className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        ) : null}
-                        {postForm.linkUrl ? (
-                          <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-border/60 bg-background/50 px-3 py-2 text-xs">
-                            <Link2 className="h-3.5 w-3.5 text-primary" />
-                            <span className="truncate">{postForm.linkUrl}</span>
-                            <button type="button" onClick={() => setPostForm((current) => ({ ...current, linkUrl: "" }))}>
-                              <X className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : null}
-                    {showLinkField ? (
-                      <div className="space-y-2">
-                        <Input placeholder="Paste a video, audio, article, or post link" value={postForm.linkUrl} onChange={(e) => setPostForm({ ...postForm, linkUrl: e.target.value })} />
-                        <div className="flex justify-end">
-                          <Button variant="ghost" size="sm" onClick={() => setShowLinkField(false)}>Done</Button>
-                        </div>
-                      </div>
-                    ) : null}
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => handlePostImageUpload(e.target.files?.[0] || null)}
-                      disabled={isUploadingPostImage}
-                    />
-                    <div className="rounded-2xl border border-border/60 bg-background/40 p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="text-sm font-medium">Add to your post</div>
-                        <div className="flex items-center gap-2">
-                          <Button type="button" variant="ghost" size="icon" className="rounded-full" onClick={() => fileInputRef.current?.click()}>
-                            <ImageIcon className="h-5 w-5 text-primary" />
-                          </Button>
-                          <Button type="button" variant="ghost" size="icon" className="rounded-full" onClick={() => setShowLinkField((current) => !current)}>
-                            <Link2 className="h-5 w-5 text-primary" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      Paste a normal link when you add one. YouTube, Vimeo, Spotify, SoundCloud, and generic links are detected automatically.
                     </div>
                     <div className="flex gap-3">
                       <Button variant="outline" className="flex-1" onClick={saveDraft}>
@@ -517,18 +539,25 @@ export default function Home() {
         </CardContent>
       </Card>
 
-      <Card className="cursor-pointer border-border/50 bg-card/70 transition-colors hover:border-primary/30" onClick={openPostDialog}>
+      <Card className="cursor-pointer border-border/70 bg-card/90 shadow-[0_10px_30px_rgba(15,23,42,0.08)] transition-colors hover:border-primary/35" onClick={openPostDialog}>
         <CardContent className="p-4 md:p-5">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-background/70 p-3 md:p-4">
             <Avatar className="h-10 w-10 md:h-11 md:w-11">
               <AvatarImage src={user?.avatarUrl || ""} />
               <AvatarFallback>{user?.username?.slice(0, 2).toUpperCase()}</AvatarFallback>
             </Avatar>
-              <button type="button" data-testid="open-post-composer" className="flex-1 rounded-full border border-border/60 bg-background/50 px-4 py-3 text-left text-sm text-muted-foreground">
-                <span className="mr-2 inline-flex rounded-full border border-border/60 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-foreground/70">
+              <button
+                type="button"
+                data-testid="open-post-composer"
+                className="flex-1 rounded-2xl border border-border bg-background px-4 py-3 text-left shadow-sm transition-colors hover:border-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+              >
+                <span className="mr-2 inline-flex rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-primary">
                   {activeIdentity === "artist" ? "Artist Page" : "Personal"}
                 </span>
-                Share a release, appearance, drop, call-for-collab, or update...
+                <div className="mt-2 text-sm font-medium text-foreground/85">Create a post</div>
+                <div className="mt-1 text-sm text-muted-foreground">
+                  Share a release, appearance, drop, call-for-collab, or update...
+                </div>
               </button>
             <div className="hidden items-center gap-1 sm:flex">
               <Button
@@ -743,6 +772,54 @@ export default function Home() {
                 </div>
               </div>
             </CardHeader>
+            {!selectedFeed && mode === "following" ? (
+              <CardContent className="pt-0">
+                <div className="rounded-2xl border border-border/50 bg-background/35 p-4">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <div className="text-sm font-medium">Following</div>
+                      <div className="mt-1 text-sm text-muted-foreground">
+                        {followingCount
+                          ? `You are following ${followingCount} ${followingCount === 1 ? "person or page" : "people and pages"}.`
+                          : "You are not following anyone yet."}
+                      </div>
+                    </div>
+                    <Link href="/discover">
+                      <Button variant="outline" size="sm">Find people to follow</Button>
+                    </Link>
+                  </div>
+                  {isLoadingFollowingPreview ? (
+                    <div className="mt-4 flex justify-center py-4"><Spinner /></div>
+                  ) : followingCount ? (
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      {followingPreview!.slice(0, 8).map((followedUser) => (
+                        <Link
+                          key={followedUser.id}
+                          href={followedUser.hasArtistPage ? `/artists/${followedUser.id}` : `/profile/${followedUser.id}`}
+                          className="flex items-center gap-3 rounded-2xl border border-border/50 bg-card/50 px-3 py-2 transition-colors hover:border-primary/30"
+                        >
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage src={followedUser.avatarUrl || ""} />
+                            <AvatarFallback>{followedUser.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-medium">{followedUser.username}</div>
+                            <div className="truncate text-xs text-muted-foreground">
+                              {followedUser.hasArtistPage ? "Artist page available" : "Personal profile"}
+                              {(followedUser.city || followedUser.location) ? ` / ${followedUser.city || followedUser.location}` : ""}
+                            </div>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="mt-4 rounded-2xl border border-dashed border-border/50 bg-card/30 p-4 text-sm text-muted-foreground">
+                      Follow a creator or person and they will appear here.
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            ) : null}
           </Card>
 
           {isLoading ? (

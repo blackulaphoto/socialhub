@@ -105,6 +105,8 @@ export default function Discover() {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ["/api/artists", "discover"] });
         queryClient.invalidateQueries({ queryKey: ["suggested-creators", "discover", user?.id] });
+        queryClient.invalidateQueries({ queryKey: ["/api/users", user?.id, "following"] });
+        queryClient.invalidateQueries({ queryKey: ["feed"] });
         toast({ title: "Following creator" });
       },
       onError: () => toast({ title: "Could not follow creator", variant: "destructive" }),
@@ -116,6 +118,8 @@ export default function Discover() {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ["/api/artists", "discover"] });
         queryClient.invalidateQueries({ queryKey: ["suggested-creators", "discover", user?.id] });
+        queryClient.invalidateQueries({ queryKey: ["/api/users", user?.id, "following"] });
+        queryClient.invalidateQueries({ queryKey: ["feed"] });
         toast({ title: "Unfollowed creator" });
       },
       onError: () => toast({ title: "Could not unfollow creator", variant: "destructive" }),

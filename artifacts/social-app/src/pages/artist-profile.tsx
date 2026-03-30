@@ -108,6 +108,14 @@ const FONT_PRESET_CLASSES: Record<string, string> = {
 
 const DEFAULT_MODULE_ORDER = ["featured", "about", "media", "posts", "events", "contact"];
 
+function formatPlace(parts: Array<string | null | undefined>) {
+  const normalized = parts
+    .map((part) => part?.trim())
+    .filter(Boolean) as string[];
+
+  return normalized.filter((part, index) => normalized.findIndex((item) => item.toLowerCase() === part.toLowerCase()) === index).join(", ");
+}
+
 function useSavedCreatorPages() {
   const storageKey = "artist-page-favorites";
   const [savedIds, setSavedIds] = useState<number[]>([]);
@@ -296,6 +304,7 @@ export default function ArtistProfile({ id }: { id: string }) {
   const artistPageName = artist.displayName || profile.user.username;
   const artistPageAvatar = artist.avatarUrl || null;
   const artistPageBanner = artist.bannerUrl || null;
+  const artistBaseLocation = formatPlace([artist.location, profile.user.city, profile.user.location]);
   const isOwnArtistPage = currentUser?.id === userId;
   const heroGridClass = layoutTemplate === "editorial"
     ? "lg:grid-cols-[1.2fr_0.8fr]"
@@ -351,6 +360,8 @@ export default function ArtistProfile({ id }: { id: string }) {
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ["profile", userId] });
+          queryClient.invalidateQueries({ queryKey: ["/api/users", currentUser?.id, "following"] });
+          queryClient.invalidateQueries({ queryKey: ["feed"] });
           queryClient.invalidateQueries({ queryKey: ["/api/activity/summary"] });
           queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
         },
@@ -434,10 +445,10 @@ export default function ArtistProfile({ id }: { id: string }) {
               <div className="mt-1 text-sm font-medium">{fact.value}</div>
             </div>
           ))}
-          {(artist.location || profile.user.city || profile.user.location) && (
+          {artistBaseLocation && (
             <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
               <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Base</div>
-              <div className="mt-1 text-sm font-medium">{artist.location || profile.user.city || profile.user.location}</div>
+              <div className="mt-1 text-sm font-medium">{artistBaseLocation}</div>
             </div>
           )}
         </div>
@@ -500,7 +511,7 @@ export default function ArtistProfile({ id }: { id: string }) {
             </div>
             <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
               <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Base</div>
-              <div className="mt-1 text-sm font-medium">{artist.location || profile.user.city || profile.user.location || "Location not added yet"}</div>
+              <div className="mt-1 text-sm font-medium">{artistBaseLocation || "Location not added yet"}</div>
             </div>
             {artist.availabilityStatus ? (
               <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
@@ -878,7 +889,7 @@ export default function ArtistProfile({ id }: { id: string }) {
                 <div className="max-w-4xl">
                   <div className="mb-4 flex flex-wrap gap-2">
                     <Badge variant="secondary">{artist.category}</Badge>
-                    {(profile.user.city || artist.location) && <Badge variant="outline">{profile.user.city || artist.location}</Badge>}
+                    {artistBaseLocation && <Badge variant="outline">{artistBaseLocation}</Badge>}
                     <Badge variant="outline">{MODULE_LABELS[visibleSections[0] || "featured"] || "Creator Page"}</Badge>
                     <Badge variant="outline">{layoutTemplate}</Badge>
                     <Badge variant="outline">{fontPreset}</Badge>
@@ -886,8 +897,8 @@ export default function ArtistProfile({ id }: { id: string }) {
                   <h1 className={cn("text-4xl font-bold md:text-6xl", headingClass)}>{artistPageName}</h1>
                   <p className={cn("mt-4 max-w-3xl text-lg font-medium text-foreground/95", layoutTemplate === "editorial" && "max-w-2xl text-xl", layoutTemplate === "music" && "text-xl")}>{heroTagline}</p>
                   <div className="mt-4 flex flex-wrap items-center gap-4 text-sm font-medium text-foreground/80">
-                    {(artist.location || profile.user.city || profile.user.location) && (
-                      <span className="inline-flex items-center"><MapPin className="mr-1.5 h-4 w-4" /> {artist.location || profile.user.city || profile.user.location}</span>
+                    {artistBaseLocation && (
+                      <span className="inline-flex items-center"><MapPin className="mr-1.5 h-4 w-4" /> {artistBaseLocation}</span>
                     )}
                     <span>{profile.user.followerCount} followers</span>
                     <span>{profile.user.followingCount} following</span>

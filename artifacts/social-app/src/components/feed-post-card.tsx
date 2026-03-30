@@ -496,15 +496,15 @@ export function FeedPostCard({
         ) : null}
         {cleanedContent ? <p className="whitespace-pre-wrap text-sm leading-6">{cleanedContent}</p> : null}
         {post.media?.length ? (
-          <div className="space-y-3">
+          <div className="space-y-4 rounded-[1.75rem] border border-border/50 bg-background/30 p-3 md:p-4">
             {post.media.map((item) => (
-              <div key={item.id} className="overflow-hidden rounded-2xl border border-border/50 bg-background/50">
+              <div key={item.id} className="overflow-hidden rounded-[1.5rem] border border-border/60 bg-background shadow-sm">
                 <MediaEmbed type={item.type} url={item.url} title={item.title || undefined} />
               </div>
             ))}
           </div>
         ) : fallbackLink ? (
-          <div className="overflow-hidden rounded-2xl border border-border/50 bg-background/50">
+          <div className="overflow-hidden rounded-[1.75rem] border border-border/60 bg-background/35 p-3 md:p-4">
             <MediaEmbed type="link" url={fallbackLink} />
           </div>
         ) : null}

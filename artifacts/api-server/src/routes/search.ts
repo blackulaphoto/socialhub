@@ -89,36 +89,50 @@ async function searchArtistUserIds(input: {
     select
       a.user_id as "userId",
       (
+        ts_rank_cd(to_tsvector('simple', coalesce(a.display_name, '')), websearch_to_tsquery('simple', $1)) * 3 +
         ts_rank_cd(to_tsvector('simple', coalesce(u.username, '')), websearch_to_tsquery('simple', $1)) * 2.2 +
         ts_rank_cd(to_tsvector('english', coalesce(a.category, '')), websearch_to_tsquery('english', $1)) * 1.5 +
         ts_rank_cd(to_tsvector('english', coalesce(a.tagline, '')), websearch_to_tsquery('english', $1)) +
         ts_rank_cd(to_tsvector('english', coalesce(a.bio, '')), websearch_to_tsquery('english', $1)) +
-        ts_rank_cd(to_tsvector('simple', coalesce(a.location, '') || ' ' || array_to_string(coalesce(a.tags, '{}'), ' ')), websearch_to_tsquery('simple', $1))
+        ts_rank_cd(to_tsvector('simple', coalesce(a.location, '') || ' ' || coalesce(d.city, '') || ' ' || coalesce(d.location, '') || ' ' || array_to_string(coalesce(a.tags, '{}'), ' ')), websearch_to_tsquery('simple', $1))
       ) as rank,
       greatest(
+        similarity(coalesce(a.display_name, ''), $1),
         similarity(coalesce(u.username, ''), $1),
         similarity(coalesce(a.category, ''), $1),
         similarity(coalesce(a.tagline, ''), $1),
         similarity(coalesce(a.location, ''), $1),
+        similarity(coalesce(d.city, ''), $1),
+        similarity(coalesce(d.location, ''), $1),
         similarity(array_to_string(coalesce(a.tags, '{}'), ' '), $1)
       ) as fuzzy_score
     from artist_profiles a
     inner join users u on u.id = a.user_id
+    left join user_profile_details d on d.user_id = a.user_id
     where
       (
         $1 = '' or
+        to_tsvector('simple', coalesce(a.display_name, '')) @@ websearch_to_tsquery('simple', $1) or
         to_tsvector('simple', coalesce(u.username, '')) @@ websearch_to_tsquery('simple', $1) or
         to_tsvector('english', coalesce(a.category, '')) @@ websearch_to_tsquery('english', $1) or
         to_tsvector('english', coalesce(a.tagline, '')) @@ websearch_to_tsquery('english', $1) or
         to_tsvector('english', coalesce(a.bio, '')) @@ websearch_to_tsquery('english', $1) or
-        to_tsvector('simple', coalesce(a.location, '') || ' ' || array_to_string(coalesce(a.tags, '{}'), ' ')) @@ websearch_to_tsquery('simple', $1) or
+        to_tsvector('simple', coalesce(a.location, '') || ' ' || coalesce(d.city, '') || ' ' || coalesce(d.location, '') || ' ' || array_to_string(coalesce(a.tags, '{}'), ' ')) @@ websearch_to_tsquery('simple', $1) or
+        similarity(coalesce(a.display_name, ''), $1) > 0.14 or
         similarity(coalesce(u.username, ''), $1) > 0.14 or
         similarity(coalesce(a.category, ''), $1) > 0.14 or
         similarity(coalesce(a.tagline, ''), $1) > 0.12 or
         similarity(coalesce(a.location, ''), $1) > 0.16 or
+        similarity(coalesce(d.city, ''), $1) > 0.16 or
+        similarity(coalesce(d.location, ''), $1) > 0.16 or
         similarity(array_to_string(coalesce(a.tags, '{}'), ' '), $1) > 0.14
       )
-      and ($2 = '' or coalesce(a.location, '') ilike ('%' || $2 || '%'))
+      and (
+        $2 = '' or
+        coalesce(a.location, '') ilike ('%' || $2 || '%') or
+        coalesce(d.city, '') ilike ('%' || $2 || '%') or
+        coalesce(d.location, '') ilike ('%' || $2 || '%')
+      )
       and ($3 = '' or coalesce(a.category, '') ilike ('%' || $3 || '%'))
       and (
         cardinality($4::text[]) = 0 or

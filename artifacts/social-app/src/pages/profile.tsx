@@ -36,6 +36,33 @@ import { ProfileReactionBar } from "@/components/profile-reaction-bar";
 import { BlockActionButton } from "@/components/block-action-button";
 import { LoadMoreSentinel } from "@/components/load-more-sentinel";
 import { useActiveIdentity } from "@/hooks/useActiveIdentity";
+import { cn } from "@/lib/utils";
+
+function formatPlace(parts: Array<string | null | undefined>) {
+  const normalized = parts
+    .map((part) => part?.trim())
+    .filter(Boolean) as string[];
+
+  return normalized.filter((part, index) => normalized.findIndex((item) => item.toLowerCase() === part.toLowerCase()) === index).join(", ");
+}
+
+const PROFILE_THEME_STYLES: Record<string, { shell: string; overlay: string; card: string }> = {
+  nocturne: {
+    shell: "linear-gradient(135deg, var(--profile-accent), rgba(12,12,18,0.92) 35%, rgba(20,28,44,0.9) 100%)",
+    overlay: "bg-gradient-to-t from-background via-background/70 to-background/10",
+    card: "bg-background/40",
+  },
+  ember: {
+    shell: "linear-gradient(135deg, var(--profile-accent), rgba(40,12,10,0.92) 32%, rgba(88,34,8,0.88) 100%)",
+    overlay: "bg-gradient-to-t from-background via-background/75 to-amber-950/10",
+    card: "bg-background/45",
+  },
+  afterhours: {
+    shell: "linear-gradient(135deg, var(--profile-accent), rgba(24,7,42,0.92) 34%, rgba(9,42,57,0.88) 100%)",
+    overlay: "bg-gradient-to-t from-background via-background/68 to-fuchsia-950/10",
+    card: "bg-background/38",
+  },
+};
 
 export default function Profile({ id }: { id: string }) {
   const userId = parseInt(id, 10);
@@ -106,6 +133,8 @@ export default function Profile({ id }: { id: string }) {
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ["/api/users", userId] });
+          queryClient.invalidateQueries({ queryKey: ["/api/users", currentUser?.id, "following"] });
+          queryClient.invalidateQueries({ queryKey: ["feed"] });
           queryClient.invalidateQueries({ queryKey: ["/api/activity/summary"] });
           queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
         },
@@ -119,19 +148,20 @@ export default function Profile({ id }: { id: string }) {
 
   const { user, isFollowing, artistProfile, creatorSettings, customFeeds, friendship, profileReactions, blockState, canInteract } = profile;
   const accent = user.accentColor || "#8b5cf6";
-  const locationLine = [user.city, user.location].filter(Boolean).join(" / ");
+  const locationLine = formatPlace([user.city, user.location]);
+  const profileTheme = PROFILE_THEME_STYLES[user.themeName || "nocturne"] || PROFILE_THEME_STYLES.nocturne;
   const photoPosts = profilePosts.filter((post) => post.imageUrl || post.media?.some((media) => media.type === "image"));
 
   return (
     <div className="w-full pb-14">
       <section
         className="relative border-b border-border/60"
-        style={{ background: `linear-gradient(135deg, ${accent}35, rgba(12,12,18,0.92) 35%, rgba(20,28,44,0.9) 100%)` }}
+        style={{ background: profileTheme.shell.replace("var(--profile-accent)", `${accent}35`) }}
       >
         {user.bannerUrl && (
           <div className="absolute inset-0 bg-cover bg-center opacity-35" style={{ backgroundImage: `url(${user.bannerUrl})` }} />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-background/10" />
+        <div className={cn("absolute inset-0", profileTheme.overlay)} />
         <div className="relative mx-auto flex max-w-5xl flex-col gap-8 px-4 py-12 md:py-16">
           <div className="flex flex-col gap-6 md:flex-row md:items-end">
             <Avatar className="h-28 w-28 border-4 border-background shadow-2xl md:h-36 md:w-36">
@@ -241,15 +271,15 @@ export default function Profile({ id }: { id: string }) {
           </div>
 
           <div className="grid grid-cols-3 gap-3 md:max-w-xl">
-            <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
+            <div className={cn("rounded-2xl border border-border/50 p-4", profileTheme.card)}>
               <div className="text-xs text-muted-foreground">Posts</div>
               <div className="mt-1 text-2xl font-semibold">{user.postCount}</div>
             </div>
-            <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
+            <div className={cn("rounded-2xl border border-border/50 p-4", profileTheme.card)}>
               <div className="text-xs text-muted-foreground">Followers</div>
               <div className="mt-1 text-2xl font-semibold">{user.followerCount}</div>
             </div>
-            <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
+            <div className={cn("rounded-2xl border border-border/50 p-4", profileTheme.card)}>
               <div className="text-xs text-muted-foreground">Following</div>
               <div className="mt-1 text-2xl font-semibold">{user.followingCount}</div>
             </div>

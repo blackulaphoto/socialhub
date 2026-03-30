@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Spinner } from "@/components/ui/spinner";
 import { QueryErrorState } from "@/components/query-error-state";
 import { FriendActionButton } from "@/components/friend-action-button";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 
 type SearchType = "all" | "users" | "artists" | "groups" | "events";
@@ -84,6 +85,7 @@ type SearchResponse = {
 };
 
 export default function Search() {
+  const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
@@ -117,6 +119,8 @@ export default function Search() {
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ["site-search"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/users", user?.id, "following"] });
+        queryClient.invalidateQueries({ queryKey: ["feed"] });
         toast({ title: "Following creator" });
       },
       onError: () => toast({ title: "Could not follow creator", variant: "destructive" }),
@@ -127,6 +131,8 @@ export default function Search() {
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ["site-search"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/users", user?.id, "following"] });
+        queryClient.invalidateQueries({ queryKey: ["feed"] });
         toast({ title: "Unfollowed creator" });
       },
       onError: () => toast({ title: "Could not unfollow creator", variant: "destructive" }),
