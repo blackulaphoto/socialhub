@@ -20,7 +20,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       queryKey: ["/api/auth/me"],
       retry: false,
       staleTime: 60_000,
-      refetchOnWindowFocus: false,
+      refetchOnWindowFocus: true,
+      refetchInterval: 60_000,
     }
   });
 

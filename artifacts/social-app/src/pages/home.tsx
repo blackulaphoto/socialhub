@@ -504,7 +504,7 @@ export default function Home() {
                         data-testid="submit-post"
                         className="flex-1"
                         onClick={submitPost}
-                        disabled={createPost.isPending || isUploadingPostImage || !postForm.content.trim()}
+                        disabled={createPost.isPending || isUploadingPostImage || !(postForm.content.trim() || postForm.imageUrl || postForm.linkUrl.trim())}
                       >
                         <Send className="mr-2 h-4 w-4" /> Post
                       </Button>

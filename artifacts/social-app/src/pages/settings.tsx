@@ -125,6 +125,8 @@ export default function Settings() {
     caption: "",
   });
   const [photoForm, setPhotoForm] = useState({ imageUrl: "", caption: "" });
+  const [photoFiles, setPhotoFiles] = useState<File[]>([]);
+  const [isUploadingPhotoBatch, setIsUploadingPhotoBatch] = useState(false);
   const [uploading, setUploading] = useState({
     avatar: false,
     banner: false,
@@ -317,6 +319,39 @@ export default function Settings() {
       });
     } finally {
       setUploading((current) => ({ ...current, [scope]: false }));
+    }
+  };
+
+  const uploadPhotosToGallery = async () => {
+    if (!photoFiles.length || !user) return;
+
+    setIsUploadingPhotoBatch(true);
+    try {
+      for (const file of photoFiles) {
+        const uploaded = await uploadImage(file, "photos");
+        await addUserPhoto.mutateAsync({
+          userId: user.id,
+          data: {
+            imageUrl: uploaded.url,
+            caption: photoForm.caption || undefined,
+          },
+        });
+      }
+
+      setPhotoFiles([]);
+      setPhotoForm({ imageUrl: "", caption: "" });
+      toast({
+        title: "Photos added",
+        description: `${photoFiles.length} photo${photoFiles.length === 1 ? "" : "s"} added to your gallery.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Could not upload photos",
+        description: error instanceof Error ? error.message : undefined,
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploadingPhotoBatch(false);
     }
   };
 
@@ -1189,25 +1224,28 @@ export default function Settings() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="photo-upload">Upload photo</Label>
+                  <Label htmlFor="photo-upload">Upload photos</Label>
                   <Input
                     id="photo-upload"
                     type="file"
                     accept="image/*"
-                    onChange={(e) => handleImageUpload(e.target.files?.[0] || null, "photos", (url) => setPhotoForm((current) => ({ ...current, imageUrl: url })))}
-                    disabled={uploading.photos}
+                    multiple
+                    onChange={(e) => setPhotoFiles(Array.from(e.target.files || []))}
+                    disabled={isUploadingPhotoBatch}
                   />
+                  <p className="text-xs text-muted-foreground">Pick one or many images. They can go straight to your gallery without creating a post.</p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="photo-url">Or paste image URL</Label>
-                  <Input id="photo-url" placeholder="https://..." value={photoForm.imageUrl} onChange={(e) => setPhotoForm({ ...photoForm, imageUrl: e.target.value })} />
+                  <Label htmlFor="photo-caption">Optional caption</Label>
+                  <Input id="photo-caption" placeholder="Leave blank if you just want the photos uploaded." value={photoForm.caption} onChange={(e) => setPhotoForm({ ...photoForm, caption: e.target.value })} />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="photo-caption">Caption</Label>
-                  <Input id="photo-caption" placeholder="Late-night shoot in downtown LA" value={photoForm.caption} onChange={(e) => setPhotoForm({ ...photoForm, caption: e.target.value })} />
-                </div>
-                <Button className="w-full" onClick={() => addUserPhoto.mutate({ userId: user.id, data: photoForm })} disabled={addUserPhoto.isPending || uploading.photos || !photoForm.imageUrl.trim()}>
-                  Add to Photo Gallery
+                {photoFiles.length > 0 ? (
+                  <div className="rounded-2xl border border-border/50 bg-background/40 px-4 py-3 text-sm text-muted-foreground">
+                    {photoFiles.length} file{photoFiles.length === 1 ? "" : "s"} ready for upload
+                  </div>
+                ) : null}
+                <Button className="w-full" onClick={uploadPhotosToGallery} disabled={addUserPhoto.isPending || isUploadingPhotoBatch || photoFiles.length === 0}>
+                  Upload to Photo Gallery
                 </Button>
               </CardContent>
             </Card>

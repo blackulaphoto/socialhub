@@ -114,8 +114,13 @@ router.post("/posts", requireAuth, async (req, res) => {
     : "public";
   const normalizedActorSurface = actorSurface === "artist" ? "artist" : "personal";
 
-  if (!normalizedContent && !normalizedRepostOfPostId) {
-    res.status(400).json({ error: "Content is required" });
+  const hasMedia = Boolean(
+    (typeof imageUrl === "string" && imageUrl.trim()) ||
+    (Array.isArray(media) && media.length > 0),
+  );
+
+  if (!normalizedContent && !normalizedRepostOfPostId && !hasMedia) {
+    res.status(400).json({ error: "Content or media is required" });
     return;
   }
 

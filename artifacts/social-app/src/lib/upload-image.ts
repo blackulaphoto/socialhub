@@ -36,6 +36,10 @@ export async function uploadImage(file: File, scope: UploadScope): Promise<Uploa
     credentials: "include",
   });
 
+  if (response.status === 401) {
+    throw new Error("Session expired. Please log in again.");
+  }
+
   if (!response.ok) {
     const error = await response.json().catch(() => null);
     const message =
