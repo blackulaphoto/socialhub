@@ -33,7 +33,7 @@ function parseTrustProxy(value: string | undefined) {
 
 function parseAllowedOrigins(value: string | undefined) {
   return value
-    ?.split(",")
+    ?.split(/[\s,]+/)
     .map((origin) => origin.trim())
     .filter(Boolean) ?? [];
 }
