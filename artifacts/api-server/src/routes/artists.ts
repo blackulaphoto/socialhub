@@ -1,18 +1,20 @@
 import { Router } from "express";
-import { artistProfilesTable, creatorProfileSettingsTable, db, galleryItemsTable, usersTable } from "@workspace/db";
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { artistProfilesTable, creatorProfileSettingsTable, db, followsTable, galleryItemsTable, usersTable } from "@workspace/db";
+import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth.js";
-import { formatArtistProfile } from "./helpers.js";
+import { formatArtistProfile, getBlockState, getBlockedUserIds } from "./helpers.js";
 
 const router = Router();
 
 router.get("/artists", async (req, res) => {
   const { location, category, tags, q } = req.query as Record<string, string>;
+  const blockedUserIds = await getBlockedUserIds(req.session.userId);
   const conditions = [];
 
   if (q) {
     conditions.push(or(
       ilike(usersTable.username, `%${q}%`),
+      ilike(artistProfilesTable.displayName, `%${q}%`),
       ilike(artistProfilesTable.category, `%${q}%`),
       ilike(artistProfilesTable.location, `%${q}%`),
     ));
@@ -31,7 +33,21 @@ router.get("/artists", async (req, res) => {
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(desc(artistProfilesTable.updatedAt));
 
-  const artists = await Promise.all(results.map((row) => formatArtistProfile(row.artist_profiles, row.users)));
+  const visibleResults = results.filter((row) => !blockedUserIds.includes(row.users.id));
+  const followRows = req.session.userId && visibleResults.length > 0
+    ? await db.select({ followingId: followsTable.followingId }).from(followsTable).where(and(
+      eq(followsTable.followerId, req.session.userId),
+      inArray(followsTable.followingId, visibleResults.map((row) => row.artist_profiles.userId)),
+    ))
+    : [];
+  const followingSet = new Set(followRows.map((row) => row.followingId));
+
+  const artists = await Promise.all(
+    visibleResults.map(async (row) => ({
+      ...(await formatArtistProfile(row.artist_profiles, row.users, req.session.userId)),
+      isFollowing: followingSet.has(row.artist_profiles.userId),
+    })),
+  );
   res.json({ artists, total: artists.length, page: 1, totalPages: 1 });
 });
 
@@ -49,8 +65,13 @@ router.get("/artists/:userId", async (req, res) => {
     res.status(404).json({ error: "Not found", message: "Artist profile not found" });
     return;
   }
+  const blockState = await getBlockState(req.session.userId, userId);
+  if (blockState.isBlockedEitherWay && req.session.userId !== userId) {
+    res.status(403).json({ error: "Artist page unavailable" });
+    return;
+  }
 
-  res.json(await formatArtistProfile(profile, user));
+  res.json(await formatArtistProfile(profile, user, req.session.userId));
 });
 
 router.post("/artists/:userId/update", requireAuth, async (req, res) => {
@@ -61,6 +82,7 @@ router.post("/artists/:userId/update", requireAuth, async (req, res) => {
   }
 
   const {
+    displayName,
     category,
     location,
     tagline,
@@ -95,6 +117,7 @@ router.post("/artists/:userId/update", requireAuth, async (req, res) => {
   if (!profile) {
     [profile] = await db.insert(artistProfilesTable).values({
       userId,
+      displayName: displayName || null,
       category: category || "General Creator",
       location: location || null,
       tagline: tagline || null,
@@ -113,6 +136,7 @@ router.post("/artists/:userId/update", requireAuth, async (req, res) => {
     }).returning();
   } else {
     [profile] = await db.update(artistProfilesTable).set({
+      displayName: displayName ?? null,
       category: category ?? profile.category,
       location: location ?? null,
       tagline: tagline ?? null,
@@ -168,7 +192,7 @@ router.post("/artists/:userId/update", requireAuth, async (req, res) => {
   });
 
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
-  res.json(await formatArtistProfile(profile, user!));
+  res.json(await formatArtistProfile(profile, user!, req.session.userId));
 });
 
 router.post("/artists/:userId/gallery", requireAuth, async (req, res) => {

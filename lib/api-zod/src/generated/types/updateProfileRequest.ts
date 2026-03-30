@@ -20,6 +20,8 @@ export interface UpdateProfileRequest {
   interests?: string[];
   accentColor?: string | null;
   themeName?: string | null;
+  onboardingCompleted?: boolean;
+  onboardingStep?: string;
   featuredContent?: string | null;
   links?: LinkItem[];
 }

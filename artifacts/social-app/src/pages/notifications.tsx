@@ -1,4 +1,4 @@
-import { Bell, Heart, MessageSquare, UserPlus } from "lucide-react";
+import { AtSign, Bell, CalendarClock, Heart, MessageSquare, UserPlus } from "lucide-react";
 import { Link } from "wouter";
 import {
   useGetActivitySummary,
@@ -17,6 +17,8 @@ import { QueryErrorState } from "@/components/query-error-state";
 function iconForType(type: string) {
   if (type === "follow") return UserPlus;
   if (type === "like") return Heart;
+  if (type === "mention") return AtSign;
+  if (type === "event_tag" || type === "event_reminder") return CalendarClock;
   return MessageSquare;
 }
 
@@ -65,7 +67,7 @@ export default function Notifications() {
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-3xl font-bold">Notification Center</h1>
-          <p className="text-muted-foreground">Recent follows, likes, messages, and creator inquiries.</p>
+          <p className="text-muted-foreground">Recent follows, likes, mentions, messages, lineup tags, and event reminders.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <Card className="bg-card/50 border-border/50"><CardContent className="px-4 py-3"><div className="text-xs text-muted-foreground">Unread messages</div><div className="text-2xl font-bold">{summary?.unreadMessages || 0}</div></CardContent></Card>

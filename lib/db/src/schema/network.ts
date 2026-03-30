@@ -25,6 +25,8 @@ export const userProfileDetailsTable = pgTable("user_profile_details", {
   interests: text("interests").array().notNull().default([]),
   accentColor: text("accent_color"),
   themeName: text("theme_name"),
+  onboardingCompleted: boolean("onboarding_completed").notNull().default(false),
+  onboardingStep: text("onboarding_step").notNull().default("profile"),
   links: jsonb("links").$type<Array<{ label: string; url: string }>>().notNull().default([]),
   featuredContent: text("featured_content"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -180,6 +182,13 @@ export const friendshipsTable = pgTable("friendships", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [unique().on(table.requesterUserId, table.addresseeUserId)]);
+
+export const userBlocksTable = pgTable("user_blocks", {
+  id: serial("id").primaryKey(),
+  blockerUserId: integer("blocker_user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  blockedUserId: integer("blocked_user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [unique().on(table.blockerUserId, table.blockedUserId)]);
 
 export const reportsTable = pgTable("reports", {
   id: serial("id").primaryKey(),

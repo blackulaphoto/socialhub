@@ -1,4 +1,5 @@
 import { Link } from "wouter";
+import { useMemo } from "react";
 import {
   Camera,
   Compass,
@@ -14,9 +15,9 @@ import {
 } from "lucide-react";
 import {
   useFollowUser,
+  getUserPosts,
   useGetUser,
   useGetUserPhotos,
-  useGetUserPosts,
   useUnfollowUser,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -27,15 +28,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FeedPostCard } from "@/components/feed-post-card";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { QueryErrorState } from "@/components/query-error-state";
 import { ReportDialog } from "@/components/report-dialog";
 import { FriendActionButton } from "@/components/friend-action-button";
 import { ProfileReactionBar } from "@/components/profile-reaction-bar";
+import { BlockActionButton } from "@/components/block-action-button";
+import { LoadMoreSentinel } from "@/components/load-more-sentinel";
+import { useActiveIdentity } from "@/hooks/useActiveIdentity";
 
 export default function Profile({ id }: { id: string }) {
   const userId = parseInt(id, 10);
   const { user: currentUser } = useAuth();
+  const { setActiveIdentity } = useActiveIdentity();
   const queryClient = useQueryClient();
   const isOwnProfile = currentUser?.id === userId;
 
@@ -53,11 +58,19 @@ export default function Profile({ id }: { id: string }) {
     isLoading: isLoadingPosts,
     isError: isPostsError,
     refetch: refetchPosts,
-  } = useGetUserPosts(userId, { limit: 50 }, {
-    query: {
-      queryKey: ["/api/users", userId, "posts"],
-      enabled: !!userId,
-    },
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ["/api/users", userId, "posts", "personal"],
+    enabled: !!userId,
+    initialPageParam: undefined as number | undefined,
+    queryFn: ({ pageParam, signal }) => getUserPosts(userId, {
+      cursor: pageParam,
+      limit: 10,
+      surface: "personal",
+    }, { signal }),
+    getNextPageParam: (lastPage) => lastPage.hasMore ? (lastPage.nextCursor ?? undefined) : undefined,
   });
   const { data: userPhotos } = useGetUserPhotos(userId, {
     query: {
@@ -68,6 +81,10 @@ export default function Profile({ id }: { id: string }) {
 
   const { mutate: follow } = useFollowUser();
   const { mutate: unfollow } = useUnfollowUser();
+  const profilePosts = useMemo(
+    () => postsData?.pages.flatMap((page) => page.posts) || [],
+    [postsData],
+  );
   const handleShare = async () => {
     const url = `${window.location.origin}/profile/${userId}`;
     try {
@@ -100,10 +117,10 @@ export default function Profile({ id }: { id: string }) {
   if (isProfileError) return <div className="mx-auto max-w-5xl px-4 py-8"><QueryErrorState title="Could not load profile" description="The profile request failed. If the API was restarted, retry." onRetry={() => refetchProfile()} /></div>;
   if (!profile) return <div className="py-20 text-center">User not found.</div>;
 
-  const { user, isFollowing, artistProfile, creatorSettings, customFeeds, friendship, profileReactions } = profile;
+  const { user, isFollowing, artistProfile, creatorSettings, customFeeds, friendship, profileReactions, blockState, canInteract } = profile;
   const accent = user.accentColor || "#8b5cf6";
   const locationLine = [user.city, user.location].filter(Boolean).join(" / ");
-  const photoPosts = (postsData?.posts || []).filter((post) => post.imageUrl || post.media?.some((media) => media.type === "image"));
+  const photoPosts = profilePosts.filter((post) => post.imageUrl || post.media?.some((media) => media.type === "image"));
 
   return (
     <div className="w-full pb-14">
@@ -157,13 +174,24 @@ export default function Profile({ id }: { id: string }) {
                           </Button>
                         </Link>
                       )}
+                      {artistProfile && (
+                        <Link href={`/artists/${user.id}`}>
+                          <Button
+                            variant="secondary"
+                            onClick={() => setActiveIdentity("artist")}
+                          >
+                            <Sparkles className="mr-2 h-4 w-4" /> Switch To Artist Page
+                          </Button>
+                        </Link>
+                      )}
                     </>
                   ) : (
                     <>
-                      <FriendActionButton userId={userId} friendship={friendship} invalidateKeys={[[ "/api/users", userId ]]} />
-                      <Button onClick={handleFollowToggle} variant={isFollowing ? "outline" : "default"}>
+                      {canInteract ? <FriendActionButton userId={userId} friendship={friendship} invalidateKeys={[[ "/api/users", userId ]]} /> : null}
+                      <Button onClick={handleFollowToggle} variant={isFollowing ? "outline" : "default"} disabled={!canInteract}>
                         {isFollowing ? "Following" : "Follow"}
                       </Button>
+                      <BlockActionButton userId={userId} blockState={blockState} invalidateKeys={[[ "/api/users", userId ]]} />
                       <Button variant="outline" onClick={handleShare}>
                         <Share2 className="mr-2 h-4 w-4" /> Share
                       </Button>
@@ -232,7 +260,14 @@ export default function Profile({ id }: { id: string }) {
                 <HeartHandshake className="mr-2 h-4 w-4 text-primary" />
                 {user.friendCount} friends
               </div>
-              <ProfileReactionBar userId={userId} summary={profileReactions} invalidateKeys={[[ "/api/users", userId ]]} />
+              {canInteract ? <ProfileReactionBar userId={userId} summary={profileReactions} invalidateKeys={[[ "/api/users", userId ]]} /> : null}
+            </div>
+          ) : null}
+          {!isOwnProfile && !canInteract ? (
+            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+              {blockState?.hasBlockedUser
+                ? "You blocked this user. Their posts and interactions are hidden until you unblock them."
+                : "This user has blocked you. Social interactions are unavailable."}
             </div>
           ) : null}
         </div>
@@ -264,11 +299,20 @@ export default function Profile({ id }: { id: string }) {
                 <div className="flex justify-center py-8"><Spinner /></div>
               ) : isPostsError ? (
                 <QueryErrorState title="Could not load posts" description="The profile loaded, but posts could not be fetched." onRetry={() => refetchPosts()} />
-              ) : postsData?.posts?.length ? (
+              ) : profilePosts.length ? (
                 <div className="space-y-4">
-                  {postsData.posts.map((post) => (
+                  {profilePosts.map((post) => (
                     <FeedPostCard key={post.id} post={post} showAuthor={false} />
                   ))}
+                  <LoadMoreSentinel
+                    enabled={Boolean(hasNextPage)}
+                    isLoading={isFetchingNextPage}
+                    onVisible={() => {
+                      if (hasNextPage && !isFetchingNextPage) {
+                        fetchNextPage();
+                      }
+                    }}
+                  />
                 </div>
               ) : (
                 <div className="rounded-xl border border-dashed border-border/50 bg-card/20 py-12 text-center text-muted-foreground">
@@ -289,7 +333,7 @@ export default function Profile({ id }: { id: string }) {
                       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                         {userPhotos.map((photo) => (
                           <div key={photo.id} className="overflow-hidden rounded-2xl border border-border/50 bg-background/40">
-                            <img src={photo.imageUrl} alt={photo.caption || `${user.username} photo`} className="h-56 w-full object-cover" />
+                            <img src={photo.imageUrl} alt={photo.caption || `${user.username} photo`} loading="lazy" decoding="async" className="h-56 w-full object-cover" />
                             <div className="space-y-2 p-4">
                               {photo.caption && <div className="text-sm">{photo.caption}</div>}
                               <div className="text-xs text-muted-foreground">{new Date(photo.createdAt).toLocaleDateString()}</div>

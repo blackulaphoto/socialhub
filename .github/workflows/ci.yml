@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: social_hub
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d social_hub"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/social_hub
+      PORT: 3001
+      SESSION_SECRET: ci-session-secret
+      BASE_PATH: /
+      VITE_API_BASE_URL: http://localhost:3001
+      PLAYWRIGHT_SKIP_API_BOOT: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.29.2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browser
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Generate API client
+        run: pnpm --filter @workspace/api-spec run codegen
+
+      - name: Run migrations
+        run: pnpm run db:migrate
+
+      - name: Seed database
+        run: pnpm --filter @workspace/scripts run seed
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: API coverage
+        run: pnpm run test:api:coverage
+
+      - name: Build API
+        run: pnpm --filter @workspace/api-server run build
+
+      - name: Start API
+        run: node --enable-source-maps ./artifacts/api-server/dist/index.mjs > api.log 2>&1 &
+
+      - name: Wait for API
+        run: |
+          for i in {1..30}; do
+            if curl -fsS http://localhost:3001/api/healthz > /dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "API did not become healthy in time"
+          cat api.log || true
+          exit 1
+
+      - name: E2E tests
+        run: pnpm run test:e2e
+
+      - name: Upload Playwright artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts
+          path: |
+            test-results
+            playwright-report
+            api.log

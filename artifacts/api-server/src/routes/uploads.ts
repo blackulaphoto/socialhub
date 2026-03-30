@@ -1,16 +1,13 @@
-import fs from "node:fs/promises";
-import path from "node:path";
 import { Router } from "express";
 import multer from "multer";
 import { requireAuth } from "../middlewares/auth.js";
 import {
   allowedUploadScopes,
-  buildStoredFilename,
-  ensureUploadDirectory,
   getImageExtension,
   getPublicUploadUrl,
+  processImageUpload,
   type UploadScope,
-} from "../lib/uploads.js";
+} from "../lib/media-storage.js";
 
 const router = Router();
 
@@ -41,19 +38,26 @@ router.post("/uploads/images", requireAuth, upload.single("file"), async (req, r
   }
 
   const scope = rawScope as UploadScope;
-  const directory = ensureUploadDirectory(scope);
-  const filename = buildStoredFilename(req.session.userId!, extension);
-  const targetPath = path.join(directory, filename);
-
-  await fs.writeFile(targetPath, file.buffer);
+  const processed = await processImageUpload({
+    buffer: file.buffer,
+    scope,
+    userId: req.session.userId!,
+    originalName: file.originalname,
+    mimeType: file.mimetype,
+  });
 
   res.status(201).json({
-    url: getPublicUploadUrl(req, scope, filename),
-    path: `/uploads/${scope}/${filename}`,
-    fileName: filename,
+    storageProvider: processed.provider,
+    url: getPublicUploadUrl(req, scope, processed.fileName),
+    thumbnailUrl: getPublicUploadUrl(req, scope, `thumbs/${processed.thumbnailFileName}`),
+    path: `/uploads/${scope}/${processed.fileName}`,
+    thumbnailPath: `/uploads/${scope}/thumbs/${processed.thumbnailFileName}`,
+    fileName: processed.fileName,
     scope,
-    mimeType: file.mimetype,
-    size: file.size,
+    mimeType: processed.mimeType,
+    size: processed.bytes,
+    width: processed.width,
+    height: processed.height,
   });
 });
 

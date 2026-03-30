@@ -5,8 +5,10 @@
  * ArtistHub Social Platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { GetUserPostsSurface } from "./getUserPostsSurface";
 
 export type GetUserPostsParams = {
-  page?: number;
+  cursor?: number;
   limit?: number;
+  surface?: GetUserPostsSurface;
 };

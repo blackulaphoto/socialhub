@@ -5,12 +5,18 @@
  * ArtistHub Social Platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { UploadImageResponseStorageProvider } from "./uploadImageResponseStorageProvider";
 
 export interface UploadImageResponse {
+  storageProvider: UploadImageResponseStorageProvider;
   url: string;
+  thumbnailUrl?: string | null;
   path: string;
+  thumbnailPath?: string | null;
   fileName: string;
   scope: string;
   mimeType: string;
   size: number;
+  width?: number | null;
+  height?: number | null;
 }

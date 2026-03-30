@@ -68,6 +68,8 @@ export interface User {
   hasArtistPage?: boolean;
   accentColor?: string | null;
   themeName?: string | null;
+  onboardingCompleted?: boolean;
+  onboardingStep?: string;
   links?: LinkItem[];
   featuredContent?: string | null;
 }
@@ -88,6 +90,7 @@ export const UserSummaryProfileType = {
 export interface UserSummary {
   id: number;
   username: string;
+  artistDisplayName?: string | null;
   avatarUrl?: string | null;
   bio?: string | null;
   profileType: UserSummaryProfileType;
@@ -103,9 +106,13 @@ export interface UserSummary {
   interests?: string[];
   hasArtistPage?: boolean;
   accentColor?: string | null;
+  onboardingCompleted?: boolean;
+  onboardingStep?: string;
   links?: LinkItem[];
   category?: string | null;
   tags?: string[];
+  hasBlockedUser: boolean;
+  isBlockedByUser: boolean;
 }
 
 export interface NotificationItem {
@@ -146,6 +153,12 @@ export interface FriendshipState {
   id?: number | null;
   status: FriendshipStateStatus;
   isFriend: boolean;
+}
+
+export interface BlockState {
+  hasBlockedUser: boolean;
+  isBlockedByUser: boolean;
+  isBlockedEitherWay: boolean;
 }
 
 export interface ReactionCounts {
@@ -190,6 +203,23 @@ export interface GalleryItem {
   createdAt: string;
 }
 
+export type PostActorSurface =
+  (typeof PostActorSurface)[keyof typeof PostActorSurface];
+
+export const PostActorSurface = {
+  personal: "personal",
+  artist: "artist",
+} as const;
+
+export type PostVisibility =
+  (typeof PostVisibility)[keyof typeof PostVisibility];
+
+export const PostVisibility = {
+  public: "public",
+  friends: "friends",
+  private: "private",
+} as const;
+
 export type PostCurrentUserReaction =
   | (typeof PostCurrentUserReaction)[keyof typeof PostCurrentUserReaction]
   | null;
@@ -225,8 +255,10 @@ export interface PostMedia {
 export interface Post {
   id: number;
   userId: number;
+  actorSurface: PostActorSurface;
   content: string;
   imageUrl?: string | null;
+  visibility: PostVisibility;
   repostOfPostId?: number | null;
   likeCount: number;
   isLiked: boolean;
@@ -246,6 +278,7 @@ export interface Post {
 export interface ArtistProfile {
   id: number;
   userId: number;
+  displayName?: string | null;
   category: string;
   location?: string | null;
   tagline?: string | null;
@@ -290,6 +323,8 @@ export interface UserProfileDetails {
   interests?: string[];
   accentColor?: string | null;
   themeName?: string | null;
+  onboardingCompleted?: boolean;
+  onboardingStep?: string;
   links?: LinkItem[];
   featuredContent?: string | null;
   createdAt?: string;
@@ -329,6 +364,8 @@ export interface UserProfile {
   user: User;
   isFollowing: boolean;
   friendship: FriendshipState;
+  blockState: BlockState;
+  canInteract: boolean;
   profileReactions: ReactionSummary;
   artistProfile?: ArtistProfile | null;
   details?: UserProfileDetails | null;
@@ -349,6 +386,8 @@ export interface UpdateProfileRequest {
   interests?: string[];
   accentColor?: string | null;
   themeName?: string | null;
+  onboardingCompleted?: boolean;
+  onboardingStep?: string;
   featuredContent?: string | null;
   links?: LinkItem[];
 }
@@ -369,6 +408,23 @@ export interface UpdateCreatorSettingsRequest {
   pinnedPostId?: number | null;
 }
 
+export type CreatePostRequestActorSurface =
+  (typeof CreatePostRequestActorSurface)[keyof typeof CreatePostRequestActorSurface];
+
+export const CreatePostRequestActorSurface = {
+  personal: "personal",
+  artist: "artist",
+} as const;
+
+export type CreatePostRequestVisibility =
+  (typeof CreatePostRequestVisibility)[keyof typeof CreatePostRequestVisibility];
+
+export const CreatePostRequestVisibility = {
+  public: "public",
+  friends: "friends",
+  private: "private",
+} as const;
+
 export interface PostMediaInput {
   type?: string;
   url?: string;
@@ -379,8 +435,35 @@ export interface PostMediaInput {
 export interface CreatePostRequest {
   content?: string;
   imageUrl?: string | null;
+  actorSurface?: CreatePostRequestActorSurface;
   repostOfPostId?: number | null;
   groupId?: number | null;
+  visibility?: CreatePostRequestVisibility;
+  media?: PostMediaInput[];
+}
+
+export type UpdatePostRequestActorSurface =
+  (typeof UpdatePostRequestActorSurface)[keyof typeof UpdatePostRequestActorSurface];
+
+export const UpdatePostRequestActorSurface = {
+  personal: "personal",
+  artist: "artist",
+} as const;
+
+export type UpdatePostRequestVisibility =
+  (typeof UpdatePostRequestVisibility)[keyof typeof UpdatePostRequestVisibility];
+
+export const UpdatePostRequestVisibility = {
+  public: "public",
+  friends: "friends",
+  private: "private",
+} as const;
+
+export interface UpdatePostRequest {
+  content: string;
+  imageUrl?: string | null;
+  actorSurface?: UpdatePostRequestActorSurface;
+  visibility?: UpdatePostRequestVisibility;
   media?: PostMediaInput[];
 }
 
@@ -410,8 +493,9 @@ export interface CreatePostCommentRequest {
 export interface PostsResponse {
   posts: Post[];
   total: number;
-  page: number;
-  totalPages: number;
+  limit: number;
+  nextCursor: number | null;
+  hasMore: boolean;
 }
 
 export type FeedResponse = PostsResponse & {
@@ -419,6 +503,7 @@ export type FeedResponse = PostsResponse & {
 };
 
 export interface UpdateArtistRequest {
+  displayName?: string | null;
   category?: string;
   location?: string | null;
   tagline?: string | null;
@@ -540,6 +625,8 @@ export interface SearchResponse {
   users: UserSummary[];
   artists: ArtistProfile[];
   total: number;
+  usersTotal: number;
+  artistsTotal: number;
 }
 
 export interface CustomFeedRequest {
@@ -658,13 +745,25 @@ export interface PageViewRequest {
   referrer?: string | null;
 }
 
+export type UploadImageResponseStorageProvider =
+  (typeof UploadImageResponseStorageProvider)[keyof typeof UploadImageResponseStorageProvider];
+
+export const UploadImageResponseStorageProvider = {
+  local: "local",
+} as const;
+
 export interface UploadImageResponse {
+  storageProvider: UploadImageResponseStorageProvider;
   url: string;
+  thumbnailUrl?: string | null;
   path: string;
+  thumbnailPath?: string | null;
   fileName: string;
   scope: string;
   mimeType: string;
   size: number;
+  width?: number | null;
+  height?: number | null;
 }
 
 export interface AnalyticsTopPath {
@@ -713,11 +812,15 @@ export type UploadImageBody = {
   scope: UploadImageBodyScope;
 };
 
+export type GetSuggestedCreatorsParams = {
+  limit?: number;
+};
+
 export type GetFeedParams = {
   mode?: GetFeedMode;
   city?: string;
   customFeedId?: number;
-  page?: number;
+  cursor?: number;
   limit?: number;
 };
 
@@ -731,9 +834,18 @@ export const GetFeedMode = {
 } as const;
 
 export type GetUserPostsParams = {
-  page?: number;
+  cursor?: number;
   limit?: number;
+  surface?: GetUserPostsSurface;
 };
+
+export type GetUserPostsSurface =
+  (typeof GetUserPostsSurface)[keyof typeof GetUserPostsSurface];
+
+export const GetUserPostsSurface = {
+  personal: "personal",
+  artist: "artist",
+} as const;
 
 export type GetArtistsParams = {
   location?: string;
@@ -753,6 +865,7 @@ export type SearchParams = {
   location?: string;
   category?: string;
   tags?: string;
+  limit?: number;
 };
 
 export type SearchType = (typeof SearchType)[keyof typeof SearchType];
@@ -766,6 +879,11 @@ export const SearchType = {
 export type GetGroupsParams = {
   q?: string;
   location?: string;
+};
+
+export type GetGroupPostsParams = {
+  cursor?: number;
+  limit?: number;
 };
 
 export type GetEventsParams = {

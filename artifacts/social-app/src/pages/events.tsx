@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCreateEvent, useGetEvents } from "@workspace/api-client-react";
-import { CalendarRange, MapPin, Plus, Sparkles, Users } from "lucide-react";
+import { useCreateEvent, useGetArtists, useGetEvents, useSearch } from "@workspace/api-client-react";
+import { CalendarRange, MapPin, Plus, Search, Sparkles, Users, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -19,6 +19,14 @@ export default function Events() {
   const queryClient = useQueryClient();
   const [city, setCity] = useState("");
   const [query, setQuery] = useState("");
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [artistSearch, setArtistSearch] = useState("");
+  const [selectedArtists, setSelectedArtists] = useState<Array<{
+    userId: number;
+    name: string;
+    category?: string;
+    location?: string | null;
+  }>>([]);
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -27,7 +35,6 @@ export default function Events() {
     city: "",
     imageUrl: "",
     lineupTags: "",
-    lineupArtistIds: "",
   });
   const [isUploadingImage, setIsUploadingImage] = useState(false);
 
@@ -36,10 +43,41 @@ export default function Events() {
     { query: { queryKey: ["events", city, query] } },
   );
 
+  const { data: suggestedArtists } = useGetArtists(
+    {
+      location: form.city || undefined,
+      limit: 6,
+    },
+    {
+      query: {
+        enabled: isCreateOpen,
+        queryKey: ["/api/artists", "event-form", form.city],
+      },
+    },
+  );
+
+  const { data: artistSearchResults, isLoading: isSearchingArtists } = useSearch(
+    {
+      q: artistSearch || undefined,
+      type: "artists",
+      location: form.city || undefined,
+      limit: 8,
+    },
+    {
+      query: {
+        enabled: isCreateOpen && artistSearch.trim().length > 1,
+        queryKey: ["event-lineup-search", artistSearch, form.city],
+      },
+    },
+  );
+
   const createEvent = useCreateEvent({
     mutation: {
       onSuccess: () => {
-        setForm({ title: "", description: "", startsAt: "", location: "", city: "", imageUrl: "", lineupTags: "", lineupArtistIds: "" });
+        setForm({ title: "", description: "", startsAt: "", location: "", city: "", imageUrl: "", lineupTags: "" });
+        setSelectedArtists([]);
+        setArtistSearch("");
+        setIsCreateOpen(false);
         queryClient.invalidateQueries({ queryKey: ["events"] });
         toast({ title: "Event created" });
       },
@@ -67,6 +105,26 @@ export default function Events() {
     }
   };
 
+  const lineupResults = (artistSearch.trim().length > 1 ? artistSearchResults?.artists : suggestedArtists?.artists) || [];
+
+  const addArtistToLineup = (artist: typeof lineupResults[number]) => {
+    if (selectedArtists.some((item) => item.userId === artist.userId)) return;
+    setSelectedArtists((current) => [
+      ...current,
+      {
+        userId: artist.userId,
+        name: artist.displayName || artist.user.username,
+        category: artist.category,
+        location: artist.location,
+      },
+    ]);
+    setArtistSearch("");
+  };
+
+  const removeArtistFromLineup = (userId: number) => {
+    setSelectedArtists((current) => current.filter((artist) => artist.userId !== userId));
+  };
+
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 p-4 md:py-8">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -74,7 +132,7 @@ export default function Events() {
           <h1 className="text-3xl font-bold">Events</h1>
           <p className="text-muted-foreground">Track lineups, appearances, and local creative happenings.</p>
         </div>
-        <Dialog>
+        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
             <Button><Plus className="mr-2 h-4 w-4" /> Add Event</Button>
           </DialogTrigger>
@@ -91,7 +149,66 @@ export default function Events() {
                 <Input type="file" accept="image/*" onChange={(e) => handleEventImageUpload(e.target.files?.[0] || null)} disabled={isUploadingImage} />
               </div>
               <Input placeholder="Lineup tags: techno, darkwave" value={form.lineupTags} onChange={(e) => setForm({ ...form, lineupTags: e.target.value })} />
-              <Input placeholder="Linked artist user IDs: 4, 5" value={form.lineupArtistIds} onChange={(e) => setForm({ ...form, lineupArtistIds: e.target.value })} />
+              <div className="space-y-3 rounded-2xl border border-border/50 bg-card/40 p-4">
+                <div>
+                  <div className="text-sm font-medium">Lineup artists</div>
+                  <div className="text-xs text-muted-foreground">Search creator pages and add them to the lineup. No internal IDs needed.</div>
+                </div>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Search artist pages..."
+                    className="pl-9"
+                    value={artistSearch}
+                    onChange={(e) => setArtistSearch(e.target.value)}
+                  />
+                </div>
+                {selectedArtists.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {selectedArtists.map((artist) => (
+                      <Badge key={artist.userId} variant="secondary" className="gap-1 pr-1">
+                        <span>{artist.name}</span>
+                        <button
+                          type="button"
+                          className="rounded-full p-0.5 hover:bg-black/10 dark:hover:bg-white/10"
+                          onClick={() => removeArtistFromLineup(artist.userId)}
+                          aria-label={`Remove ${artist.name}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
+                  {isSearchingArtists ? (
+                    <div className="flex justify-center py-4"><Spinner /></div>
+                  ) : lineupResults.length > 0 ? (
+                    lineupResults
+                      .filter((artist) => !selectedArtists.some((selected) => selected.userId === artist.userId))
+                      .map((artist) => (
+                        <button
+                          key={artist.id}
+                          type="button"
+                          onClick={() => addArtistToLineup(artist)}
+                          className="flex w-full items-center justify-between rounded-xl border border-border/50 bg-background/60 px-3 py-3 text-left transition-colors hover:border-primary/30 hover:bg-accent/40"
+                        >
+                          <div className="min-w-0">
+                            <div className="truncate font-medium">{artist.displayName || artist.user.username}</div>
+                            <div className="truncate text-xs text-muted-foreground">
+                              {[artist.category, artist.location].filter(Boolean).join(" · ") || "Creator page"}
+                            </div>
+                          </div>
+                          <Badge variant="outline">Add</Badge>
+                        </button>
+                      ))
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-border/50 bg-background/30 p-4 text-sm text-muted-foreground">
+                      {artistSearch.trim().length > 1 ? "No artist pages matched that search." : "Suggested artist pages will show up here."}
+                    </div>
+                  )}
+                </div>
+              </div>
               <Button
                 className="w-full"
                 onClick={() =>
@@ -104,7 +221,7 @@ export default function Events() {
                       city: form.city || undefined,
                       imageUrl: form.imageUrl || undefined,
                       lineupTags: form.lineupTags.split(",").map((tag) => tag.trim()).filter(Boolean),
-                      lineupArtistIds: form.lineupArtistIds.split(",").map((id) => Number(id.trim())).filter(Boolean),
+                      lineupArtistIds: selectedArtists.map((artist) => artist.userId),
                     },
                   })
                 }

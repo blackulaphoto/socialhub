@@ -1,11 +1,13 @@
-import { useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "wouter";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Image as ImageIcon,
   Link2,
   Newspaper,
   Plus,
   Radio,
+  Save,
   Send,
   SlidersHorizontal,
   Sparkles,
@@ -15,7 +17,7 @@ import {
   useCreateCustomFeed,
   useCreatePost,
   useGetCustomFeeds,
-  useGetFeed,
+  getFeed,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -38,6 +40,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { uploadImage } from "@/lib/upload-image";
 import { getEmbedDescriptor } from "@/lib/embeds";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { LoadMoreSentinel } from "@/components/load-more-sentinel";
+import { useActiveIdentity } from "@/hooks/useActiveIdentity";
+
+const POST_DRAFT_KEY = "socialhub:post-draft";
 
 const FEED_MODES = [
   { value: "following", label: "Following", helper: "People you chose to keep up with." },
@@ -52,17 +59,24 @@ function activeFeedLabel(mode: string, selectedCustomFeedName?: string | null) {
 
 export default function Home() {
   const { user } = useAuth();
+  const { activeIdentity, canUseArtistIdentity, setActiveIdentity } = useActiveIdentity();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [mode, setMode] = useState("following");
   const [city, setCity] = useState("");
   const [selectedCustomFeed, setSelectedCustomFeed] = useState<number | null>(null);
-  const [postForm, setPostForm] = useState({ content: "", imageUrl: "", linkUrl: "" });
+  const [postForm, setPostForm] = useState<{ content: string; imageUrl: string; linkUrl: string; visibility: "public" | "friends" | "private" }>({
+    content: "",
+    imageUrl: "",
+    linkUrl: "",
+    visibility: "public",
+  });
   const [feedForm, setFeedForm] = useState({ name: "", description: "", categories: "", tags: "", locations: "", includedUserIds: "" });
   const [isUploadingPostImage, setIsUploadingPostImage] = useState(false);
   const [isPostDialogOpen, setIsPostDialogOpen] = useState(false);
   const [showLinkField, setShowLinkField] = useState(false);
+  const [draftLoaded, setDraftLoaded] = useState(false);
 
   const feedParams = {
     mode: (selectedCustomFeed ? "custom" : mode) as "following" | "local" | "discovery" | "custom",
@@ -75,10 +89,31 @@ export default function Home() {
     isLoading,
     isError,
     refetch,
-  } = useGetFeed(feedParams, {
-    query: {
-      queryKey: ["feed", feedParams.mode, city, selectedCustomFeed],
-      enabled: !!user,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ["feed", feedParams.mode, city, selectedCustomFeed],
+    enabled: !!user,
+    initialPageParam: undefined as number | undefined,
+    queryFn: ({ pageParam, signal }) => getFeed({
+      ...feedParams,
+      cursor: pageParam,
+      limit: 10,
+    }, { signal }),
+    getNextPageParam: (lastPage) => lastPage.hasMore ? (lastPage.nextCursor ?? undefined) : undefined,
+  });
+  const { data: suggestedCreators } = useQuery({
+    queryKey: ["suggested-creators", user?.id],
+    enabled: !!user?.id,
+    queryFn: async () => {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/users/${user!.id}/suggested-creators?limit=4`, {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw new Error("Could not load suggested creators");
+      }
+      return response.json() as Promise<{ artists: Array<{ userId: number; category: string; location?: string | null; tagline?: string | null; tags?: string[]; user: { username: string; avatarUrl?: string | null } }> }>;
     },
   });
 
@@ -92,11 +127,12 @@ export default function Home() {
   const createPost = useCreatePost({
     mutation: {
       onSuccess: () => {
-        setPostForm({ content: "", imageUrl: "", linkUrl: "" });
+        setPostForm({ content: "", imageUrl: "", linkUrl: "", visibility: "public" });
         setShowLinkField(false);
         setIsPostDialogOpen(false);
         queryClient.invalidateQueries({ queryKey: ["feed"] });
         queryClient.invalidateQueries({ queryKey: ["/api/users", user?.id, "posts"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/users", user?.id, "posts", "artist"] });
         toast({ title: "Post published", description: "Your update is now live in the feed." });
       },
       onError: () => {
@@ -120,6 +156,10 @@ export default function Home() {
   });
 
   const selectedFeed = customFeeds?.find((feed) => feed.id === selectedCustomFeed) || null;
+  const feedPosts = useMemo(
+    () => data?.pages.flatMap((page) => page.posts) || [],
+    [data],
+  );
 
   const handlePostImageUpload = async (file: File | null) => {
     if (!file) return;
@@ -145,6 +185,8 @@ export default function Home() {
       data: {
         content: postForm.content,
         imageUrl: postForm.imageUrl || undefined,
+        visibility: postForm.visibility,
+        actorSurface: canUseArtistIdentity && activeIdentity === "artist" ? "artist" : "personal",
         media: [
           postForm.imageUrl ? { type: "image", url: postForm.imageUrl } : null,
           linkMedia ? { type: linkMedia.kind, url: linkMedia.href, title: linkMedia.label } : null,
@@ -154,8 +196,11 @@ export default function Home() {
   };
 
   const clearComposer = () => {
-    setPostForm({ content: "", imageUrl: "", linkUrl: "" });
+    setPostForm({ content: "", imageUrl: "", linkUrl: "", visibility: "public" });
     setShowLinkField(false);
+    if (typeof window !== "undefined" && user?.id) {
+      window.localStorage.removeItem(`${POST_DRAFT_KEY}:${user.id}`);
+    }
   };
 
   const openPostDialog = () => {
@@ -173,6 +218,37 @@ export default function Home() {
     window.setTimeout(() => fileInputRef.current?.click(), 50);
   };
 
+  const saveDraft = () => {
+    if (typeof window === "undefined" || !user?.id) return;
+    window.localStorage.setItem(`${POST_DRAFT_KEY}:${user.id}`, JSON.stringify(postForm));
+    toast({ title: "Draft saved", description: "Your unfinished post is stored on this device." });
+  };
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !user?.id || draftLoaded) return;
+    const saved = window.localStorage.getItem(`${POST_DRAFT_KEY}:${user.id}`);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved) as typeof postForm;
+        setPostForm((current) => ({ ...current, ...parsed }));
+        setShowLinkField(Boolean(parsed.linkUrl));
+      } catch {
+        window.localStorage.removeItem(`${POST_DRAFT_KEY}:${user.id}`);
+      }
+    }
+    setDraftLoaded(true);
+  }, [draftLoaded, user?.id]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !user?.id || !draftLoaded) return;
+    const hasContent = Boolean(postForm.content.trim() || postForm.imageUrl || postForm.linkUrl);
+    if (!hasContent) {
+      window.localStorage.removeItem(`${POST_DRAFT_KEY}:${user.id}`);
+      return;
+    }
+    window.localStorage.setItem(`${POST_DRAFT_KEY}:${user.id}`, JSON.stringify(postForm));
+  }, [draftLoaded, postForm, user?.id]);
+
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 p-4 md:py-8">
       <Card className="border-border/50 bg-card/60 md:hidden">
@@ -182,9 +258,9 @@ export default function Home() {
               <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[10px] uppercase tracking-[0.24em] text-primary">
                 <SlidersHorizontal className="h-3 w-3" /> Feed
               </div>
-              <h1 className="mt-3 text-xl font-bold">ArtistHub</h1>
+                <h1 className="mt-3 text-xl font-bold">ArtistHub</h1>
               <p className="mt-1 text-xs text-muted-foreground">
-                {activeFeedLabel(mode, selectedFeed?.name)} / {data?.posts?.length || 0} posts loaded
+                {activeFeedLabel(mode, selectedFeed?.name)} / {feedPosts.length || 0} posts loaded
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -313,12 +389,54 @@ export default function Home() {
                         <Radio className="mr-1 h-3 w-3" />
                         Posting into {activeFeedLabel(mode, selectedFeed?.name)}
                       </Badge>
+                      <Badge variant={activeIdentity === "artist" ? "default" : "secondary"} className="rounded-full">
+                        {activeIdentity === "artist" ? "Posting as artist page" : "Posting as personal"}
+                      </Badge>
                       {city && <Badge variant="secondary">{city}</Badge>}
                     </div>
-                    <Textarea
-                      placeholder="Share a release, appearance, drop, call-for-collab, or update..."
-                      value={postForm.content}
-                      onChange={(e) => setPostForm({ ...postForm, content: e.target.value })}
+                    {canUseArtistIdentity && (
+                      <div className="flex items-center gap-2 rounded-2xl border border-border/60 bg-background/40 p-2">
+                        <Button
+                          type="button"
+                          variant={activeIdentity === "personal" ? "default" : "ghost"}
+                          size="sm"
+                          className="rounded-full"
+                          onClick={() => setActiveIdentity("personal")}
+                        >
+                          Personal
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={activeIdentity === "artist" ? "default" : "ghost"}
+                          size="sm"
+                          className="rounded-full"
+                          onClick={() => setActiveIdentity("artist")}
+                        >
+                          Artist Page
+                        </Button>
+                      </div>
+                    )}
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">Who can see this?</div>
+                      <Select value={postForm.visibility} onValueChange={(value) => setPostForm((current) => ({ ...current, visibility: value as "public" | "friends" | "private" }))}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Choose post visibility" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="public">Public</SelectItem>
+                          <SelectItem value="friends">Friends only</SelectItem>
+                          <SelectItem value="private">Only me</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <div className="text-xs text-muted-foreground">
+                        Public posts show everywhere. Friends-only posts are limited to accepted friends. Private posts only show on your own profile.
+                      </div>
+                    </div>
+                      <Textarea
+                        data-testid="post-composer-textarea"
+                        placeholder="Share a release, appearance, drop, call-for-collab, or update..."
+                        value={postForm.content}
+                        onChange={(e) => setPostForm({ ...postForm, content: e.target.value })}
                       className="min-h-40 border-0 bg-background/20 px-0 text-base shadow-none focus-visible:ring-0"
                     />
                     {(postForm.imageUrl || postForm.linkUrl) ? (
@@ -376,10 +494,14 @@ export default function Home() {
                       Paste a normal link when you add one. YouTube, Vimeo, Spotify, SoundCloud, and generic links are detected automatically.
                     </div>
                     <div className="flex gap-3">
+                      <Button variant="outline" className="flex-1" onClick={saveDraft}>
+                        <Save className="mr-2 h-4 w-4" /> Save Draft
+                      </Button>
                       <Button variant="outline" className="flex-1" onClick={clearComposer}>
                         Reset
                       </Button>
                       <Button
+                        data-testid="submit-post"
                         className="flex-1"
                         onClick={submitPost}
                         disabled={createPost.isPending || isUploadingPostImage || !postForm.content.trim()}
@@ -402,9 +524,12 @@ export default function Home() {
               <AvatarImage src={user?.avatarUrl || ""} />
               <AvatarFallback>{user?.username?.slice(0, 2).toUpperCase()}</AvatarFallback>
             </Avatar>
-            <button type="button" className="flex-1 rounded-full border border-border/60 bg-background/50 px-4 py-3 text-left text-sm text-muted-foreground">
-              Share a release, appearance, drop, call-for-collab, or update...
-            </button>
+              <button type="button" data-testid="open-post-composer" className="flex-1 rounded-full border border-border/60 bg-background/50 px-4 py-3 text-left text-sm text-muted-foreground">
+                <span className="mr-2 inline-flex rounded-full border border-border/60 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-foreground/70">
+                  {activeIdentity === "artist" ? "Artist Page" : "Personal"}
+                </span>
+                Share a release, appearance, drop, call-for-collab, or update...
+              </button>
             <div className="hidden items-center gap-1 sm:flex">
               <Button
                 type="button"
@@ -456,7 +581,7 @@ export default function Home() {
                 </div>
                 <div className="rounded-2xl border border-border/50 bg-background/50 p-4">
                   <div className="text-muted-foreground">Posts loaded</div>
-                  <div className="mt-1 font-semibold">{data?.posts?.length || 0}</div>
+                  <div className="mt-1 font-semibold">{feedPosts.length || 0}</div>
                 </div>
               </div>
             </div>
@@ -466,6 +591,35 @@ export default function Home() {
 
       <div className="flex flex-col gap-6 lg:flex-row">
         <div className="hidden space-y-4 md:block lg:w-80">
+          {!!suggestedCreators?.artists?.length && (
+            <Card className="border-border/50 bg-card/50">
+              <CardContent className="space-y-4 p-4">
+                <div>
+                  <h2 className="font-semibold">Suggested Creators</h2>
+                  <div className="mt-1 text-xs text-muted-foreground">Based on your interests and location.</div>
+                </div>
+                <div className="space-y-3">
+                  {suggestedCreators.artists.map((artist) => (
+                    <Link
+                      key={artist.userId}
+                      href={`/artists/${artist.userId}`}
+                      className="flex items-start gap-3 rounded-2xl border border-border/50 bg-background/30 p-3 transition-colors hover:border-primary/30"
+                    >
+                      <Avatar className="h-11 w-11">
+                        <AvatarImage src={artist.user.avatarUrl || ""} />
+                        <AvatarFallback>{artist.user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-medium">{artist.user.username}</div>
+                        <div className="text-xs text-muted-foreground">{[artist.category, artist.location].filter(Boolean).join(" · ")}</div>
+                        {artist.tagline ? <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">{artist.tagline}</div> : null}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
           <Card className="border-border/50 bg-card/50">
             <CardContent className="space-y-4 p-4">
               <div>
@@ -597,10 +751,10 @@ export default function Home() {
             <QueryErrorState title="Could not load feed" description="The feed request failed. Check the API and retry." onRetry={() => refetch()} />
           ) : (
             <div className="space-y-4">
-              {data?.posts?.map((post) => (
+              {feedPosts.map((post) => (
                 <FeedPostCard key={post.id} post={post} />
               ))}
-              {(!data?.posts || data.posts.length === 0) && (
+              {feedPosts.length === 0 && (
                 <Card className="border-dashed border-border/50 bg-card/40">
                   <CardContent className="p-12 text-center text-muted-foreground">
                     <Sparkles className="mx-auto mb-4 h-10 w-10 opacity-30" />
@@ -611,6 +765,15 @@ export default function Home() {
                   </CardContent>
                 </Card>
               )}
+              <LoadMoreSentinel
+                enabled={Boolean(hasNextPage)}
+                isLoading={isFetchingNextPage}
+                onVisible={() => {
+                  if (hasNextPage && !isFetchingNextPage) {
+                    fetchNextPage();
+                  }
+                }}
+              />
             </div>
           )}
         </div>

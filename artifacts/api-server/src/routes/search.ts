@@ -1,62 +1,358 @@
 import { Router } from "express";
-import { artistProfilesTable, db, userProfileDetailsTable, usersTable } from "@workspace/db";
-import { and, eq, ilike, or, sql } from "drizzle-orm";
-import { formatArtistProfile, getUserSummary } from "./helpers.js";
+import { artistProfilesTable, db, eventsTable, followsTable, groupsTable, pool, usersTable } from "@workspace/db";
+import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { formatArtistProfile, formatEvent, formatGroup, getBlockedUserIds, getFriendshipState, getUserSummary } from "./helpers.js";
 
 const router = Router();
 
+type SearchType = "all" | "users" | "artists" | "groups" | "events";
+
+function clampLimit(value: string | undefined) {
+  const parsed = value ? Number(value) : 24;
+  if (Number.isNaN(parsed)) return 24;
+  return Math.max(1, Math.min(parsed, 50));
+}
+
+async function searchUserIds(input: {
+  q: string;
+  location: string;
+  blockedUserIds: number[];
+  limit: number;
+}) {
+  const query = `
+    select
+      u.id,
+      (
+        ts_rank_cd(to_tsvector('simple', coalesce(u.username, '')), websearch_to_tsquery('simple', $1)) * 2.5 +
+        ts_rank_cd(to_tsvector('english', coalesce(u.bio, '')), websearch_to_tsquery('english', $1)) +
+        ts_rank_cd(to_tsvector('english', coalesce(d.about, '')), websearch_to_tsquery('english', $1)) +
+        ts_rank_cd(to_tsvector('simple', coalesce(d.location, '') || ' ' || coalesce(d.city, '')), websearch_to_tsquery('simple', $1))
+      ) as rank,
+      greatest(
+        similarity(coalesce(u.username, ''), $1),
+        similarity(coalesce(u.bio, ''), $1),
+        similarity(coalesce(d.about, ''), $1),
+        similarity(coalesce(d.location, ''), $1),
+        similarity(coalesce(d.city, ''), $1)
+      ) as fuzzy_score
+    from users u
+    left join user_profile_details d on d.user_id = u.id
+    where
+      (
+        $1 = '' or
+        to_tsvector('simple', coalesce(u.username, '')) @@ websearch_to_tsquery('simple', $1) or
+        to_tsvector('english', coalesce(u.bio, '')) @@ websearch_to_tsquery('english', $1) or
+        to_tsvector('english', coalesce(d.about, '')) @@ websearch_to_tsquery('english', $1) or
+        to_tsvector('simple', coalesce(d.location, '') || ' ' || coalesce(d.city, '')) @@ websearch_to_tsquery('simple', $1) or
+        similarity(coalesce(u.username, ''), $1) > 0.14 or
+        similarity(coalesce(u.bio, ''), $1) > 0.12 or
+        similarity(coalesce(d.about, ''), $1) > 0.12 or
+        similarity(coalesce(d.location, ''), $1) > 0.16 or
+        similarity(coalesce(d.city, ''), $1) > 0.16
+      )
+      and (
+        $2 = '' or
+        coalesce(d.location, '') ilike ('%' || $2 || '%') or
+        coalesce(d.city, '') ilike ('%' || $2 || '%')
+      )
+      and (
+        cardinality($3::int[]) = 0 or
+        not (u.id = any($3::int[]))
+      )
+    order by
+      case when $1 = '' then 0 else 1 end desc,
+      rank desc,
+      fuzzy_score desc,
+      u.created_at desc
+    limit $4
+  `;
+
+  const result = await pool.query<{ id: number }>(query, [
+    input.q,
+    input.location,
+    input.blockedUserIds,
+    input.limit,
+  ]);
+
+  return result.rows.map((row) => row.id);
+}
+
+async function searchArtistUserIds(input: {
+  q: string;
+  location: string;
+  category: string;
+  tagList: string[];
+  blockedUserIds: number[];
+  limit: number;
+}) {
+  const query = `
+    select
+      a.user_id as "userId",
+      (
+        ts_rank_cd(to_tsvector('simple', coalesce(u.username, '')), websearch_to_tsquery('simple', $1)) * 2.2 +
+        ts_rank_cd(to_tsvector('english', coalesce(a.category, '')), websearch_to_tsquery('english', $1)) * 1.5 +
+        ts_rank_cd(to_tsvector('english', coalesce(a.tagline, '')), websearch_to_tsquery('english', $1)) +
+        ts_rank_cd(to_tsvector('english', coalesce(a.bio, '')), websearch_to_tsquery('english', $1)) +
+        ts_rank_cd(to_tsvector('simple', coalesce(a.location, '') || ' ' || array_to_string(coalesce(a.tags, '{}'), ' ')), websearch_to_tsquery('simple', $1))
+      ) as rank,
+      greatest(
+        similarity(coalesce(u.username, ''), $1),
+        similarity(coalesce(a.category, ''), $1),
+        similarity(coalesce(a.tagline, ''), $1),
+        similarity(coalesce(a.location, ''), $1),
+        similarity(array_to_string(coalesce(a.tags, '{}'), ' '), $1)
+      ) as fuzzy_score
+    from artist_profiles a
+    inner join users u on u.id = a.user_id
+    where
+      (
+        $1 = '' or
+        to_tsvector('simple', coalesce(u.username, '')) @@ websearch_to_tsquery('simple', $1) or
+        to_tsvector('english', coalesce(a.category, '')) @@ websearch_to_tsquery('english', $1) or
+        to_tsvector('english', coalesce(a.tagline, '')) @@ websearch_to_tsquery('english', $1) or
+        to_tsvector('english', coalesce(a.bio, '')) @@ websearch_to_tsquery('english', $1) or
+        to_tsvector('simple', coalesce(a.location, '') || ' ' || array_to_string(coalesce(a.tags, '{}'), ' ')) @@ websearch_to_tsquery('simple', $1) or
+        similarity(coalesce(u.username, ''), $1) > 0.14 or
+        similarity(coalesce(a.category, ''), $1) > 0.14 or
+        similarity(coalesce(a.tagline, ''), $1) > 0.12 or
+        similarity(coalesce(a.location, ''), $1) > 0.16 or
+        similarity(array_to_string(coalesce(a.tags, '{}'), ' '), $1) > 0.14
+      )
+      and ($2 = '' or coalesce(a.location, '') ilike ('%' || $2 || '%'))
+      and ($3 = '' or coalesce(a.category, '') ilike ('%' || $3 || '%'))
+      and (
+        cardinality($4::text[]) = 0 or
+        coalesce(a.tags, '{}') && $4::text[]
+      )
+      and (
+        cardinality($5::int[]) = 0 or
+        not (a.user_id = any($5::int[]))
+      )
+    order by
+      case when $1 = '' then 0 else 1 end desc,
+      rank desc,
+      fuzzy_score desc,
+      a.updated_at desc
+    limit $6
+  `;
+
+  const result = await pool.query<{ userId: number }>(query, [
+    input.q,
+    input.location,
+    input.category,
+    input.tagList,
+    input.blockedUserIds,
+    input.limit,
+  ]);
+
+  return result.rows.map((row) => row.userId);
+}
+
+async function searchGroupIds(input: {
+  q: string;
+  location: string;
+  category: string;
+  tagList: string[];
+  limit: number;
+}) {
+  const conditions = [];
+  if (input.q) {
+    conditions.push(or(
+      ilike(groupsTable.name, `%${input.q}%`),
+      ilike(groupsTable.description, `%${input.q}%`),
+      ilike(groupsTable.category, `%${input.q}%`),
+    ));
+  }
+  if (input.location) {
+    conditions.push(ilike(groupsTable.location, `%${input.location}%`));
+  }
+  if (input.category) {
+    conditions.push(ilike(groupsTable.category, `%${input.category}%`));
+  }
+  if (input.tagList.length > 0) {
+    conditions.push(sql`${groupsTable.tags} && ${input.tagList}`);
+  }
+
+  const groups = await db.select({ id: groupsTable.id }).from(groupsTable)
+    .where(conditions.length ? and(...conditions) : undefined)
+    .orderBy(desc(groupsTable.updatedAt))
+    .limit(input.limit);
+
+  return groups.map((group) => group.id);
+}
+
+async function searchEventIds(input: {
+  q: string;
+  location: string;
+  tagList: string[];
+  limit: number;
+}) {
+  const conditions = [];
+  if (input.q) {
+    conditions.push(or(
+      ilike(eventsTable.title, `%${input.q}%`),
+      ilike(eventsTable.description, `%${input.q}%`),
+      ilike(eventsTable.location, `%${input.q}%`),
+    ));
+  }
+  if (input.location) {
+    conditions.push(or(
+      ilike(eventsTable.location, `%${input.location}%`),
+      ilike(eventsTable.city, `%${input.location}%`),
+    ));
+  }
+  if (input.tagList.length > 0) {
+    conditions.push(sql`${eventsTable.lineupTags} && ${input.tagList}`);
+  }
+
+  const events = await db.select({ id: eventsTable.id }).from(eventsTable)
+    .where(conditions.length ? and(...conditions) : undefined)
+    .orderBy(eventsTable.startsAt)
+    .limit(input.limit);
+
+  return events.map((event) => event.id);
+}
+
 router.get("/search", async (req, res) => {
-  const { q, type = "all", location, category, tags } = req.query as Record<string, string>;
+  const {
+    q = "",
+    type = "all",
+    location = "",
+    category = "",
+    tags = "",
+    limit,
+  } = req.query as Record<string, string>;
 
-  const userConditions = [];
-  if (q) {
-    userConditions.push(or(
-      ilike(usersTable.username, `%${q}%`),
-      ilike(usersTable.bio, `%${q}%`),
-    ));
-  }
-  if (location) {
-    const localDetails = await db.select({ userId: userProfileDetailsTable.userId })
-      .from(userProfileDetailsTable)
-      .where(or(ilike(userProfileDetailsTable.location, `%${location}%`), ilike(userProfileDetailsTable.city, `%${location}%`)));
-    const ids = localDetails.map((entry) => entry.userId);
-    if (ids.length > 0) {
-      userConditions.push(or(...ids.map((id) => eq(usersTable.id, id))));
-    }
-  }
+  const normalizedQuery = q.trim();
+  const normalizedLocation = location.trim();
+  const normalizedCategory = category.trim();
+  const tagList = tags
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+  const safeType: SearchType = type === "users" || type === "artists" || type === "groups" || type === "events" ? type : "all";
+  const safeLimit = clampLimit(limit);
 
-  const artistConditions = [];
-  if (q) {
-    artistConditions.push(or(
-      ilike(usersTable.username, `%${q}%`),
-      ilike(artistProfilesTable.category, `%${q}%`),
-      ilike(artistProfilesTable.location, `%${q}%`),
-      sql`${artistProfilesTable.tags} && ARRAY[${sql`${q}`}]::text[]`,
-    ));
-  }
-  if (location) artistConditions.push(ilike(artistProfilesTable.location, `%${location}%`));
-  if (category) artistConditions.push(ilike(artistProfilesTable.category, `%${category}%`));
-  if (tags) {
-    const tagList = tags.split(",").map((tag) => tag.trim()).filter(Boolean);
-    if (tagList.length > 0) {
-      artistConditions.push(sql`${artistProfilesTable.tags} && ARRAY[${sql.join(tagList.map((tag) => sql`${tag}`), sql`, `)}]::text[]`);
-    }
+  if (!normalizedQuery && !normalizedLocation && !normalizedCategory && tagList.length === 0) {
+    res.json({ users: [], artists: [], groups: [], events: [], total: 0, usersTotal: 0, artistsTotal: 0, groupsTotal: 0, eventsTotal: 0 });
+    return;
   }
 
-  const users = (type === "all" || type === "users")
-    ? await db.select().from(usersTable).where(userConditions.length > 0 ? and(...userConditions) : undefined).limit(24)
+  const blockedUserIds = await getBlockedUserIds(req.session.userId);
+
+  const userIds = safeType === "all" || safeType === "users"
+    ? await searchUserIds({
+      q: normalizedQuery,
+      location: normalizedLocation,
+      blockedUserIds,
+      limit: safeLimit,
+    })
     : [];
-  const artists = (type === "all" || type === "artists")
+
+  const artistUserIds = safeType === "all" || safeType === "artists"
+    ? await searchArtistUserIds({
+      q: normalizedQuery,
+      location: normalizedLocation,
+      category: normalizedCategory,
+      tagList,
+      blockedUserIds,
+      limit: safeLimit,
+    })
+    : [];
+
+  const groupIds = safeType === "all" || safeType === "groups"
+    ? await searchGroupIds({
+      q: normalizedQuery,
+      location: normalizedLocation,
+      category: normalizedCategory,
+      tagList,
+      limit: safeLimit,
+    })
+    : [];
+
+  const eventIds = safeType === "all" || safeType === "events"
+    ? await searchEventIds({
+      q: normalizedQuery,
+      location: normalizedLocation,
+      tagList,
+      limit: safeLimit,
+    })
+    : [];
+
+  const users = userIds.length > 0
+    ? await db.select().from(usersTable).where(inArray(usersTable.id, userIds))
+    : [];
+  const artists = artistUserIds.length > 0
     ? await db.select().from(artistProfilesTable)
       .innerJoin(usersTable, eq(artistProfilesTable.userId, usersTable.id))
-      .where(artistConditions.length > 0 ? and(...artistConditions) : undefined)
-      .limit(24)
+      .where(inArray(artistProfilesTable.userId, artistUserIds))
+    : [];
+  const groups = groupIds.length > 0
+    ? await db.select().from(groupsTable).where(inArray(groupsTable.id, groupIds))
+    : [];
+  const events = eventIds.length > 0
+    ? await db.select().from(eventsTable).where(inArray(eventsTable.id, eventIds))
     : [];
 
+  const userMap = new Map(users.map((user) => [user.id, user]));
+  const artistMap = new Map(artists.map((row) => [row.artist_profiles.userId, row]));
+  const groupMap = new Map(groups.map((group) => [group.id, group]));
+  const eventMap = new Map(events.map((event) => [event.id, event]));
+
+  const relatedUserIds = [...new Set([...userIds, ...artistUserIds])];
+  const followRows = req.session.userId && relatedUserIds.length > 0
+    ? await db.select({ followingId: followsTable.followingId }).from(followsTable).where(and(
+      eq(followsTable.followerId, req.session.userId),
+      inArray(followsTable.followingId, relatedUserIds),
+    ))
+    : [];
+  const followingSet = new Set(followRows.map((row) => row.followingId));
+
+  const orderedUsers = await Promise.all(
+    userIds
+      .map((id) => userMap.get(id))
+      .filter(Boolean)
+      .map(async (user) => ({
+        ...(await getUserSummary(user!, req.session.userId)),
+        friendship: await getFriendshipState(req.session.userId, user!.id),
+        isFollowing: followingSet.has(user!.id),
+      })),
+  );
+
+  const orderedArtists = await Promise.all(
+    artistUserIds
+      .map((id) => artistMap.get(id))
+      .filter(Boolean)
+      .map(async (row) => ({
+        ...(await formatArtistProfile(row!.artist_profiles, row!.users, req.session.userId)),
+        isFollowing: followingSet.has(row!.artist_profiles.userId),
+      })),
+  );
+
+  const orderedGroups = await Promise.all(
+    groupIds
+      .map((id) => groupMap.get(id))
+      .filter(Boolean)
+      .map((group) => formatGroup(group!, req.session.userId)),
+  );
+
+  const orderedEvents = await Promise.all(
+    eventIds
+      .map((id) => eventMap.get(id))
+      .filter(Boolean)
+      .map((event) => formatEvent(event!)),
+  );
+
   res.json({
-    users: await Promise.all(users.map((user) => getUserSummary(user))),
-    artists: await Promise.all(artists.map((artist) => formatArtistProfile(artist.artist_profiles, artist.users))),
-    total: users.length + artists.length,
+    users: orderedUsers,
+    artists: orderedArtists,
+    groups: orderedGroups,
+    events: orderedEvents,
+    total: orderedUsers.length + orderedArtists.length + orderedGroups.length + orderedEvents.length,
+    usersTotal: orderedUsers.length,
+    artistsTotal: orderedArtists.length,
+    groupsTotal: orderedGroups.length,
+    eventsTotal: orderedEvents.length,
   });
 });
 

@@ -2,6 +2,7 @@ import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { setBaseUrl, useTrackPageView } from "@workspace/api-client-react";
+import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
@@ -24,6 +25,8 @@ import GroupDetail from "@/pages/group-detail";
 import Events from "@/pages/events";
 import EventDetail from "@/pages/event-detail";
 import Notifications from "@/pages/notifications";
+import Onboarding from "@/pages/onboarding";
+import { ActiveIdentityProvider } from "@/hooks/useActiveIdentity";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -64,6 +67,7 @@ function Router() {
     <Switch>
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
+      <Route path="/onboarding" component={Onboarding} />
       
       {/* Protected Routes inside AppLayout */}
       <Route path="/">
@@ -74,6 +78,9 @@ function Router() {
       </Route>
       <Route path="/artists/:id">
         {params => <AppLayout><ArtistProfile id={params.id} /></AppLayout>}
+      </Route>
+      <Route path="/discover">
+        <AppLayout><Discover /></AppLayout>
       </Route>
       <Route path="/artists">
         <AppLayout><Discover /></AppLayout>
@@ -117,16 +124,20 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <ApiClientConfig />
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <AuthProvider>
-            <AnalyticsTracker />
-            <Router />
-          </AuthProvider>
-        </WouterRouter>
-        <Toaster />
-      </TooltipProvider>
+      <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+        <TooltipProvider>
+          <ApiClientConfig />
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <AuthProvider>
+              <ActiveIdentityProvider>
+                <AnalyticsTracker />
+                <Router />
+              </ActiveIdentityProvider>
+            </AuthProvider>
+          </WouterRouter>
+          <Toaster />
+        </TooltipProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

@@ -13,6 +13,7 @@ import type { UserSummary } from "./userSummary";
 export interface ArtistProfile {
   id: number;
   userId: number;
+  displayName?: string | null;
   category: string;
   location?: string | null;
   tagline?: string | null;

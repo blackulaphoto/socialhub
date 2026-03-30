@@ -57,6 +57,8 @@ export const LoginResponse = zod.object({
     hasArtistPage: zod.boolean().optional(),
     accentColor: zod.string().nullish(),
     themeName: zod.string().nullish(),
+    onboardingCompleted: zod.boolean().optional(),
+    onboardingStep: zod.string().optional(),
     links: zod
       .array(
         zod.object({
@@ -106,6 +108,8 @@ export const GetMeResponse = zod.object({
   hasArtistPage: zod.boolean().optional(),
   accentColor: zod.string().nullish(),
   themeName: zod.string().nullish(),
+  onboardingCompleted: zod.boolean().optional(),
+  onboardingStep: zod.string().optional(),
   links: zod
     .array(
       zod.object({
@@ -138,6 +142,7 @@ export const GetActivitySummaryResponse = zod.object({
           zod.object({
             id: zod.number(),
             username: zod.string(),
+            artistDisplayName: zod.string().nullish(),
             avatarUrl: zod.string().nullish(),
             bio: zod.string().nullish(),
             profileType: zod.enum(["user", "artist"]),
@@ -153,6 +158,8 @@ export const GetActivitySummaryResponse = zod.object({
             interests: zod.array(zod.string()).optional(),
             hasArtistPage: zod.boolean().optional(),
             accentColor: zod.string().nullish(),
+            onboardingCompleted: zod.boolean().optional(),
+            onboardingStep: zod.string().optional(),
             links: zod
               .array(
                 zod.object({
@@ -163,6 +170,8 @@ export const GetActivitySummaryResponse = zod.object({
               .optional(),
             category: zod.string().nullish(),
             tags: zod.array(zod.string()).optional(),
+            hasBlockedUser: zod.boolean(),
+            isBlockedByUser: zod.boolean(),
           }),
           zod.null(),
         ])
@@ -192,6 +201,7 @@ export const GetNotificationsResponseItem = zod.object({
       zod.object({
         id: zod.number(),
         username: zod.string(),
+        artistDisplayName: zod.string().nullish(),
         avatarUrl: zod.string().nullish(),
         bio: zod.string().nullish(),
         profileType: zod.enum(["user", "artist"]),
@@ -207,6 +217,8 @@ export const GetNotificationsResponseItem = zod.object({
         interests: zod.array(zod.string()).optional(),
         hasArtistPage: zod.boolean().optional(),
         accentColor: zod.string().nullish(),
+        onboardingCompleted: zod.boolean().optional(),
+        onboardingStep: zod.string().optional(),
         links: zod
           .array(
             zod.object({
@@ -217,6 +229,8 @@ export const GetNotificationsResponseItem = zod.object({
           .optional(),
         category: zod.string().nullish(),
         tags: zod.array(zod.string()).optional(),
+        hasBlockedUser: zod.boolean(),
+        isBlockedByUser: zod.boolean(),
       }),
       zod.null(),
     ])
@@ -311,6 +325,8 @@ export const GetUserResponse = zod.object({
     hasArtistPage: zod.boolean().optional(),
     accentColor: zod.string().nullish(),
     themeName: zod.string().nullish(),
+    onboardingCompleted: zod.boolean().optional(),
+    onboardingStep: zod.string().optional(),
     links: zod
       .array(
         zod.object({
@@ -327,6 +343,12 @@ export const GetUserResponse = zod.object({
     status: zod.enum(["self", "none", "outgoing", "incoming", "friends"]),
     isFriend: zod.boolean(),
   }),
+  blockState: zod.object({
+    hasBlockedUser: zod.boolean(),
+    isBlockedByUser: zod.boolean(),
+    isBlockedEitherWay: zod.boolean(),
+  }),
+  canInteract: zod.boolean(),
   profileReactions: zod.object({
     total: zod.number(),
     counts: zod.object({
@@ -341,6 +363,7 @@ export const GetUserResponse = zod.object({
     .object({
       id: zod.number(),
       userId: zod.number(),
+      displayName: zod.string().nullish(),
       category: zod.string(),
       location: zod.string().nullish(),
       tagline: zod.string().nullish(),
@@ -374,6 +397,7 @@ export const GetUserResponse = zod.object({
       user: zod.object({
         id: zod.number(),
         username: zod.string(),
+        artistDisplayName: zod.string().nullish(),
         avatarUrl: zod.string().nullish(),
         bio: zod.string().nullish(),
         profileType: zod.enum(["user", "artist"]),
@@ -389,6 +413,8 @@ export const GetUserResponse = zod.object({
         interests: zod.array(zod.string()).optional(),
         hasArtistPage: zod.boolean().optional(),
         accentColor: zod.string().nullish(),
+        onboardingCompleted: zod.boolean().optional(),
+        onboardingStep: zod.string().optional(),
         links: zod
           .array(
             zod.object({
@@ -399,6 +425,8 @@ export const GetUserResponse = zod.object({
           .optional(),
         category: zod.string().nullish(),
         tags: zod.array(zod.string()).optional(),
+        hasBlockedUser: zod.boolean(),
+        isBlockedByUser: zod.boolean(),
       }),
       primaryActionType: zod.string(),
       primaryActionLabel: zod.string(),
@@ -416,8 +444,10 @@ export const GetUserResponse = zod.object({
         .object({
           id: zod.number(),
           userId: zod.number(),
+          actorSurface: zod.enum(["personal", "artist"]),
           content: zod.string(),
           imageUrl: zod.string().nullish(),
+          visibility: zod.enum(["public", "friends", "private"]),
           repostOfPostId: zod.number().nullish(),
           likeCount: zod.number(),
           isLiked: zod.boolean(),
@@ -446,6 +476,7 @@ export const GetUserResponse = zod.object({
                 .object({
                   id: zod.number(),
                   username: zod.string(),
+                  artistDisplayName: zod.string().nullish(),
                   avatarUrl: zod.string().nullish(),
                   bio: zod.string().nullish(),
                   profileType: zod.enum(["user", "artist"]),
@@ -461,6 +492,8 @@ export const GetUserResponse = zod.object({
                   interests: zod.array(zod.string()).optional(),
                   hasArtistPage: zod.boolean().optional(),
                   accentColor: zod.string().nullish(),
+                  onboardingCompleted: zod.boolean().optional(),
+                  onboardingStep: zod.string().optional(),
                   links: zod
                     .array(
                       zod.object({
@@ -471,6 +504,8 @@ export const GetUserResponse = zod.object({
                     .optional(),
                   category: zod.string().nullish(),
                   tags: zod.array(zod.string()).optional(),
+                  hasBlockedUser: zod.boolean(),
+                  isBlockedByUser: zod.boolean(),
                 })
                 .nullish(),
             }),
@@ -480,6 +515,7 @@ export const GetUserResponse = zod.object({
             .object({
               id: zod.number(),
               username: zod.string(),
+              artistDisplayName: zod.string().nullish(),
               avatarUrl: zod.string().nullish(),
               bio: zod.string().nullish(),
               profileType: zod.enum(["user", "artist"]),
@@ -495,6 +531,8 @@ export const GetUserResponse = zod.object({
               interests: zod.array(zod.string()).optional(),
               hasArtistPage: zod.boolean().optional(),
               accentColor: zod.string().nullish(),
+              onboardingCompleted: zod.boolean().optional(),
+              onboardingStep: zod.string().optional(),
               links: zod
                 .array(
                   zod.object({
@@ -505,6 +543,8 @@ export const GetUserResponse = zod.object({
                 .optional(),
               category: zod.string().nullish(),
               tags: zod.array(zod.string()).optional(),
+              hasBlockedUser: zod.boolean(),
+              isBlockedByUser: zod.boolean(),
             })
             .optional(),
           createdAt: zod.coerce.date(),
@@ -539,6 +579,8 @@ export const GetUserResponse = zod.object({
       interests: zod.array(zod.string()).optional(),
       accentColor: zod.string().nullish(),
       themeName: zod.string().nullish(),
+      onboardingCompleted: zod.boolean().optional(),
+      onboardingStep: zod.string().optional(),
       links: zod
         .array(
           zod.object({
@@ -569,8 +611,10 @@ export const GetUserResponse = zod.object({
       .object({
         id: zod.number(),
         userId: zod.number(),
+        actorSurface: zod.enum(["personal", "artist"]),
         content: zod.string(),
         imageUrl: zod.string().nullish(),
+        visibility: zod.enum(["public", "friends", "private"]),
         repostOfPostId: zod.number().nullish(),
         likeCount: zod.number(),
         isLiked: zod.boolean(),
@@ -599,6 +643,7 @@ export const GetUserResponse = zod.object({
               .object({
                 id: zod.number(),
                 username: zod.string(),
+                artistDisplayName: zod.string().nullish(),
                 avatarUrl: zod.string().nullish(),
                 bio: zod.string().nullish(),
                 profileType: zod.enum(["user", "artist"]),
@@ -614,6 +659,8 @@ export const GetUserResponse = zod.object({
                 interests: zod.array(zod.string()).optional(),
                 hasArtistPage: zod.boolean().optional(),
                 accentColor: zod.string().nullish(),
+                onboardingCompleted: zod.boolean().optional(),
+                onboardingStep: zod.string().optional(),
                 links: zod
                   .array(
                     zod.object({
@@ -624,6 +671,8 @@ export const GetUserResponse = zod.object({
                   .optional(),
                 category: zod.string().nullish(),
                 tags: zod.array(zod.string()).optional(),
+                hasBlockedUser: zod.boolean(),
+                isBlockedByUser: zod.boolean(),
               })
               .nullish(),
           }),
@@ -633,6 +682,7 @@ export const GetUserResponse = zod.object({
           .object({
             id: zod.number(),
             username: zod.string(),
+            artistDisplayName: zod.string().nullish(),
             avatarUrl: zod.string().nullish(),
             bio: zod.string().nullish(),
             profileType: zod.enum(["user", "artist"]),
@@ -648,6 +698,8 @@ export const GetUserResponse = zod.object({
             interests: zod.array(zod.string()).optional(),
             hasArtistPage: zod.boolean().optional(),
             accentColor: zod.string().nullish(),
+            onboardingCompleted: zod.boolean().optional(),
+            onboardingStep: zod.string().optional(),
             links: zod
               .array(
                 zod.object({
@@ -658,6 +710,8 @@ export const GetUserResponse = zod.object({
               .optional(),
             category: zod.string().nullish(),
             tags: zod.array(zod.string()).optional(),
+            hasBlockedUser: zod.boolean(),
+            isBlockedByUser: zod.boolean(),
           })
           .optional(),
         createdAt: zod.coerce.date(),
@@ -714,6 +768,8 @@ export const UpdateProfileBody = zod.object({
   interests: zod.array(zod.string()).optional(),
   accentColor: zod.string().nullish(),
   themeName: zod.string().nullish(),
+  onboardingCompleted: zod.boolean().optional(),
+  onboardingStep: zod.string().optional(),
   featuredContent: zod.string().nullish(),
   links: zod
     .array(
@@ -750,6 +806,8 @@ export const UpdateProfileResponse = zod.object({
   hasArtistPage: zod.boolean().optional(),
   accentColor: zod.string().nullish(),
   themeName: zod.string().nullish(),
+  onboardingCompleted: zod.boolean().optional(),
+  onboardingStep: zod.string().optional(),
   links: zod
     .array(
       zod.object({
@@ -862,6 +920,30 @@ export const UnfollowUserResponse = zod.object({
 });
 
 /**
+ * @summary Block a user
+ */
+export const BlockUserParams = zod.object({
+  userId: zod.coerce.number(),
+});
+
+export const BlockUserResponse = zod.object({
+  success: zod.boolean(),
+  message: zod.string().optional(),
+});
+
+/**
+ * @summary Unblock a user
+ */
+export const UnblockUserParams = zod.object({
+  userId: zod.coerce.number(),
+});
+
+export const UnblockUserResponse = zod.object({
+  success: zod.boolean(),
+  message: zod.string().optional(),
+});
+
+/**
  * @summary Get user followers
  */
 export const GetFollowersParams = zod.object({
@@ -871,6 +953,7 @@ export const GetFollowersParams = zod.object({
 export const GetFollowersResponseItem = zod.object({
   id: zod.number(),
   username: zod.string(),
+  artistDisplayName: zod.string().nullish(),
   avatarUrl: zod.string().nullish(),
   bio: zod.string().nullish(),
   profileType: zod.enum(["user", "artist"]),
@@ -886,6 +969,8 @@ export const GetFollowersResponseItem = zod.object({
   interests: zod.array(zod.string()).optional(),
   hasArtistPage: zod.boolean().optional(),
   accentColor: zod.string().nullish(),
+  onboardingCompleted: zod.boolean().optional(),
+  onboardingStep: zod.string().optional(),
   links: zod
     .array(
       zod.object({
@@ -896,8 +981,236 @@ export const GetFollowersResponseItem = zod.object({
     .optional(),
   category: zod.string().nullish(),
   tags: zod.array(zod.string()).optional(),
+  hasBlockedUser: zod.boolean(),
+  isBlockedByUser: zod.boolean(),
 });
 export const GetFollowersResponse = zod.array(GetFollowersResponseItem);
+
+/**
+ * @summary Get suggested creators for the current user
+ */
+export const GetSuggestedCreatorsParams = zod.object({
+  userId: zod.coerce.number(),
+});
+
+export const getSuggestedCreatorsQueryLimitDefault = 6;
+
+export const GetSuggestedCreatorsQueryParams = zod.object({
+  limit: zod.coerce.number().default(getSuggestedCreatorsQueryLimitDefault),
+});
+
+export const GetSuggestedCreatorsResponse = zod.object({
+  artists: zod.array(
+    zod.object({
+      id: zod.number(),
+      userId: zod.number(),
+      displayName: zod.string().nullish(),
+      category: zod.string(),
+      location: zod.string().nullish(),
+      tagline: zod.string().nullish(),
+      tags: zod.array(zod.string()),
+      bio: zod.string().nullish(),
+      influences: zod.string().nullish(),
+      availabilityStatus: zod.string().nullish(),
+      pronouns: zod.string().nullish(),
+      yearsActive: zod.string().nullish(),
+      representedBy: zod.string().nullish(),
+      openForCommissions: zod.boolean(),
+      touring: zod.boolean(),
+      acceptsCollaborations: zod.boolean(),
+      customFields: zod.array(
+        zod.object({
+          label: zod.string(),
+          value: zod.string(),
+        }),
+      ),
+      bookingEmail: zod.string().nullish(),
+      gallery: zod.array(
+        zod.object({
+          id: zod.number(),
+          artistId: zod.number(),
+          type: zod.enum(["image", "video", "audio"]),
+          url: zod.string(),
+          caption: zod.string().nullish(),
+          createdAt: zod.coerce.date(),
+        }),
+      ),
+      user: zod.object({
+        id: zod.number(),
+        username: zod.string(),
+        artistDisplayName: zod.string().nullish(),
+        avatarUrl: zod.string().nullish(),
+        bio: zod.string().nullish(),
+        profileType: zod.enum(["user", "artist"]),
+        followerCount: zod.number(),
+        friendCount: zod.number(),
+        bannerUrl: zod.string().nullish(),
+        location: zod.string().nullish(),
+        city: zod.string().nullish(),
+        age: zod.number().nullish(),
+        work: zod.string().nullish(),
+        school: zod.string().nullish(),
+        about: zod.string().nullish(),
+        interests: zod.array(zod.string()).optional(),
+        hasArtistPage: zod.boolean().optional(),
+        accentColor: zod.string().nullish(),
+        onboardingCompleted: zod.boolean().optional(),
+        onboardingStep: zod.string().optional(),
+        links: zod
+          .array(
+            zod.object({
+              label: zod.string(),
+              url: zod.string(),
+            }),
+          )
+          .optional(),
+        category: zod.string().nullish(),
+        tags: zod.array(zod.string()).optional(),
+        hasBlockedUser: zod.boolean(),
+        isBlockedByUser: zod.boolean(),
+      }),
+      primaryActionType: zod.string(),
+      primaryActionLabel: zod.string(),
+      primaryActionUrl: zod.string().nullish(),
+      featuredTitle: zod.string().nullish(),
+      featuredDescription: zod.string().nullish(),
+      featuredUrl: zod.string().nullish(),
+      featuredType: zod.string(),
+      moodPreset: zod.string(),
+      layoutTemplate: zod.string(),
+      fontPreset: zod.string(),
+      enabledModules: zod.array(zod.string()),
+      moduleOrder: zod.array(zod.string()),
+      pinnedPost: zod
+        .object({
+          id: zod.number(),
+          userId: zod.number(),
+          actorSurface: zod.enum(["personal", "artist"]),
+          content: zod.string(),
+          imageUrl: zod.string().nullish(),
+          visibility: zod.enum(["public", "friends", "private"]),
+          repostOfPostId: zod.number().nullish(),
+          likeCount: zod.number(),
+          isLiked: zod.boolean(),
+          reactionCounts: zod.object({
+            like: zod.number(),
+            heart: zod.number(),
+            wow: zod.number(),
+            angry: zod.number(),
+          }),
+          totalReactionCount: zod.number(),
+          currentUserReaction: zod
+            .enum(["like", "heart", "wow", "angry"])
+            .nullish(),
+          repostCount: zod.number(),
+          commentCount: zod.number(),
+          comments: zod.array(
+            zod.object({
+              id: zod.number(),
+              postId: zod.number(),
+              userId: zod.number(),
+              parentCommentId: zod.number().nullish(),
+              content: zod.string(),
+              createdAt: zod.coerce.date(),
+              updatedAt: zod.coerce.date(),
+              author: zod
+                .object({
+                  id: zod.number(),
+                  username: zod.string(),
+                  artistDisplayName: zod.string().nullish(),
+                  avatarUrl: zod.string().nullish(),
+                  bio: zod.string().nullish(),
+                  profileType: zod.enum(["user", "artist"]),
+                  followerCount: zod.number(),
+                  friendCount: zod.number(),
+                  bannerUrl: zod.string().nullish(),
+                  location: zod.string().nullish(),
+                  city: zod.string().nullish(),
+                  age: zod.number().nullish(),
+                  work: zod.string().nullish(),
+                  school: zod.string().nullish(),
+                  about: zod.string().nullish(),
+                  interests: zod.array(zod.string()).optional(),
+                  hasArtistPage: zod.boolean().optional(),
+                  accentColor: zod.string().nullish(),
+                  onboardingCompleted: zod.boolean().optional(),
+                  onboardingStep: zod.string().optional(),
+                  links: zod
+                    .array(
+                      zod.object({
+                        label: zod.string(),
+                        url: zod.string(),
+                      }),
+                    )
+                    .optional(),
+                  category: zod.string().nullish(),
+                  tags: zod.array(zod.string()).optional(),
+                  hasBlockedUser: zod.boolean(),
+                  isBlockedByUser: zod.boolean(),
+                })
+                .nullish(),
+            }),
+          ),
+          originalPost: zod.unknown().nullish(),
+          author: zod
+            .object({
+              id: zod.number(),
+              username: zod.string(),
+              artistDisplayName: zod.string().nullish(),
+              avatarUrl: zod.string().nullish(),
+              bio: zod.string().nullish(),
+              profileType: zod.enum(["user", "artist"]),
+              followerCount: zod.number(),
+              friendCount: zod.number(),
+              bannerUrl: zod.string().nullish(),
+              location: zod.string().nullish(),
+              city: zod.string().nullish(),
+              age: zod.number().nullish(),
+              work: zod.string().nullish(),
+              school: zod.string().nullish(),
+              about: zod.string().nullish(),
+              interests: zod.array(zod.string()).optional(),
+              hasArtistPage: zod.boolean().optional(),
+              accentColor: zod.string().nullish(),
+              onboardingCompleted: zod.boolean().optional(),
+              onboardingStep: zod.string().optional(),
+              links: zod
+                .array(
+                  zod.object({
+                    label: zod.string(),
+                    url: zod.string(),
+                  }),
+                )
+                .optional(),
+              category: zod.string().nullish(),
+              tags: zod.array(zod.string()).optional(),
+              hasBlockedUser: zod.boolean(),
+              isBlockedByUser: zod.boolean(),
+            })
+            .optional(),
+          createdAt: zod.coerce.date(),
+          updatedAt: zod.coerce.date().optional(),
+          media: zod
+            .array(
+              zod.object({
+                id: zod.number(),
+                postId: zod.number(),
+                type: zod.string(),
+                url: zod.string(),
+                title: zod.string().nullish(),
+                thumbnailUrl: zod.string().nullish(),
+                createdAt: zod.coerce.date(),
+              }),
+            )
+            .optional(),
+        })
+        .nullish(),
+    }),
+  ),
+  total: zod.number(),
+  page: zod.number(),
+  totalPages: zod.number(),
+});
 
 /**
  * @summary Get users that this user follows
@@ -909,6 +1222,7 @@ export const GetFollowingParams = zod.object({
 export const GetFollowingResponseItem = zod.object({
   id: zod.number(),
   username: zod.string(),
+  artistDisplayName: zod.string().nullish(),
   avatarUrl: zod.string().nullish(),
   bio: zod.string().nullish(),
   profileType: zod.enum(["user", "artist"]),
@@ -924,6 +1238,8 @@ export const GetFollowingResponseItem = zod.object({
   interests: zod.array(zod.string()).optional(),
   hasArtistPage: zod.boolean().optional(),
   accentColor: zod.string().nullish(),
+  onboardingCompleted: zod.boolean().optional(),
+  onboardingStep: zod.string().optional(),
   links: zod
     .array(
       zod.object({
@@ -934,20 +1250,21 @@ export const GetFollowingResponseItem = zod.object({
     .optional(),
   category: zod.string().nullish(),
   tags: zod.array(zod.string()).optional(),
+  hasBlockedUser: zod.boolean(),
+  isBlockedByUser: zod.boolean(),
 });
 export const GetFollowingResponse = zod.array(GetFollowingResponseItem);
 
 /**
  * @summary Get chronological feed for current user
  */
-export const getFeedQueryPageDefault = 1;
-export const getFeedQueryLimitDefault = 20;
+export const getFeedQueryLimitDefault = 12;
 
 export const GetFeedQueryParams = zod.object({
   mode: zod.enum(["following", "local", "discovery", "custom"]).optional(),
   city: zod.coerce.string().optional(),
   customFeedId: zod.coerce.number().optional(),
-  page: zod.coerce.number().default(getFeedQueryPageDefault),
+  cursor: zod.coerce.number().optional(),
   limit: zod.coerce.number().default(getFeedQueryLimitDefault),
 });
 
@@ -957,8 +1274,10 @@ export const GetFeedResponse = zod
       zod.object({
         id: zod.number(),
         userId: zod.number(),
+        actorSurface: zod.enum(["personal", "artist"]),
         content: zod.string(),
         imageUrl: zod.string().nullish(),
+        visibility: zod.enum(["public", "friends", "private"]),
         repostOfPostId: zod.number().nullish(),
         likeCount: zod.number(),
         isLiked: zod.boolean(),
@@ -987,6 +1306,7 @@ export const GetFeedResponse = zod
               .object({
                 id: zod.number(),
                 username: zod.string(),
+                artistDisplayName: zod.string().nullish(),
                 avatarUrl: zod.string().nullish(),
                 bio: zod.string().nullish(),
                 profileType: zod.enum(["user", "artist"]),
@@ -1002,6 +1322,8 @@ export const GetFeedResponse = zod
                 interests: zod.array(zod.string()).optional(),
                 hasArtistPage: zod.boolean().optional(),
                 accentColor: zod.string().nullish(),
+                onboardingCompleted: zod.boolean().optional(),
+                onboardingStep: zod.string().optional(),
                 links: zod
                   .array(
                     zod.object({
@@ -1012,6 +1334,8 @@ export const GetFeedResponse = zod
                   .optional(),
                 category: zod.string().nullish(),
                 tags: zod.array(zod.string()).optional(),
+                hasBlockedUser: zod.boolean(),
+                isBlockedByUser: zod.boolean(),
               })
               .nullish(),
           }),
@@ -1021,6 +1345,7 @@ export const GetFeedResponse = zod
           .object({
             id: zod.number(),
             username: zod.string(),
+            artistDisplayName: zod.string().nullish(),
             avatarUrl: zod.string().nullish(),
             bio: zod.string().nullish(),
             profileType: zod.enum(["user", "artist"]),
@@ -1036,6 +1361,8 @@ export const GetFeedResponse = zod
             interests: zod.array(zod.string()).optional(),
             hasArtistPage: zod.boolean().optional(),
             accentColor: zod.string().nullish(),
+            onboardingCompleted: zod.boolean().optional(),
+            onboardingStep: zod.string().optional(),
             links: zod
               .array(
                 zod.object({
@@ -1046,6 +1373,8 @@ export const GetFeedResponse = zod
               .optional(),
             category: zod.string().nullish(),
             tags: zod.array(zod.string()).optional(),
+            hasBlockedUser: zod.boolean(),
+            isBlockedByUser: zod.boolean(),
           })
           .optional(),
         createdAt: zod.coerce.date(),
@@ -1066,8 +1395,9 @@ export const GetFeedResponse = zod
       }),
     ),
     total: zod.number(),
-    page: zod.number(),
-    totalPages: zod.number(),
+    limit: zod.number(),
+    nextCursor: zod.number().nullable(),
+    hasMore: zod.boolean(),
   })
   .and(
     zod.object({
@@ -1081,8 +1411,10 @@ export const GetFeedResponse = zod
 export const CreatePostBody = zod.object({
   content: zod.string().optional(),
   imageUrl: zod.string().nullish(),
+  actorSurface: zod.enum(["personal", "artist"]).optional(),
   repostOfPostId: zod.number().nullish(),
   groupId: zod.number().nullish(),
+  visibility: zod.enum(["public", "friends", "private"]).optional(),
   media: zod
     .array(
       zod.object({
@@ -1105,8 +1437,10 @@ export const GetPostParams = zod.object({
 export const GetPostResponse = zod.object({
   id: zod.number(),
   userId: zod.number(),
+  actorSurface: zod.enum(["personal", "artist"]),
   content: zod.string(),
   imageUrl: zod.string().nullish(),
+  visibility: zod.enum(["public", "friends", "private"]),
   repostOfPostId: zod.number().nullish(),
   likeCount: zod.number(),
   isLiked: zod.boolean(),
@@ -1133,6 +1467,7 @@ export const GetPostResponse = zod.object({
         .object({
           id: zod.number(),
           username: zod.string(),
+          artistDisplayName: zod.string().nullish(),
           avatarUrl: zod.string().nullish(),
           bio: zod.string().nullish(),
           profileType: zod.enum(["user", "artist"]),
@@ -1148,6 +1483,8 @@ export const GetPostResponse = zod.object({
           interests: zod.array(zod.string()).optional(),
           hasArtistPage: zod.boolean().optional(),
           accentColor: zod.string().nullish(),
+          onboardingCompleted: zod.boolean().optional(),
+          onboardingStep: zod.string().optional(),
           links: zod
             .array(
               zod.object({
@@ -1158,6 +1495,8 @@ export const GetPostResponse = zod.object({
             .optional(),
           category: zod.string().nullish(),
           tags: zod.array(zod.string()).optional(),
+          hasBlockedUser: zod.boolean(),
+          isBlockedByUser: zod.boolean(),
         })
         .nullish(),
     }),
@@ -1167,6 +1506,7 @@ export const GetPostResponse = zod.object({
     .object({
       id: zod.number(),
       username: zod.string(),
+      artistDisplayName: zod.string().nullish(),
       avatarUrl: zod.string().nullish(),
       bio: zod.string().nullish(),
       profileType: zod.enum(["user", "artist"]),
@@ -1182,6 +1522,8 @@ export const GetPostResponse = zod.object({
       interests: zod.array(zod.string()).optional(),
       hasArtistPage: zod.boolean().optional(),
       accentColor: zod.string().nullish(),
+      onboardingCompleted: zod.boolean().optional(),
+      onboardingStep: zod.string().optional(),
       links: zod
         .array(
           zod.object({
@@ -1192,6 +1534,8 @@ export const GetPostResponse = zod.object({
         .optional(),
       category: zod.string().nullish(),
       tags: zod.array(zod.string()).optional(),
+      hasBlockedUser: zod.boolean(),
+      isBlockedByUser: zod.boolean(),
     })
     .optional(),
   createdAt: zod.coerce.date(),
@@ -1221,6 +1565,151 @@ export const DeletePostParams = zod.object({
 export const DeletePostResponse = zod.object({
   success: zod.boolean(),
   message: zod.string().optional(),
+});
+
+/**
+ * @summary Update a post
+ */
+export const UpdatePostParams = zod.object({
+  postId: zod.coerce.number(),
+});
+
+export const UpdatePostBody = zod.object({
+  content: zod.string(),
+  imageUrl: zod.string().nullish(),
+  actorSurface: zod.enum(["personal", "artist"]).optional(),
+  visibility: zod.enum(["public", "friends", "private"]).optional(),
+  media: zod
+    .array(
+      zod.object({
+        type: zod.string().optional(),
+        url: zod.string().optional(),
+        title: zod.string().nullish(),
+        thumbnailUrl: zod.string().nullish(),
+      }),
+    )
+    .optional(),
+});
+
+export const UpdatePostResponse = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  actorSurface: zod.enum(["personal", "artist"]),
+  content: zod.string(),
+  imageUrl: zod.string().nullish(),
+  visibility: zod.enum(["public", "friends", "private"]),
+  repostOfPostId: zod.number().nullish(),
+  likeCount: zod.number(),
+  isLiked: zod.boolean(),
+  reactionCounts: zod.object({
+    like: zod.number(),
+    heart: zod.number(),
+    wow: zod.number(),
+    angry: zod.number(),
+  }),
+  totalReactionCount: zod.number(),
+  currentUserReaction: zod.enum(["like", "heart", "wow", "angry"]).nullish(),
+  repostCount: zod.number(),
+  commentCount: zod.number(),
+  comments: zod.array(
+    zod.object({
+      id: zod.number(),
+      postId: zod.number(),
+      userId: zod.number(),
+      parentCommentId: zod.number().nullish(),
+      content: zod.string(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+      author: zod
+        .object({
+          id: zod.number(),
+          username: zod.string(),
+          artistDisplayName: zod.string().nullish(),
+          avatarUrl: zod.string().nullish(),
+          bio: zod.string().nullish(),
+          profileType: zod.enum(["user", "artist"]),
+          followerCount: zod.number(),
+          friendCount: zod.number(),
+          bannerUrl: zod.string().nullish(),
+          location: zod.string().nullish(),
+          city: zod.string().nullish(),
+          age: zod.number().nullish(),
+          work: zod.string().nullish(),
+          school: zod.string().nullish(),
+          about: zod.string().nullish(),
+          interests: zod.array(zod.string()).optional(),
+          hasArtistPage: zod.boolean().optional(),
+          accentColor: zod.string().nullish(),
+          onboardingCompleted: zod.boolean().optional(),
+          onboardingStep: zod.string().optional(),
+          links: zod
+            .array(
+              zod.object({
+                label: zod.string(),
+                url: zod.string(),
+              }),
+            )
+            .optional(),
+          category: zod.string().nullish(),
+          tags: zod.array(zod.string()).optional(),
+          hasBlockedUser: zod.boolean(),
+          isBlockedByUser: zod.boolean(),
+        })
+        .nullish(),
+    }),
+  ),
+  originalPost: zod.unknown().nullish(),
+  author: zod
+    .object({
+      id: zod.number(),
+      username: zod.string(),
+      artistDisplayName: zod.string().nullish(),
+      avatarUrl: zod.string().nullish(),
+      bio: zod.string().nullish(),
+      profileType: zod.enum(["user", "artist"]),
+      followerCount: zod.number(),
+      friendCount: zod.number(),
+      bannerUrl: zod.string().nullish(),
+      location: zod.string().nullish(),
+      city: zod.string().nullish(),
+      age: zod.number().nullish(),
+      work: zod.string().nullish(),
+      school: zod.string().nullish(),
+      about: zod.string().nullish(),
+      interests: zod.array(zod.string()).optional(),
+      hasArtistPage: zod.boolean().optional(),
+      accentColor: zod.string().nullish(),
+      onboardingCompleted: zod.boolean().optional(),
+      onboardingStep: zod.string().optional(),
+      links: zod
+        .array(
+          zod.object({
+            label: zod.string(),
+            url: zod.string(),
+          }),
+        )
+        .optional(),
+      category: zod.string().nullish(),
+      tags: zod.array(zod.string()).optional(),
+      hasBlockedUser: zod.boolean(),
+      isBlockedByUser: zod.boolean(),
+    })
+    .optional(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date().optional(),
+  media: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        postId: zod.number(),
+        type: zod.string(),
+        url: zod.string(),
+        title: zod.string().nullish(),
+        thumbnailUrl: zod.string().nullish(),
+        createdAt: zod.coerce.date(),
+      }),
+    )
+    .optional(),
 });
 
 /**
@@ -1261,8 +1750,10 @@ export const ReactToPostBody = zod.object({
 export const ReactToPostResponse = zod.object({
   id: zod.number(),
   userId: zod.number(),
+  actorSurface: zod.enum(["personal", "artist"]),
   content: zod.string(),
   imageUrl: zod.string().nullish(),
+  visibility: zod.enum(["public", "friends", "private"]),
   repostOfPostId: zod.number().nullish(),
   likeCount: zod.number(),
   isLiked: zod.boolean(),
@@ -1289,6 +1780,7 @@ export const ReactToPostResponse = zod.object({
         .object({
           id: zod.number(),
           username: zod.string(),
+          artistDisplayName: zod.string().nullish(),
           avatarUrl: zod.string().nullish(),
           bio: zod.string().nullish(),
           profileType: zod.enum(["user", "artist"]),
@@ -1304,6 +1796,8 @@ export const ReactToPostResponse = zod.object({
           interests: zod.array(zod.string()).optional(),
           hasArtistPage: zod.boolean().optional(),
           accentColor: zod.string().nullish(),
+          onboardingCompleted: zod.boolean().optional(),
+          onboardingStep: zod.string().optional(),
           links: zod
             .array(
               zod.object({
@@ -1314,6 +1808,8 @@ export const ReactToPostResponse = zod.object({
             .optional(),
           category: zod.string().nullish(),
           tags: zod.array(zod.string()).optional(),
+          hasBlockedUser: zod.boolean(),
+          isBlockedByUser: zod.boolean(),
         })
         .nullish(),
     }),
@@ -1323,6 +1819,7 @@ export const ReactToPostResponse = zod.object({
     .object({
       id: zod.number(),
       username: zod.string(),
+      artistDisplayName: zod.string().nullish(),
       avatarUrl: zod.string().nullish(),
       bio: zod.string().nullish(),
       profileType: zod.enum(["user", "artist"]),
@@ -1338,6 +1835,8 @@ export const ReactToPostResponse = zod.object({
       interests: zod.array(zod.string()).optional(),
       hasArtistPage: zod.boolean().optional(),
       accentColor: zod.string().nullish(),
+      onboardingCompleted: zod.boolean().optional(),
+      onboardingStep: zod.string().optional(),
       links: zod
         .array(
           zod.object({
@@ -1348,6 +1847,8 @@ export const ReactToPostResponse = zod.object({
         .optional(),
       category: zod.string().nullish(),
       tags: zod.array(zod.string()).optional(),
+      hasBlockedUser: zod.boolean(),
+      isBlockedByUser: zod.boolean(),
     })
     .optional(),
   createdAt: zod.coerce.date(),
@@ -1377,8 +1878,10 @@ export const RemovePostReactionParams = zod.object({
 export const RemovePostReactionResponse = zod.object({
   id: zod.number(),
   userId: zod.number(),
+  actorSurface: zod.enum(["personal", "artist"]),
   content: zod.string(),
   imageUrl: zod.string().nullish(),
+  visibility: zod.enum(["public", "friends", "private"]),
   repostOfPostId: zod.number().nullish(),
   likeCount: zod.number(),
   isLiked: zod.boolean(),
@@ -1405,6 +1908,7 @@ export const RemovePostReactionResponse = zod.object({
         .object({
           id: zod.number(),
           username: zod.string(),
+          artistDisplayName: zod.string().nullish(),
           avatarUrl: zod.string().nullish(),
           bio: zod.string().nullish(),
           profileType: zod.enum(["user", "artist"]),
@@ -1420,6 +1924,8 @@ export const RemovePostReactionResponse = zod.object({
           interests: zod.array(zod.string()).optional(),
           hasArtistPage: zod.boolean().optional(),
           accentColor: zod.string().nullish(),
+          onboardingCompleted: zod.boolean().optional(),
+          onboardingStep: zod.string().optional(),
           links: zod
             .array(
               zod.object({
@@ -1430,6 +1936,8 @@ export const RemovePostReactionResponse = zod.object({
             .optional(),
           category: zod.string().nullish(),
           tags: zod.array(zod.string()).optional(),
+          hasBlockedUser: zod.boolean(),
+          isBlockedByUser: zod.boolean(),
         })
         .nullish(),
     }),
@@ -1439,6 +1947,7 @@ export const RemovePostReactionResponse = zod.object({
     .object({
       id: zod.number(),
       username: zod.string(),
+      artistDisplayName: zod.string().nullish(),
       avatarUrl: zod.string().nullish(),
       bio: zod.string().nullish(),
       profileType: zod.enum(["user", "artist"]),
@@ -1454,6 +1963,8 @@ export const RemovePostReactionResponse = zod.object({
       interests: zod.array(zod.string()).optional(),
       hasArtistPage: zod.boolean().optional(),
       accentColor: zod.string().nullish(),
+      onboardingCompleted: zod.boolean().optional(),
+      onboardingStep: zod.string().optional(),
       links: zod
         .array(
           zod.object({
@@ -1464,6 +1975,8 @@ export const RemovePostReactionResponse = zod.object({
         .optional(),
       category: zod.string().nullish(),
       tags: zod.array(zod.string()).optional(),
+      hasBlockedUser: zod.boolean(),
+      isBlockedByUser: zod.boolean(),
     })
     .optional(),
   createdAt: zod.coerce.date(),
@@ -1513,6 +2026,7 @@ export const GetPostCommentsResponseItem = zod.object({
     .object({
       id: zod.number(),
       username: zod.string(),
+      artistDisplayName: zod.string().nullish(),
       avatarUrl: zod.string().nullish(),
       bio: zod.string().nullish(),
       profileType: zod.enum(["user", "artist"]),
@@ -1528,6 +2042,8 @@ export const GetPostCommentsResponseItem = zod.object({
       interests: zod.array(zod.string()).optional(),
       hasArtistPage: zod.boolean().optional(),
       accentColor: zod.string().nullish(),
+      onboardingCompleted: zod.boolean().optional(),
+      onboardingStep: zod.string().optional(),
       links: zod
         .array(
           zod.object({
@@ -1538,6 +2054,8 @@ export const GetPostCommentsResponseItem = zod.object({
         .optional(),
       category: zod.string().nullish(),
       tags: zod.array(zod.string()).optional(),
+      hasBlockedUser: zod.boolean(),
+      isBlockedByUser: zod.boolean(),
     })
     .nullish(),
 });
@@ -1575,6 +2093,7 @@ export const DeletePostCommentResponseItem = zod.object({
     .object({
       id: zod.number(),
       username: zod.string(),
+      artistDisplayName: zod.string().nullish(),
       avatarUrl: zod.string().nullish(),
       bio: zod.string().nullish(),
       profileType: zod.enum(["user", "artist"]),
@@ -1590,6 +2109,8 @@ export const DeletePostCommentResponseItem = zod.object({
       interests: zod.array(zod.string()).optional(),
       hasArtistPage: zod.boolean().optional(),
       accentColor: zod.string().nullish(),
+      onboardingCompleted: zod.boolean().optional(),
+      onboardingStep: zod.string().optional(),
       links: zod
         .array(
           zod.object({
@@ -1600,6 +2121,8 @@ export const DeletePostCommentResponseItem = zod.object({
         .optional(),
       category: zod.string().nullish(),
       tags: zod.array(zod.string()).optional(),
+      hasBlockedUser: zod.boolean(),
+      isBlockedByUser: zod.boolean(),
     })
     .nullish(),
 });
@@ -1614,12 +2137,12 @@ export const GetUserPostsParams = zod.object({
   userId: zod.coerce.number(),
 });
 
-export const getUserPostsQueryPageDefault = 1;
-export const getUserPostsQueryLimitDefault = 20;
+export const getUserPostsQueryLimitDefault = 12;
 
 export const GetUserPostsQueryParams = zod.object({
-  page: zod.coerce.number().default(getUserPostsQueryPageDefault),
+  cursor: zod.coerce.number().optional(),
   limit: zod.coerce.number().default(getUserPostsQueryLimitDefault),
+  surface: zod.enum(["personal", "artist"]).optional(),
 });
 
 export const GetUserPostsResponse = zod.object({
@@ -1627,8 +2150,10 @@ export const GetUserPostsResponse = zod.object({
     zod.object({
       id: zod.number(),
       userId: zod.number(),
+      actorSurface: zod.enum(["personal", "artist"]),
       content: zod.string(),
       imageUrl: zod.string().nullish(),
+      visibility: zod.enum(["public", "friends", "private"]),
       repostOfPostId: zod.number().nullish(),
       likeCount: zod.number(),
       isLiked: zod.boolean(),
@@ -1657,6 +2182,7 @@ export const GetUserPostsResponse = zod.object({
             .object({
               id: zod.number(),
               username: zod.string(),
+              artistDisplayName: zod.string().nullish(),
               avatarUrl: zod.string().nullish(),
               bio: zod.string().nullish(),
               profileType: zod.enum(["user", "artist"]),
@@ -1672,6 +2198,8 @@ export const GetUserPostsResponse = zod.object({
               interests: zod.array(zod.string()).optional(),
               hasArtistPage: zod.boolean().optional(),
               accentColor: zod.string().nullish(),
+              onboardingCompleted: zod.boolean().optional(),
+              onboardingStep: zod.string().optional(),
               links: zod
                 .array(
                   zod.object({
@@ -1682,6 +2210,8 @@ export const GetUserPostsResponse = zod.object({
                 .optional(),
               category: zod.string().nullish(),
               tags: zod.array(zod.string()).optional(),
+              hasBlockedUser: zod.boolean(),
+              isBlockedByUser: zod.boolean(),
             })
             .nullish(),
         }),
@@ -1691,6 +2221,7 @@ export const GetUserPostsResponse = zod.object({
         .object({
           id: zod.number(),
           username: zod.string(),
+          artistDisplayName: zod.string().nullish(),
           avatarUrl: zod.string().nullish(),
           bio: zod.string().nullish(),
           profileType: zod.enum(["user", "artist"]),
@@ -1706,6 +2237,8 @@ export const GetUserPostsResponse = zod.object({
           interests: zod.array(zod.string()).optional(),
           hasArtistPage: zod.boolean().optional(),
           accentColor: zod.string().nullish(),
+          onboardingCompleted: zod.boolean().optional(),
+          onboardingStep: zod.string().optional(),
           links: zod
             .array(
               zod.object({
@@ -1716,6 +2249,8 @@ export const GetUserPostsResponse = zod.object({
             .optional(),
           category: zod.string().nullish(),
           tags: zod.array(zod.string()).optional(),
+          hasBlockedUser: zod.boolean(),
+          isBlockedByUser: zod.boolean(),
         })
         .optional(),
       createdAt: zod.coerce.date(),
@@ -1736,8 +2271,9 @@ export const GetUserPostsResponse = zod.object({
     }),
   ),
   total: zod.number(),
-  page: zod.number(),
-  totalPages: zod.number(),
+  limit: zod.number(),
+  nextCursor: zod.number().nullable(),
+  hasMore: zod.boolean(),
 });
 
 /**
@@ -1801,6 +2337,7 @@ export const GetArtistsResponse = zod.object({
     zod.object({
       id: zod.number(),
       userId: zod.number(),
+      displayName: zod.string().nullish(),
       category: zod.string(),
       location: zod.string().nullish(),
       tagline: zod.string().nullish(),
@@ -1834,6 +2371,7 @@ export const GetArtistsResponse = zod.object({
       user: zod.object({
         id: zod.number(),
         username: zod.string(),
+        artistDisplayName: zod.string().nullish(),
         avatarUrl: zod.string().nullish(),
         bio: zod.string().nullish(),
         profileType: zod.enum(["user", "artist"]),
@@ -1849,6 +2387,8 @@ export const GetArtistsResponse = zod.object({
         interests: zod.array(zod.string()).optional(),
         hasArtistPage: zod.boolean().optional(),
         accentColor: zod.string().nullish(),
+        onboardingCompleted: zod.boolean().optional(),
+        onboardingStep: zod.string().optional(),
         links: zod
           .array(
             zod.object({
@@ -1859,6 +2399,8 @@ export const GetArtistsResponse = zod.object({
           .optional(),
         category: zod.string().nullish(),
         tags: zod.array(zod.string()).optional(),
+        hasBlockedUser: zod.boolean(),
+        isBlockedByUser: zod.boolean(),
       }),
       primaryActionType: zod.string(),
       primaryActionLabel: zod.string(),
@@ -1876,8 +2418,10 @@ export const GetArtistsResponse = zod.object({
         .object({
           id: zod.number(),
           userId: zod.number(),
+          actorSurface: zod.enum(["personal", "artist"]),
           content: zod.string(),
           imageUrl: zod.string().nullish(),
+          visibility: zod.enum(["public", "friends", "private"]),
           repostOfPostId: zod.number().nullish(),
           likeCount: zod.number(),
           isLiked: zod.boolean(),
@@ -1906,6 +2450,7 @@ export const GetArtistsResponse = zod.object({
                 .object({
                   id: zod.number(),
                   username: zod.string(),
+                  artistDisplayName: zod.string().nullish(),
                   avatarUrl: zod.string().nullish(),
                   bio: zod.string().nullish(),
                   profileType: zod.enum(["user", "artist"]),
@@ -1921,6 +2466,8 @@ export const GetArtistsResponse = zod.object({
                   interests: zod.array(zod.string()).optional(),
                   hasArtistPage: zod.boolean().optional(),
                   accentColor: zod.string().nullish(),
+                  onboardingCompleted: zod.boolean().optional(),
+                  onboardingStep: zod.string().optional(),
                   links: zod
                     .array(
                       zod.object({
@@ -1931,6 +2478,8 @@ export const GetArtistsResponse = zod.object({
                     .optional(),
                   category: zod.string().nullish(),
                   tags: zod.array(zod.string()).optional(),
+                  hasBlockedUser: zod.boolean(),
+                  isBlockedByUser: zod.boolean(),
                 })
                 .nullish(),
             }),
@@ -1940,6 +2489,7 @@ export const GetArtistsResponse = zod.object({
             .object({
               id: zod.number(),
               username: zod.string(),
+              artistDisplayName: zod.string().nullish(),
               avatarUrl: zod.string().nullish(),
               bio: zod.string().nullish(),
               profileType: zod.enum(["user", "artist"]),
@@ -1955,6 +2505,8 @@ export const GetArtistsResponse = zod.object({
               interests: zod.array(zod.string()).optional(),
               hasArtistPage: zod.boolean().optional(),
               accentColor: zod.string().nullish(),
+              onboardingCompleted: zod.boolean().optional(),
+              onboardingStep: zod.string().optional(),
               links: zod
                 .array(
                   zod.object({
@@ -1965,6 +2517,8 @@ export const GetArtistsResponse = zod.object({
                 .optional(),
               category: zod.string().nullish(),
               tags: zod.array(zod.string()).optional(),
+              hasBlockedUser: zod.boolean(),
+              isBlockedByUser: zod.boolean(),
             })
             .optional(),
           createdAt: zod.coerce.date(),
@@ -2001,6 +2555,7 @@ export const GetArtistProfileParams = zod.object({
 export const GetArtistProfileResponse = zod.object({
   id: zod.number(),
   userId: zod.number(),
+  displayName: zod.string().nullish(),
   category: zod.string(),
   location: zod.string().nullish(),
   tagline: zod.string().nullish(),
@@ -2034,6 +2589,7 @@ export const GetArtistProfileResponse = zod.object({
   user: zod.object({
     id: zod.number(),
     username: zod.string(),
+    artistDisplayName: zod.string().nullish(),
     avatarUrl: zod.string().nullish(),
     bio: zod.string().nullish(),
     profileType: zod.enum(["user", "artist"]),
@@ -2049,6 +2605,8 @@ export const GetArtistProfileResponse = zod.object({
     interests: zod.array(zod.string()).optional(),
     hasArtistPage: zod.boolean().optional(),
     accentColor: zod.string().nullish(),
+    onboardingCompleted: zod.boolean().optional(),
+    onboardingStep: zod.string().optional(),
     links: zod
       .array(
         zod.object({
@@ -2059,6 +2617,8 @@ export const GetArtistProfileResponse = zod.object({
       .optional(),
     category: zod.string().nullish(),
     tags: zod.array(zod.string()).optional(),
+    hasBlockedUser: zod.boolean(),
+    isBlockedByUser: zod.boolean(),
   }),
   primaryActionType: zod.string(),
   primaryActionLabel: zod.string(),
@@ -2076,8 +2636,10 @@ export const GetArtistProfileResponse = zod.object({
     .object({
       id: zod.number(),
       userId: zod.number(),
+      actorSurface: zod.enum(["personal", "artist"]),
       content: zod.string(),
       imageUrl: zod.string().nullish(),
+      visibility: zod.enum(["public", "friends", "private"]),
       repostOfPostId: zod.number().nullish(),
       likeCount: zod.number(),
       isLiked: zod.boolean(),
@@ -2106,6 +2668,7 @@ export const GetArtistProfileResponse = zod.object({
             .object({
               id: zod.number(),
               username: zod.string(),
+              artistDisplayName: zod.string().nullish(),
               avatarUrl: zod.string().nullish(),
               bio: zod.string().nullish(),
               profileType: zod.enum(["user", "artist"]),
@@ -2121,6 +2684,8 @@ export const GetArtistProfileResponse = zod.object({
               interests: zod.array(zod.string()).optional(),
               hasArtistPage: zod.boolean().optional(),
               accentColor: zod.string().nullish(),
+              onboardingCompleted: zod.boolean().optional(),
+              onboardingStep: zod.string().optional(),
               links: zod
                 .array(
                   zod.object({
@@ -2131,6 +2696,8 @@ export const GetArtistProfileResponse = zod.object({
                 .optional(),
               category: zod.string().nullish(),
               tags: zod.array(zod.string()).optional(),
+              hasBlockedUser: zod.boolean(),
+              isBlockedByUser: zod.boolean(),
             })
             .nullish(),
         }),
@@ -2140,6 +2707,7 @@ export const GetArtistProfileResponse = zod.object({
         .object({
           id: zod.number(),
           username: zod.string(),
+          artistDisplayName: zod.string().nullish(),
           avatarUrl: zod.string().nullish(),
           bio: zod.string().nullish(),
           profileType: zod.enum(["user", "artist"]),
@@ -2155,6 +2723,8 @@ export const GetArtistProfileResponse = zod.object({
           interests: zod.array(zod.string()).optional(),
           hasArtistPage: zod.boolean().optional(),
           accentColor: zod.string().nullish(),
+          onboardingCompleted: zod.boolean().optional(),
+          onboardingStep: zod.string().optional(),
           links: zod
             .array(
               zod.object({
@@ -2165,6 +2735,8 @@ export const GetArtistProfileResponse = zod.object({
             .optional(),
           category: zod.string().nullish(),
           tags: zod.array(zod.string()).optional(),
+          hasBlockedUser: zod.boolean(),
+          isBlockedByUser: zod.boolean(),
         })
         .optional(),
       createdAt: zod.coerce.date(),
@@ -2194,6 +2766,7 @@ export const UpdateArtistProfileParams = zod.object({
 });
 
 export const UpdateArtistProfileBody = zod.object({
+  displayName: zod.string().nullish(),
   category: zod.string().optional(),
   location: zod.string().nullish(),
   tagline: zod.string().nullish(),
@@ -2234,6 +2807,7 @@ export const UpdateArtistProfileBody = zod.object({
 export const UpdateArtistProfileResponse = zod.object({
   id: zod.number(),
   userId: zod.number(),
+  displayName: zod.string().nullish(),
   category: zod.string(),
   location: zod.string().nullish(),
   tagline: zod.string().nullish(),
@@ -2267,6 +2841,7 @@ export const UpdateArtistProfileResponse = zod.object({
   user: zod.object({
     id: zod.number(),
     username: zod.string(),
+    artistDisplayName: zod.string().nullish(),
     avatarUrl: zod.string().nullish(),
     bio: zod.string().nullish(),
     profileType: zod.enum(["user", "artist"]),
@@ -2282,6 +2857,8 @@ export const UpdateArtistProfileResponse = zod.object({
     interests: zod.array(zod.string()).optional(),
     hasArtistPage: zod.boolean().optional(),
     accentColor: zod.string().nullish(),
+    onboardingCompleted: zod.boolean().optional(),
+    onboardingStep: zod.string().optional(),
     links: zod
       .array(
         zod.object({
@@ -2292,6 +2869,8 @@ export const UpdateArtistProfileResponse = zod.object({
       .optional(),
     category: zod.string().nullish(),
     tags: zod.array(zod.string()).optional(),
+    hasBlockedUser: zod.boolean(),
+    isBlockedByUser: zod.boolean(),
   }),
   primaryActionType: zod.string(),
   primaryActionLabel: zod.string(),
@@ -2309,8 +2888,10 @@ export const UpdateArtistProfileResponse = zod.object({
     .object({
       id: zod.number(),
       userId: zod.number(),
+      actorSurface: zod.enum(["personal", "artist"]),
       content: zod.string(),
       imageUrl: zod.string().nullish(),
+      visibility: zod.enum(["public", "friends", "private"]),
       repostOfPostId: zod.number().nullish(),
       likeCount: zod.number(),
       isLiked: zod.boolean(),
@@ -2339,6 +2920,7 @@ export const UpdateArtistProfileResponse = zod.object({
             .object({
               id: zod.number(),
               username: zod.string(),
+              artistDisplayName: zod.string().nullish(),
               avatarUrl: zod.string().nullish(),
               bio: zod.string().nullish(),
               profileType: zod.enum(["user", "artist"]),
@@ -2354,6 +2936,8 @@ export const UpdateArtistProfileResponse = zod.object({
               interests: zod.array(zod.string()).optional(),
               hasArtistPage: zod.boolean().optional(),
               accentColor: zod.string().nullish(),
+              onboardingCompleted: zod.boolean().optional(),
+              onboardingStep: zod.string().optional(),
               links: zod
                 .array(
                   zod.object({
@@ -2364,6 +2948,8 @@ export const UpdateArtistProfileResponse = zod.object({
                 .optional(),
               category: zod.string().nullish(),
               tags: zod.array(zod.string()).optional(),
+              hasBlockedUser: zod.boolean(),
+              isBlockedByUser: zod.boolean(),
             })
             .nullish(),
         }),
@@ -2373,6 +2959,7 @@ export const UpdateArtistProfileResponse = zod.object({
         .object({
           id: zod.number(),
           username: zod.string(),
+          artistDisplayName: zod.string().nullish(),
           avatarUrl: zod.string().nullish(),
           bio: zod.string().nullish(),
           profileType: zod.enum(["user", "artist"]),
@@ -2388,6 +2975,8 @@ export const UpdateArtistProfileResponse = zod.object({
           interests: zod.array(zod.string()).optional(),
           hasArtistPage: zod.boolean().optional(),
           accentColor: zod.string().nullish(),
+          onboardingCompleted: zod.boolean().optional(),
+          onboardingStep: zod.string().optional(),
           links: zod
             .array(
               zod.object({
@@ -2398,6 +2987,8 @@ export const UpdateArtistProfileResponse = zod.object({
             .optional(),
           category: zod.string().nullish(),
           tags: zod.array(zod.string()).optional(),
+          hasBlockedUser: zod.boolean(),
+          isBlockedByUser: zod.boolean(),
         })
         .optional(),
       createdAt: zod.coerce.date(),
@@ -2453,6 +3044,7 @@ export const GetConversationsResponseItem = zod.object({
   otherUser: zod.object({
     id: zod.number(),
     username: zod.string(),
+    artistDisplayName: zod.string().nullish(),
     avatarUrl: zod.string().nullish(),
     bio: zod.string().nullish(),
     profileType: zod.enum(["user", "artist"]),
@@ -2468,6 +3060,8 @@ export const GetConversationsResponseItem = zod.object({
     interests: zod.array(zod.string()).optional(),
     hasArtistPage: zod.boolean().optional(),
     accentColor: zod.string().nullish(),
+    onboardingCompleted: zod.boolean().optional(),
+    onboardingStep: zod.string().optional(),
     links: zod
       .array(
         zod.object({
@@ -2478,6 +3072,8 @@ export const GetConversationsResponseItem = zod.object({
       .optional(),
     category: zod.string().nullish(),
     tags: zod.array(zod.string()).optional(),
+    hasBlockedUser: zod.boolean(),
+    isBlockedByUser: zod.boolean(),
   }),
   lastMessage: zod.string().nullish(),
   lastMessageAt: zod.coerce.date().nullish(),
@@ -2553,6 +3149,7 @@ export const SearchQueryParams = zod.object({
   location: zod.coerce.string().optional(),
   category: zod.coerce.string().optional(),
   tags: zod.coerce.string().optional(),
+  limit: zod.coerce.number().optional(),
 });
 
 export const SearchResponse = zod.object({
@@ -2560,6 +3157,7 @@ export const SearchResponse = zod.object({
     zod.object({
       id: zod.number(),
       username: zod.string(),
+      artistDisplayName: zod.string().nullish(),
       avatarUrl: zod.string().nullish(),
       bio: zod.string().nullish(),
       profileType: zod.enum(["user", "artist"]),
@@ -2575,6 +3173,8 @@ export const SearchResponse = zod.object({
       interests: zod.array(zod.string()).optional(),
       hasArtistPage: zod.boolean().optional(),
       accentColor: zod.string().nullish(),
+      onboardingCompleted: zod.boolean().optional(),
+      onboardingStep: zod.string().optional(),
       links: zod
         .array(
           zod.object({
@@ -2585,12 +3185,15 @@ export const SearchResponse = zod.object({
         .optional(),
       category: zod.string().nullish(),
       tags: zod.array(zod.string()).optional(),
+      hasBlockedUser: zod.boolean(),
+      isBlockedByUser: zod.boolean(),
     }),
   ),
   artists: zod.array(
     zod.object({
       id: zod.number(),
       userId: zod.number(),
+      displayName: zod.string().nullish(),
       category: zod.string(),
       location: zod.string().nullish(),
       tagline: zod.string().nullish(),
@@ -2624,6 +3227,7 @@ export const SearchResponse = zod.object({
       user: zod.object({
         id: zod.number(),
         username: zod.string(),
+        artistDisplayName: zod.string().nullish(),
         avatarUrl: zod.string().nullish(),
         bio: zod.string().nullish(),
         profileType: zod.enum(["user", "artist"]),
@@ -2639,6 +3243,8 @@ export const SearchResponse = zod.object({
         interests: zod.array(zod.string()).optional(),
         hasArtistPage: zod.boolean().optional(),
         accentColor: zod.string().nullish(),
+        onboardingCompleted: zod.boolean().optional(),
+        onboardingStep: zod.string().optional(),
         links: zod
           .array(
             zod.object({
@@ -2649,6 +3255,8 @@ export const SearchResponse = zod.object({
           .optional(),
         category: zod.string().nullish(),
         tags: zod.array(zod.string()).optional(),
+        hasBlockedUser: zod.boolean(),
+        isBlockedByUser: zod.boolean(),
       }),
       primaryActionType: zod.string(),
       primaryActionLabel: zod.string(),
@@ -2666,8 +3274,10 @@ export const SearchResponse = zod.object({
         .object({
           id: zod.number(),
           userId: zod.number(),
+          actorSurface: zod.enum(["personal", "artist"]),
           content: zod.string(),
           imageUrl: zod.string().nullish(),
+          visibility: zod.enum(["public", "friends", "private"]),
           repostOfPostId: zod.number().nullish(),
           likeCount: zod.number(),
           isLiked: zod.boolean(),
@@ -2696,6 +3306,7 @@ export const SearchResponse = zod.object({
                 .object({
                   id: zod.number(),
                   username: zod.string(),
+                  artistDisplayName: zod.string().nullish(),
                   avatarUrl: zod.string().nullish(),
                   bio: zod.string().nullish(),
                   profileType: zod.enum(["user", "artist"]),
@@ -2711,6 +3322,8 @@ export const SearchResponse = zod.object({
                   interests: zod.array(zod.string()).optional(),
                   hasArtistPage: zod.boolean().optional(),
                   accentColor: zod.string().nullish(),
+                  onboardingCompleted: zod.boolean().optional(),
+                  onboardingStep: zod.string().optional(),
                   links: zod
                     .array(
                       zod.object({
@@ -2721,6 +3334,8 @@ export const SearchResponse = zod.object({
                     .optional(),
                   category: zod.string().nullish(),
                   tags: zod.array(zod.string()).optional(),
+                  hasBlockedUser: zod.boolean(),
+                  isBlockedByUser: zod.boolean(),
                 })
                 .nullish(),
             }),
@@ -2730,6 +3345,7 @@ export const SearchResponse = zod.object({
             .object({
               id: zod.number(),
               username: zod.string(),
+              artistDisplayName: zod.string().nullish(),
               avatarUrl: zod.string().nullish(),
               bio: zod.string().nullish(),
               profileType: zod.enum(["user", "artist"]),
@@ -2745,6 +3361,8 @@ export const SearchResponse = zod.object({
               interests: zod.array(zod.string()).optional(),
               hasArtistPage: zod.boolean().optional(),
               accentColor: zod.string().nullish(),
+              onboardingCompleted: zod.boolean().optional(),
+              onboardingStep: zod.string().optional(),
               links: zod
                 .array(
                   zod.object({
@@ -2755,6 +3373,8 @@ export const SearchResponse = zod.object({
                 .optional(),
               category: zod.string().nullish(),
               tags: zod.array(zod.string()).optional(),
+              hasBlockedUser: zod.boolean(),
+              isBlockedByUser: zod.boolean(),
             })
             .optional(),
           createdAt: zod.coerce.date(),
@@ -2777,6 +3397,8 @@ export const SearchResponse = zod.object({
     }),
   ),
   total: zod.number(),
+  usersTotal: zod.number(),
+  artistsTotal: zod.number(),
 });
 
 /**
@@ -2943,6 +3565,7 @@ export const GetGroupsResponseItem = zod.object({
     .object({
       id: zod.number(),
       username: zod.string(),
+      artistDisplayName: zod.string().nullish(),
       avatarUrl: zod.string().nullish(),
       bio: zod.string().nullish(),
       profileType: zod.enum(["user", "artist"]),
@@ -2958,6 +3581,8 @@ export const GetGroupsResponseItem = zod.object({
       interests: zod.array(zod.string()).optional(),
       hasArtistPage: zod.boolean().optional(),
       accentColor: zod.string().nullish(),
+      onboardingCompleted: zod.boolean().optional(),
+      onboardingStep: zod.string().optional(),
       links: zod
         .array(
           zod.object({
@@ -2968,6 +3593,8 @@ export const GetGroupsResponseItem = zod.object({
         .optional(),
       category: zod.string().nullish(),
       tags: zod.array(zod.string()).optional(),
+      hasBlockedUser: zod.boolean(),
+      isBlockedByUser: zod.boolean(),
     })
     .nullish(),
   memberCount: zod.number(),
@@ -2977,6 +3604,7 @@ export const GetGroupsResponseItem = zod.object({
     zod.object({
       id: zod.number(),
       username: zod.string(),
+      artistDisplayName: zod.string().nullish(),
       avatarUrl: zod.string().nullish(),
       bio: zod.string().nullish(),
       profileType: zod.enum(["user", "artist"]),
@@ -2992,6 +3620,8 @@ export const GetGroupsResponseItem = zod.object({
       interests: zod.array(zod.string()).optional(),
       hasArtistPage: zod.boolean().optional(),
       accentColor: zod.string().nullish(),
+      onboardingCompleted: zod.boolean().optional(),
+      onboardingStep: zod.string().optional(),
       links: zod
         .array(
           zod.object({
@@ -3002,6 +3632,8 @@ export const GetGroupsResponseItem = zod.object({
         .optional(),
       category: zod.string().nullish(),
       tags: zod.array(zod.string()).optional(),
+      hasBlockedUser: zod.boolean(),
+      isBlockedByUser: zod.boolean(),
     }),
   ),
 });
@@ -3045,6 +3677,7 @@ export const GetGroupResponse = zod.object({
       .object({
         id: zod.number(),
         username: zod.string(),
+        artistDisplayName: zod.string().nullish(),
         avatarUrl: zod.string().nullish(),
         bio: zod.string().nullish(),
         profileType: zod.enum(["user", "artist"]),
@@ -3060,6 +3693,8 @@ export const GetGroupResponse = zod.object({
         interests: zod.array(zod.string()).optional(),
         hasArtistPage: zod.boolean().optional(),
         accentColor: zod.string().nullish(),
+        onboardingCompleted: zod.boolean().optional(),
+        onboardingStep: zod.string().optional(),
         links: zod
           .array(
             zod.object({
@@ -3070,6 +3705,8 @@ export const GetGroupResponse = zod.object({
           .optional(),
         category: zod.string().nullish(),
         tags: zod.array(zod.string()).optional(),
+        hasBlockedUser: zod.boolean(),
+        isBlockedByUser: zod.boolean(),
       })
       .nullish(),
     memberCount: zod.number(),
@@ -3079,6 +3716,7 @@ export const GetGroupResponse = zod.object({
       zod.object({
         id: zod.number(),
         username: zod.string(),
+        artistDisplayName: zod.string().nullish(),
         avatarUrl: zod.string().nullish(),
         bio: zod.string().nullish(),
         profileType: zod.enum(["user", "artist"]),
@@ -3094,6 +3732,8 @@ export const GetGroupResponse = zod.object({
         interests: zod.array(zod.string()).optional(),
         hasArtistPage: zod.boolean().optional(),
         accentColor: zod.string().nullish(),
+        onboardingCompleted: zod.boolean().optional(),
+        onboardingStep: zod.string().optional(),
         links: zod
           .array(
             zod.object({
@@ -3104,6 +3744,8 @@ export const GetGroupResponse = zod.object({
           .optional(),
         category: zod.string().nullish(),
         tags: zod.array(zod.string()).optional(),
+        hasBlockedUser: zod.boolean(),
+        isBlockedByUser: zod.boolean(),
       }),
     ),
   }),
@@ -3111,8 +3753,10 @@ export const GetGroupResponse = zod.object({
     zod.object({
       id: zod.number(),
       userId: zod.number(),
+      actorSurface: zod.enum(["personal", "artist"]),
       content: zod.string(),
       imageUrl: zod.string().nullish(),
+      visibility: zod.enum(["public", "friends", "private"]),
       repostOfPostId: zod.number().nullish(),
       likeCount: zod.number(),
       isLiked: zod.boolean(),
@@ -3141,6 +3785,7 @@ export const GetGroupResponse = zod.object({
             .object({
               id: zod.number(),
               username: zod.string(),
+              artistDisplayName: zod.string().nullish(),
               avatarUrl: zod.string().nullish(),
               bio: zod.string().nullish(),
               profileType: zod.enum(["user", "artist"]),
@@ -3156,6 +3801,8 @@ export const GetGroupResponse = zod.object({
               interests: zod.array(zod.string()).optional(),
               hasArtistPage: zod.boolean().optional(),
               accentColor: zod.string().nullish(),
+              onboardingCompleted: zod.boolean().optional(),
+              onboardingStep: zod.string().optional(),
               links: zod
                 .array(
                   zod.object({
@@ -3166,6 +3813,8 @@ export const GetGroupResponse = zod.object({
                 .optional(),
               category: zod.string().nullish(),
               tags: zod.array(zod.string()).optional(),
+              hasBlockedUser: zod.boolean(),
+              isBlockedByUser: zod.boolean(),
             })
             .nullish(),
         }),
@@ -3175,6 +3824,7 @@ export const GetGroupResponse = zod.object({
         .object({
           id: zod.number(),
           username: zod.string(),
+          artistDisplayName: zod.string().nullish(),
           avatarUrl: zod.string().nullish(),
           bio: zod.string().nullish(),
           profileType: zod.enum(["user", "artist"]),
@@ -3190,6 +3840,8 @@ export const GetGroupResponse = zod.object({
           interests: zod.array(zod.string()).optional(),
           hasArtistPage: zod.boolean().optional(),
           accentColor: zod.string().nullish(),
+          onboardingCompleted: zod.boolean().optional(),
+          onboardingStep: zod.string().optional(),
           links: zod
             .array(
               zod.object({
@@ -3200,6 +3852,8 @@ export const GetGroupResponse = zod.object({
             .optional(),
           category: zod.string().nullish(),
           tags: zod.array(zod.string()).optional(),
+          hasBlockedUser: zod.boolean(),
+          isBlockedByUser: zod.boolean(),
         })
         .optional(),
       createdAt: zod.coerce.date(),
@@ -3219,6 +3873,151 @@ export const GetGroupResponse = zod.object({
         .optional(),
     }),
   ),
+});
+
+/**
+ * @summary Get posts for a group
+ */
+export const GetGroupPostsParams = zod.object({
+  groupId: zod.coerce.number(),
+});
+
+export const getGroupPostsQueryLimitDefault = 12;
+
+export const GetGroupPostsQueryParams = zod.object({
+  cursor: zod.coerce.number().optional(),
+  limit: zod.coerce.number().default(getGroupPostsQueryLimitDefault),
+});
+
+export const GetGroupPostsResponse = zod.object({
+  posts: zod.array(
+    zod.object({
+      id: zod.number(),
+      userId: zod.number(),
+      actorSurface: zod.enum(["personal", "artist"]),
+      content: zod.string(),
+      imageUrl: zod.string().nullish(),
+      visibility: zod.enum(["public", "friends", "private"]),
+      repostOfPostId: zod.number().nullish(),
+      likeCount: zod.number(),
+      isLiked: zod.boolean(),
+      reactionCounts: zod.object({
+        like: zod.number(),
+        heart: zod.number(),
+        wow: zod.number(),
+        angry: zod.number(),
+      }),
+      totalReactionCount: zod.number(),
+      currentUserReaction: zod
+        .enum(["like", "heart", "wow", "angry"])
+        .nullish(),
+      repostCount: zod.number(),
+      commentCount: zod.number(),
+      comments: zod.array(
+        zod.object({
+          id: zod.number(),
+          postId: zod.number(),
+          userId: zod.number(),
+          parentCommentId: zod.number().nullish(),
+          content: zod.string(),
+          createdAt: zod.coerce.date(),
+          updatedAt: zod.coerce.date(),
+          author: zod
+            .object({
+              id: zod.number(),
+              username: zod.string(),
+              artistDisplayName: zod.string().nullish(),
+              avatarUrl: zod.string().nullish(),
+              bio: zod.string().nullish(),
+              profileType: zod.enum(["user", "artist"]),
+              followerCount: zod.number(),
+              friendCount: zod.number(),
+              bannerUrl: zod.string().nullish(),
+              location: zod.string().nullish(),
+              city: zod.string().nullish(),
+              age: zod.number().nullish(),
+              work: zod.string().nullish(),
+              school: zod.string().nullish(),
+              about: zod.string().nullish(),
+              interests: zod.array(zod.string()).optional(),
+              hasArtistPage: zod.boolean().optional(),
+              accentColor: zod.string().nullish(),
+              onboardingCompleted: zod.boolean().optional(),
+              onboardingStep: zod.string().optional(),
+              links: zod
+                .array(
+                  zod.object({
+                    label: zod.string(),
+                    url: zod.string(),
+                  }),
+                )
+                .optional(),
+              category: zod.string().nullish(),
+              tags: zod.array(zod.string()).optional(),
+              hasBlockedUser: zod.boolean(),
+              isBlockedByUser: zod.boolean(),
+            })
+            .nullish(),
+        }),
+      ),
+      originalPost: zod.unknown().nullish(),
+      author: zod
+        .object({
+          id: zod.number(),
+          username: zod.string(),
+          artistDisplayName: zod.string().nullish(),
+          avatarUrl: zod.string().nullish(),
+          bio: zod.string().nullish(),
+          profileType: zod.enum(["user", "artist"]),
+          followerCount: zod.number(),
+          friendCount: zod.number(),
+          bannerUrl: zod.string().nullish(),
+          location: zod.string().nullish(),
+          city: zod.string().nullish(),
+          age: zod.number().nullish(),
+          work: zod.string().nullish(),
+          school: zod.string().nullish(),
+          about: zod.string().nullish(),
+          interests: zod.array(zod.string()).optional(),
+          hasArtistPage: zod.boolean().optional(),
+          accentColor: zod.string().nullish(),
+          onboardingCompleted: zod.boolean().optional(),
+          onboardingStep: zod.string().optional(),
+          links: zod
+            .array(
+              zod.object({
+                label: zod.string(),
+                url: zod.string(),
+              }),
+            )
+            .optional(),
+          category: zod.string().nullish(),
+          tags: zod.array(zod.string()).optional(),
+          hasBlockedUser: zod.boolean(),
+          isBlockedByUser: zod.boolean(),
+        })
+        .optional(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date().optional(),
+      media: zod
+        .array(
+          zod.object({
+            id: zod.number(),
+            postId: zod.number(),
+            type: zod.string(),
+            url: zod.string(),
+            title: zod.string().nullish(),
+            thumbnailUrl: zod.string().nullish(),
+            createdAt: zod.coerce.date(),
+          }),
+        )
+        .optional(),
+    }),
+  ),
+  total: zod.number(),
+  limit: zod.number(),
+  nextCursor: zod.number().nullable(),
+  hasMore: zod.boolean(),
 });
 
 /**
@@ -3270,6 +4069,7 @@ export const GetEventsResponseItem = zod.object({
     .object({
       id: zod.number(),
       username: zod.string(),
+      artistDisplayName: zod.string().nullish(),
       avatarUrl: zod.string().nullish(),
       bio: zod.string().nullish(),
       profileType: zod.enum(["user", "artist"]),
@@ -3285,6 +4085,8 @@ export const GetEventsResponseItem = zod.object({
       interests: zod.array(zod.string()).optional(),
       hasArtistPage: zod.boolean().optional(),
       accentColor: zod.string().nullish(),
+      onboardingCompleted: zod.boolean().optional(),
+      onboardingStep: zod.string().optional(),
       links: zod
         .array(
           zod.object({
@@ -3295,12 +4097,15 @@ export const GetEventsResponseItem = zod.object({
         .optional(),
       category: zod.string().nullish(),
       tags: zod.array(zod.string()).optional(),
+      hasBlockedUser: zod.boolean(),
+      isBlockedByUser: zod.boolean(),
     })
     .nullish(),
   artists: zod.array(
     zod.object({
       id: zod.number(),
       username: zod.string(),
+      artistDisplayName: zod.string().nullish(),
       avatarUrl: zod.string().nullish(),
       bio: zod.string().nullish(),
       profileType: zod.enum(["user", "artist"]),
@@ -3316,6 +4121,8 @@ export const GetEventsResponseItem = zod.object({
       interests: zod.array(zod.string()).optional(),
       hasArtistPage: zod.boolean().optional(),
       accentColor: zod.string().nullish(),
+      onboardingCompleted: zod.boolean().optional(),
+      onboardingStep: zod.string().optional(),
       links: zod
         .array(
           zod.object({
@@ -3326,6 +4133,8 @@ export const GetEventsResponseItem = zod.object({
         .optional(),
       category: zod.string().nullish(),
       tags: zod.array(zod.string()).optional(),
+      hasBlockedUser: zod.boolean(),
+      isBlockedByUser: zod.boolean(),
     }),
   ),
 });
@@ -3369,6 +4178,7 @@ export const GetEventResponse = zod.object({
     .object({
       id: zod.number(),
       username: zod.string(),
+      artistDisplayName: zod.string().nullish(),
       avatarUrl: zod.string().nullish(),
       bio: zod.string().nullish(),
       profileType: zod.enum(["user", "artist"]),
@@ -3384,6 +4194,8 @@ export const GetEventResponse = zod.object({
       interests: zod.array(zod.string()).optional(),
       hasArtistPage: zod.boolean().optional(),
       accentColor: zod.string().nullish(),
+      onboardingCompleted: zod.boolean().optional(),
+      onboardingStep: zod.string().optional(),
       links: zod
         .array(
           zod.object({
@@ -3394,12 +4206,15 @@ export const GetEventResponse = zod.object({
         .optional(),
       category: zod.string().nullish(),
       tags: zod.array(zod.string()).optional(),
+      hasBlockedUser: zod.boolean(),
+      isBlockedByUser: zod.boolean(),
     })
     .nullish(),
   artists: zod.array(
     zod.object({
       id: zod.number(),
       username: zod.string(),
+      artistDisplayName: zod.string().nullish(),
       avatarUrl: zod.string().nullish(),
       bio: zod.string().nullish(),
       profileType: zod.enum(["user", "artist"]),
@@ -3415,6 +4230,8 @@ export const GetEventResponse = zod.object({
       interests: zod.array(zod.string()).optional(),
       hasArtistPage: zod.boolean().optional(),
       accentColor: zod.string().nullish(),
+      onboardingCompleted: zod.boolean().optional(),
+      onboardingStep: zod.string().optional(),
       links: zod
         .array(
           zod.object({
@@ -3425,6 +4242,8 @@ export const GetEventResponse = zod.object({
         .optional(),
       category: zod.string().nullish(),
       tags: zod.array(zod.string()).optional(),
+      hasBlockedUser: zod.boolean(),
+      isBlockedByUser: zod.boolean(),
     }),
   ),
 });
@@ -3484,6 +4303,8 @@ export const AdminGetUsersResponse = zod.object({
       hasArtistPage: zod.boolean().optional(),
       accentColor: zod.string().nullish(),
       themeName: zod.string().nullish(),
+      onboardingCompleted: zod.boolean().optional(),
+      onboardingStep: zod.string().optional(),
       links: zod
         .array(
           zod.object({
@@ -3516,8 +4337,10 @@ export const AdminGetPostsResponse = zod.object({
     zod.object({
       id: zod.number(),
       userId: zod.number(),
+      actorSurface: zod.enum(["personal", "artist"]),
       content: zod.string(),
       imageUrl: zod.string().nullish(),
+      visibility: zod.enum(["public", "friends", "private"]),
       repostOfPostId: zod.number().nullish(),
       likeCount: zod.number(),
       isLiked: zod.boolean(),
@@ -3546,6 +4369,7 @@ export const AdminGetPostsResponse = zod.object({
             .object({
               id: zod.number(),
               username: zod.string(),
+              artistDisplayName: zod.string().nullish(),
               avatarUrl: zod.string().nullish(),
               bio: zod.string().nullish(),
               profileType: zod.enum(["user", "artist"]),
@@ -3561,6 +4385,8 @@ export const AdminGetPostsResponse = zod.object({
               interests: zod.array(zod.string()).optional(),
               hasArtistPage: zod.boolean().optional(),
               accentColor: zod.string().nullish(),
+              onboardingCompleted: zod.boolean().optional(),
+              onboardingStep: zod.string().optional(),
               links: zod
                 .array(
                   zod.object({
@@ -3571,6 +4397,8 @@ export const AdminGetPostsResponse = zod.object({
                 .optional(),
               category: zod.string().nullish(),
               tags: zod.array(zod.string()).optional(),
+              hasBlockedUser: zod.boolean(),
+              isBlockedByUser: zod.boolean(),
             })
             .nullish(),
         }),
@@ -3580,6 +4408,7 @@ export const AdminGetPostsResponse = zod.object({
         .object({
           id: zod.number(),
           username: zod.string(),
+          artistDisplayName: zod.string().nullish(),
           avatarUrl: zod.string().nullish(),
           bio: zod.string().nullish(),
           profileType: zod.enum(["user", "artist"]),
@@ -3595,6 +4424,8 @@ export const AdminGetPostsResponse = zod.object({
           interests: zod.array(zod.string()).optional(),
           hasArtistPage: zod.boolean().optional(),
           accentColor: zod.string().nullish(),
+          onboardingCompleted: zod.boolean().optional(),
+          onboardingStep: zod.string().optional(),
           links: zod
             .array(
               zod.object({
@@ -3605,6 +4436,8 @@ export const AdminGetPostsResponse = zod.object({
             .optional(),
           category: zod.string().nullish(),
           tags: zod.array(zod.string()).optional(),
+          hasBlockedUser: zod.boolean(),
+          isBlockedByUser: zod.boolean(),
         })
         .optional(),
       createdAt: zod.coerce.date(),
@@ -3625,8 +4458,9 @@ export const AdminGetPostsResponse = zod.object({
     }),
   ),
   total: zod.number(),
-  page: zod.number(),
-  totalPages: zod.number(),
+  limit: zod.number(),
+  nextCursor: zod.number().nullable(),
+  hasMore: zod.boolean(),
 });
 
 /**
@@ -3649,6 +4483,7 @@ export const AdminGetGroupsResponseItem = zod.object({
     .object({
       id: zod.number(),
       username: zod.string(),
+      artistDisplayName: zod.string().nullish(),
       avatarUrl: zod.string().nullish(),
       bio: zod.string().nullish(),
       profileType: zod.enum(["user", "artist"]),
@@ -3664,6 +4499,8 @@ export const AdminGetGroupsResponseItem = zod.object({
       interests: zod.array(zod.string()).optional(),
       hasArtistPage: zod.boolean().optional(),
       accentColor: zod.string().nullish(),
+      onboardingCompleted: zod.boolean().optional(),
+      onboardingStep: zod.string().optional(),
       links: zod
         .array(
           zod.object({
@@ -3674,6 +4511,8 @@ export const AdminGetGroupsResponseItem = zod.object({
         .optional(),
       category: zod.string().nullish(),
       tags: zod.array(zod.string()).optional(),
+      hasBlockedUser: zod.boolean(),
+      isBlockedByUser: zod.boolean(),
     })
     .nullish(),
   memberCount: zod.number(),
@@ -3683,6 +4522,7 @@ export const AdminGetGroupsResponseItem = zod.object({
     zod.object({
       id: zod.number(),
       username: zod.string(),
+      artistDisplayName: zod.string().nullish(),
       avatarUrl: zod.string().nullish(),
       bio: zod.string().nullish(),
       profileType: zod.enum(["user", "artist"]),
@@ -3698,6 +4538,8 @@ export const AdminGetGroupsResponseItem = zod.object({
       interests: zod.array(zod.string()).optional(),
       hasArtistPage: zod.boolean().optional(),
       accentColor: zod.string().nullish(),
+      onboardingCompleted: zod.boolean().optional(),
+      onboardingStep: zod.string().optional(),
       links: zod
         .array(
           zod.object({
@@ -3708,6 +4550,8 @@ export const AdminGetGroupsResponseItem = zod.object({
         .optional(),
       category: zod.string().nullish(),
       tags: zod.array(zod.string()).optional(),
+      hasBlockedUser: zod.boolean(),
+      isBlockedByUser: zod.boolean(),
     }),
   ),
 });
@@ -3733,6 +4577,7 @@ export const AdminGetEventsResponseItem = zod.object({
     .object({
       id: zod.number(),
       username: zod.string(),
+      artistDisplayName: zod.string().nullish(),
       avatarUrl: zod.string().nullish(),
       bio: zod.string().nullish(),
       profileType: zod.enum(["user", "artist"]),
@@ -3748,6 +4593,8 @@ export const AdminGetEventsResponseItem = zod.object({
       interests: zod.array(zod.string()).optional(),
       hasArtistPage: zod.boolean().optional(),
       accentColor: zod.string().nullish(),
+      onboardingCompleted: zod.boolean().optional(),
+      onboardingStep: zod.string().optional(),
       links: zod
         .array(
           zod.object({
@@ -3758,12 +4605,15 @@ export const AdminGetEventsResponseItem = zod.object({
         .optional(),
       category: zod.string().nullish(),
       tags: zod.array(zod.string()).optional(),
+      hasBlockedUser: zod.boolean(),
+      isBlockedByUser: zod.boolean(),
     })
     .nullish(),
   artists: zod.array(
     zod.object({
       id: zod.number(),
       username: zod.string(),
+      artistDisplayName: zod.string().nullish(),
       avatarUrl: zod.string().nullish(),
       bio: zod.string().nullish(),
       profileType: zod.enum(["user", "artist"]),
@@ -3779,6 +4629,8 @@ export const AdminGetEventsResponseItem = zod.object({
       interests: zod.array(zod.string()).optional(),
       hasArtistPage: zod.boolean().optional(),
       accentColor: zod.string().nullish(),
+      onboardingCompleted: zod.boolean().optional(),
+      onboardingStep: zod.string().optional(),
       links: zod
         .array(
           zod.object({
@@ -3789,6 +4641,8 @@ export const AdminGetEventsResponseItem = zod.object({
         .optional(),
       category: zod.string().nullish(),
       tags: zod.array(zod.string()).optional(),
+      hasBlockedUser: zod.boolean(),
+      isBlockedByUser: zod.boolean(),
     }),
   ),
 });
@@ -3840,6 +4694,8 @@ export const AdminGetReportsResponseItem = zod
           hasArtistPage: zod.boolean().optional(),
           accentColor: zod.string().nullish(),
           themeName: zod.string().nullish(),
+          onboardingCompleted: zod.boolean().optional(),
+          onboardingStep: zod.string().optional(),
           links: zod
             .array(
               zod.object({
@@ -3877,6 +4733,8 @@ export const AdminGetReportsResponseItem = zod
           hasArtistPage: zod.boolean().optional(),
           accentColor: zod.string().nullish(),
           themeName: zod.string().nullish(),
+          onboardingCompleted: zod.boolean().optional(),
+          onboardingStep: zod.string().optional(),
           links: zod
             .array(
               zod.object({

@@ -8,12 +8,17 @@ export type UploadScope =
   | "photos";
 
 type UploadImageResponse = {
+  storageProvider?: "local";
   url: string;
+  thumbnailUrl?: string | null;
   path: string;
+  thumbnailPath?: string | null;
   fileName: string;
   scope: UploadScope;
   mimeType: string;
   size: number;
+  width?: number | null;
+  height?: number | null;
 };
 
 function getApiBaseUrl() {

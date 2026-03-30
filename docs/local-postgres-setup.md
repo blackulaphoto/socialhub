@@ -39,6 +39,10 @@ To stop it:
 
 The repo now includes a local `.env` at the root and an example in `.env.example`.
 
+Local media storage is documented in:
+
+- `docs/local-media-storage.md`
+
 Default local values:
 
 ```env

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useAddUserPhoto,
@@ -6,7 +7,9 @@ import {
   useAddGalleryItem,
   useDeleteUserPhoto,
   useDeleteGalleryItem,
+  useGetEvents,
   useGetUser,
+  useGetUserPosts,
   useGetUserPhotos,
   useUpdateArtistProfile,
   useUpdateCreatorSettings,
@@ -27,6 +30,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { MediaEmbed } from "@/components/media-embed";
 import { useToast } from "@/hooks/use-toast";
 import { uploadImage } from "@/lib/upload-image";
+import { Image as ImageIcon, UploadCloud } from "lucide-react";
 
 const ACTION_OPTIONS = [
   "Book Me",
@@ -82,12 +86,14 @@ function actionTypeFromLabel(label: string) {
 
 export default function Settings() {
   const { user } = useAuth();
+  const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [basic, setBasic] = useState<Record<string, string>>({});
   const [artist, setArtist] = useState<Record<string, string>>({});
   const [creator, setCreator] = useState<Record<string, string>>({});
   const [isCreatingArtistPage, setIsCreatingArtistPage] = useState(false);
+  const [creatorSetupStage, setCreatorSetupStage] = useState<"starter" | "advanced">("starter");
   const [activeTab, setActiveTab] = useState("profile");
   const [pageModules, setPageModules] = useState<{ enabledModules: string[]; moduleOrder: string[] }>({
     enabledModules: ["featured", "about", "media", "posts", "events", "contact"],
@@ -118,11 +124,26 @@ export default function Settings() {
       enabled: !!user?.id,
     },
   });
+  const { data: artistPostsPage } = useGetUserPosts(user?.id || 0, {
+    limit: 50,
+    surface: "artist",
+  }, {
+    query: {
+      queryKey: ["/api/users", user?.id, "posts", "artist", "settings"],
+      enabled: !!user?.id,
+    },
+  });
+  const { data: events } = useGetEvents(undefined, {
+    query: {
+      queryKey: ["/api/events", "settings", user?.id],
+      enabled: !!user?.id,
+    },
+  });
 
   useEffect(() => {
     if (!profile) return;
     setIsCreatingArtistPage(false);
-    setActiveTab("profile");
+    setCreatorSetupStage("starter");
     setBasic({
       avatarUrl: profile.user.avatarUrl || "",
       bio: profile.user.bio || "",
@@ -140,6 +161,7 @@ export default function Settings() {
       links: (profile.user.links || []).map((link) => `${link.label}|${link.url}`).join("\n"),
     });
     setArtist({
+      displayName: profile.artistProfile?.displayName || "",
       category: profile.artistProfile?.category || "General Creator",
       location: profile.artistProfile?.location || "",
       tagline: profile.artistProfile?.tagline || "",
@@ -175,12 +197,35 @@ export default function Settings() {
     });
   }, [profile]);
 
+  useEffect(() => {
+    const rawSearch = typeof window !== "undefined" ? window.location.search : "";
+    const tab = new URLSearchParams(rawSearch).get("tab");
+    if (tab === "creator" && (profile?.artistProfile || !profile?.artistProfile)) {
+      setActiveTab(profile?.artistProfile ? "creator" : "profile");
+      if (!profile?.artistProfile) {
+        setIsCreatingArtistPage(true);
+        setCreatorSetupStage("starter");
+      }
+    } else if (tab === "photos") {
+      setActiveTab("photos");
+    } else if (tab === "gallery" && profile?.artistProfile) {
+      setActiveTab("gallery");
+    } else {
+      setActiveTab("profile");
+    }
+  }, [location, profile?.artistProfile]);
+
   const actionPreset = useMemo(() => {
     return ACTION_OPTIONS.includes(creator.primaryActionLabel || "") ? creator.primaryActionLabel : "Custom";
   }, [creator.primaryActionLabel]);
 
   const hasArtistPage = !!profile?.artistProfile;
   const showCreatorTools = hasArtistPage || isCreatingArtistPage;
+  const isStarterCreatorSetup = !hasArtistPage && creatorSetupStage === "starter";
+  const artistPosts = artistPostsPage?.posts || [];
+  const linkedEvents = user
+    ? (events || []).filter((event) => event.host?.id === user.id || event.artists?.some((artistMember) => artistMember.id === user.id))
+    : [];
 
   const saveBasic = useUpdateProfile({
     mutation: {
@@ -316,6 +361,9 @@ export default function Settings() {
                   {showCreatorTools && creator.primaryActionLabel && <Badge>{creator.primaryActionLabel}</Badge>}
                 </div>
                 <div className="text-3xl font-bold md:text-4xl">{user.username}</div>
+                {showCreatorTools && artist.displayName ? (
+                  <div className="mt-1 text-sm font-medium text-foreground/80">Artist page name: {artist.displayName}</div>
+                ) : null}
                 <div className="mt-2 text-sm text-muted-foreground">
                   {[basic.city, basic.location].filter(Boolean).join(" / ") || "Location preview"}
                 </div>
@@ -497,6 +545,7 @@ export default function Settings() {
                     className="mt-4"
                     onClick={() => {
                       setIsCreatingArtistPage(true);
+                      setCreatorSetupStage("starter");
                       setActiveTab("creator");
                       setArtist((current) => ({
                         ...current,
@@ -517,16 +566,101 @@ export default function Settings() {
         {showCreatorTools && (
           <TabsContent value="creator">
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+              {!isStarterCreatorSetup && (
+                <Card className="border-border/50 bg-card/50 xl:col-span-2">
+                  <CardHeader>
+                    <CardTitle>Artist Page Hero</CardTitle>
+                    <CardDescription>Change the artist-page profile photo and header image here so the public creator page looks right immediately.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-5">
+                    <div className="rounded-3xl border border-border/50 bg-background/40 p-5">
+                      <div className="flex flex-col gap-5 md:flex-row md:items-center">
+                        <Avatar className="h-24 w-24 border-4 border-background shadow-xl">
+                          <AvatarImage src={basic.avatarUrl || ""} />
+                          <AvatarFallback>{user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        <div className="grid flex-1 gap-4 md:grid-cols-2">
+                          <div className="space-y-2">
+                            <Label>Artist page profile photo</Label>
+                            <Input placeholder="https://..." value={basic.avatarUrl || ""} onChange={(e) => setBasic({ ...basic, avatarUrl: e.target.value })} />
+                            <Input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => handleImageUpload(e.target.files?.[0] || null, "avatar", (url) => setBasic((current) => ({ ...current, avatarUrl: url })))}
+                              disabled={uploading.avatar}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Artist page header image</Label>
+                            <Input placeholder="https://..." value={basic.bannerUrl || ""} onChange={(e) => setBasic({ ...basic, bannerUrl: e.target.value })} />
+                            <Input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => handleImageUpload(e.target.files?.[0] || null, "banner", (url) => setBasic((current) => ({ ...current, bannerUrl: url })))}
+                              disabled={uploading.banner}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                        <Badge variant="outline"><UploadCloud className="mr-1 h-3 w-3" /> Upload or paste a URL</Badge>
+                        <Badge variant="outline"><ImageIcon className="mr-1 h-3 w-3" /> Uses the same avatar/banner as your personal profile for now</Badge>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               <Card className="border-border/50 bg-card/50">
                 <CardHeader>
                   <CardTitle>Creator Page</CardTitle>
-                  <CardDescription>Identity, optional creator fields, featured sections, flexible action button, and page style controls.</CardDescription>
+                  <CardDescription>
+                    {hasArtistPage || creatorSetupStage === "advanced"
+                      ? "Identity, optional creator fields, featured sections, flexible action button, and page style controls."
+                      : "Start with the essentials first. Once the linked page exists, unlock the deeper creator controls."}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-5">
+                  <div className="flex flex-wrap gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setLocation(`/artists/${user.id}`)}
+                      disabled={!hasArtistPage}
+                    >
+                      Preview Artist Page
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => setLocation(`/artists/${user.id}`)}
+                      disabled={!hasArtistPage}
+                    >
+                      View Public Page
+                    </Button>
+                  </div>
+                  {!hasArtistPage && (
+                    <div className="text-sm text-muted-foreground">
+                      Save the artist page once, then use Preview Artist Page to see what visitors will see.
+                    </div>
+                  )}
+                  {isStarterCreatorSetup && (
+                    <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
+                      <div className="text-sm font-medium">Starter creator setup</div>
+                      <div className="mt-1 text-sm text-muted-foreground">
+                        Launch the page with the basics first: page name, category, location, tagline, tags, and contact email. After that, use Edit Artist Page for media, featured content, events, and styling.
+                      </div>
+                    </div>
+                  )}
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label>Category</Label>
-                      <Select value={artist.category || "General Creator"} onValueChange={(value) => setArtist({ ...artist, category: value })}>
+                <div className="space-y-2">
+                  <Label>Artist page name</Label>
+                  <Input placeholder="Rancid" value={artist.displayName || ""} onChange={(e) => setArtist({ ...artist, displayName: e.target.value })} />
+                  <p className="text-xs text-muted-foreground">This is the public name shown on the artist page. It can be different from your personal account name.</p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Category</Label>
+                  <Select value={artist.category || "General Creator"} onValueChange={(value) => setArtist({ ...artist, category: value })}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>{CREATOR_TYPES.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
                       </Select>
@@ -552,97 +686,185 @@ export default function Settings() {
                     <Input placeholder="bookings@example.com" value={artist.bookingEmail || ""} onChange={(e) => setArtist({ ...artist, bookingEmail: e.target.value })} />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label>Creator bio</Label>
-                    <Textarea placeholder="Write a bio for your creator page." value={artist.bio || ""} onChange={(e) => setArtist({ ...artist, bio: e.target.value })} />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Influences / inspirations</Label>
-                    <Textarea placeholder="Scenes, artists, references, moods, or eras that shape your work." value={artist.influences || ""} onChange={(e) => setArtist({ ...artist, influences: e.target.value })} />
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {!isStarterCreatorSetup && (
                     <div className="space-y-2">
-                      <Label>Availability status</Label>
-                      <Input placeholder="Available for summer bookings" value={artist.availabilityStatus || ""} onChange={(e) => setArtist({ ...artist, availabilityStatus: e.target.value })} />
+                      <Label>Creator bio</Label>
+                      <Textarea placeholder="Write a bio for your creator page." value={artist.bio || ""} onChange={(e) => setArtist({ ...artist, bio: e.target.value })} />
                     </div>
-                    <div className="space-y-2">
-                      <Label>Pronouns</Label>
-                      <Input placeholder="she/her" value={artist.pronouns || ""} onChange={(e) => setArtist({ ...artist, pronouns: e.target.value })} />
+                  )}
+
+                  {isStarterCreatorSetup && (
+                    <div className="rounded-2xl border border-border/50 bg-background/30 p-4">
+                      <div className="text-sm font-medium">More options live under Edit Artist Page</div>
+                      <div className="mt-1 text-sm text-muted-foreground">
+                        Once the page is created, come back here to add hero images, featured posts, media modules, events, action buttons, mood, layout, and deeper profile details.
+                      </div>
+                      <div className="mt-4 flex justify-end">
+                        <Button type="button" variant="outline" onClick={() => setCreatorSetupStage("advanced")}>
+                          Show Advanced Fields
+                        </Button>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {(hasArtistPage || creatorSetupStage === "advanced") && (
                     <div className="space-y-2">
-                      <Label>Years active</Label>
-                      <Input placeholder="8 years" value={artist.yearsActive || ""} onChange={(e) => setArtist({ ...artist, yearsActive: e.target.value })} />
+                      <Label>Influences / inspirations</Label>
+                      <Textarea placeholder="Scenes, artists, references, moods, or eras that shape your work." value={artist.influences || ""} onChange={(e) => setArtist({ ...artist, influences: e.target.value })} />
                     </div>
-                    <div className="space-y-2">
-                      <Label>Agency / manager / representation</Label>
-                      <Input placeholder="Represented by Night Office" value={artist.representedBy || ""} onChange={(e) => setArtist({ ...artist, representedBy: e.target.value })} />
+                  )}
+
+                  {(hasArtistPage || creatorSetupStage === "advanced") && (
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Availability status</Label>
+                        <Input placeholder="Available for summer bookings" value={artist.availabilityStatus || ""} onChange={(e) => setArtist({ ...artist, availabilityStatus: e.target.value })} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Pronouns</Label>
+                        <Input placeholder="she/her" value={artist.pronouns || ""} onChange={(e) => setArtist({ ...artist, pronouns: e.target.value })} />
+                      </div>
                     </div>
-                  </div>
+                  )}
 
-                  <div className="space-y-2">
-                    <Label>Optional custom fields</Label>
-                    <Textarea placeholder={"Label|Value\nGenres|Industrial, EBM, Warehouse\nAvailable for|Club sets and one-off bookings"} value={artist.customFields || ""} onChange={(e) => setArtist({ ...artist, customFields: e.target.value })} />
-                  </div>
+                  {(hasArtistPage || creatorSetupStage === "advanced") && (
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Years active</Label>
+                        <Input placeholder="8 years" value={artist.yearsActive || ""} onChange={(e) => setArtist({ ...artist, yearsActive: e.target.value })} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Agency / manager / representation</Label>
+                        <Input placeholder="Represented by Night Office" value={artist.representedBy || ""} onChange={(e) => setArtist({ ...artist, representedBy: e.target.value })} />
+                      </div>
+                    </div>
+                  )}
 
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                    <label className="flex items-center gap-3 rounded-2xl border border-border/50 bg-background/30 px-4 py-3">
-                      <Checkbox checked={creator.openForCommissions === "true"} onCheckedChange={(checked) => setCreator({ ...creator, openForCommissions: checked ? "true" : "false" })} />
-                      <span className="text-sm">Open for commissions</span>
-                    </label>
-                    <label className="flex items-center gap-3 rounded-2xl border border-border/50 bg-background/30 px-4 py-3">
-                      <Checkbox checked={creator.touring === "true"} onCheckedChange={(checked) => setCreator({ ...creator, touring: checked ? "true" : "false" })} />
-                      <span className="text-sm">Touring</span>
-                    </label>
-                    <label className="flex items-center gap-3 rounded-2xl border border-border/50 bg-background/30 px-4 py-3">
-                      <Checkbox checked={creator.acceptsCollaborations !== "false"} onCheckedChange={(checked) => setCreator({ ...creator, acceptsCollaborations: checked ? "true" : "false" })} />
-                      <span className="text-sm">Accepts collaborations</span>
-                    </label>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {(hasArtistPage || creatorSetupStage === "advanced") && (
                     <div className="space-y-2">
-                      <Label>Primary action preset</Label>
-                      <Select
-                        value={actionPreset}
-                        onValueChange={(value) => {
-                          if (value === "Custom") {
+                      <Label>Optional custom fields</Label>
+                      <Textarea placeholder={"Label|Value\nGenres|Industrial, EBM, Warehouse\nAvailable for|Club sets and one-off bookings"} value={artist.customFields || ""} onChange={(e) => setArtist({ ...artist, customFields: e.target.value })} />
+                    </div>
+                  )}
+
+                  {!isStarterCreatorSetup && (
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                      <label className="flex items-center gap-3 rounded-2xl border border-border/50 bg-background/30 px-4 py-3">
+                        <Checkbox checked={creator.openForCommissions === "true"} onCheckedChange={(checked) => setCreator({ ...creator, openForCommissions: checked ? "true" : "false" })} />
+                        <span className="text-sm">Open for commissions</span>
+                      </label>
+                      <label className="flex items-center gap-3 rounded-2xl border border-border/50 bg-background/30 px-4 py-3">
+                        <Checkbox checked={creator.touring === "true"} onCheckedChange={(checked) => setCreator({ ...creator, touring: checked ? "true" : "false" })} />
+                        <span className="text-sm">Touring</span>
+                      </label>
+                      <label className="flex items-center gap-3 rounded-2xl border border-border/50 bg-background/30 px-4 py-3">
+                        <Checkbox checked={creator.acceptsCollaborations !== "false"} onCheckedChange={(checked) => setCreator({ ...creator, acceptsCollaborations: checked ? "true" : "false" })} />
+                        <span className="text-sm">Accepts collaborations</span>
+                      </label>
+                    </div>
+                  )}
+
+                  {!isStarterCreatorSetup && (
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Primary action preset</Label>
+                        <Select
+                          value={actionPreset}
+                          onValueChange={(value) => {
+                            if (value === "Custom") {
+                              setCreator({
+                                ...creator,
+                                primaryActionLabel: creator.primaryActionLabel && !ACTION_OPTIONS.includes(creator.primaryActionLabel) ? creator.primaryActionLabel : "",
+                                primaryActionType: actionTypeFromLabel(creator.primaryActionLabel || "contact"),
+                              });
+                              return;
+                            }
                             setCreator({
                               ...creator,
-                              primaryActionLabel: creator.primaryActionLabel && !ACTION_OPTIONS.includes(creator.primaryActionLabel) ? creator.primaryActionLabel : "",
-                              primaryActionType: actionTypeFromLabel(creator.primaryActionLabel || "contact"),
+                              primaryActionLabel: value,
+                              primaryActionType: actionTypeFromLabel(value),
                             });
-                            return;
-                          }
-                          setCreator({
-                            ...creator,
-                            primaryActionLabel: value,
-                            primaryActionType: actionTypeFromLabel(value),
-                          });
-                        }}
-                      >
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>{ACTION_OPTIONS.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
-                      </Select>
+                          }}
+                        >
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>{ACTION_OPTIONS.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>External destination</Label>
+                        <Input placeholder="Store or external URL" value={creator.primaryActionUrl || ""} onChange={(e) => setCreator({ ...creator, primaryActionUrl: e.target.value })} />
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label>External destination</Label>
-                      <Input placeholder="Store or external URL" value={creator.primaryActionUrl || ""} onChange={(e) => setCreator({ ...creator, primaryActionUrl: e.target.value })} />
-                    </div>
-                  </div>
+                  )}
 
-                  {actionPreset === "Custom" && (
+                  {!isStarterCreatorSetup && actionPreset === "Custom" && (
                     <div className="space-y-2">
                       <Label>Custom button label</Label>
                       <Input placeholder="Commission Me" value={creator.primaryActionLabel || ""} onChange={(e) => setCreator({ ...creator, primaryActionLabel: e.target.value })} />
                     </div>
                   )}
 
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {!isStarterCreatorSetup && (
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <Card className="border-border/50 bg-background/30">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base">Featured Module</CardTitle>
+                        <CardDescription>Pick what leads the page without using internal IDs.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => setCreator((current) => ({ ...current, featuredType: "post" }))}
+                        >
+                          Feature a post
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="w-full"
+                          onClick={() => setCreator((current) => ({ ...current, pinnedPostId: "" }))}
+                        >
+                          Clear pinned post
+                        </Button>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border-border/50 bg-background/30">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base">Media Module</CardTitle>
+                        <CardDescription>Add images, video, and audio to the artist showcase.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="text-sm text-muted-foreground">
+                          {profile.artistProfile?.gallery?.length || 0} items currently in the showcase.
+                        </div>
+                        <Button type="button" className="w-full" variant="outline" onClick={() => setActiveTab("gallery")}>
+                          Open Showcase Manager
+                        </Button>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border-border/50 bg-background/30">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base">Events Module</CardTitle>
+                        <CardDescription>Create or manage appearances linked to this artist page.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="text-sm text-muted-foreground">
+                          {linkedEvents.length} linked events currently showing on the artist page.
+                        </div>
+                        <Button type="button" className="w-full" variant="outline" onClick={() => setLocation("/events")}>
+                          Open Events Manager
+                        </Button>
+                      </CardContent>
+                    </Card>
+                    </div>
+                  )}
+
+                  {!isStarterCreatorSetup && (
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div className="space-y-2">
                       <Label>Featured type</Label>
                       <Select value={creator.featuredType || "highlight"} onValueChange={(value) => setCreator({ ...creator, featuredType: value })}>
@@ -654,12 +876,28 @@ export default function Settings() {
                       <Label>Featured title</Label>
                       <Input placeholder="Friday Residency" value={creator.featuredTitle || ""} onChange={(e) => setCreator({ ...creator, featuredTitle: e.target.value })} />
                     </div>
-                  </div>
-                  <Textarea placeholder="Featured description" value={creator.featuredDescription || ""} onChange={(e) => setCreator({ ...creator, featuredDescription: e.target.value })} />
-                  <Input placeholder="Featured URL" value={creator.featuredUrl || ""} onChange={(e) => setCreator({ ...creator, featuredUrl: e.target.value })} />
-                  <Input placeholder="Pinned post ID" value={creator.pinnedPostId || ""} onChange={(e) => setCreator({ ...creator, pinnedPostId: e.target.value })} />
+                    </div>
+                  )}
+                  {!isStarterCreatorSetup && <Textarea placeholder="Featured description" value={creator.featuredDescription || ""} onChange={(e) => setCreator({ ...creator, featuredDescription: e.target.value })} />}
+                  {!isStarterCreatorSetup && <Input placeholder="Featured URL" value={creator.featuredUrl || ""} onChange={(e) => setCreator({ ...creator, featuredUrl: e.target.value })} />}
+                  {!isStarterCreatorSetup && <div className="space-y-2">
+                    <Label>Pinned post</Label>
+                    <Select value={creator.pinnedPostId || "none"} onValueChange={(value) => setCreator({ ...creator, pinnedPostId: value === "none" ? "" : value })}>
+                      <SelectTrigger><SelectValue placeholder="Choose one of your artist-page posts" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No pinned post</SelectItem>
+                        {artistPosts.map((post) => (
+                          <SelectItem key={post.id} value={String(post.id)}>
+                            {post.content.trim().slice(0, 56) || `Post #${post.id}`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">Choose from your artist-page posts directly. No manual post ID needed.</p>
+                  </div>}
 
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                  {!isStarterCreatorSetup && (
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                     <div className="space-y-2">
                       <Label>Mood preset</Label>
                       <Select value={creator.moodPreset || "sleek"} onValueChange={(value) => setCreator({ ...creator, moodPreset: value })}>
@@ -681,9 +919,10 @@ export default function Settings() {
                         <SelectContent>{FONT_OPTIONS.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
                       </Select>
                     </div>
-                  </div>
+                    </div>
+                  )}
 
-                  <div className="space-y-3">
+                  {!isStarterCreatorSetup && <div className="space-y-3">
                     <Label>Visible modules</Label>
                     <div className="grid gap-3 md:grid-cols-2">
                       {MODULE_OPTIONS.map((module) => (
@@ -693,9 +932,9 @@ export default function Settings() {
                         </label>
                       ))}
                     </div>
-                  </div>
+                  </div>}
 
-                  <div className="space-y-3">
+                  {!isStarterCreatorSetup && <div className="space-y-3">
                     <Label>Module order</Label>
                     <div className="space-y-2">
                       {pageModules.moduleOrder.map((module, index) => (
@@ -708,15 +947,43 @@ export default function Settings() {
                         </div>
                       ))}
                     </div>
-                  </div>
+                  </div>}
 
                   <div className="flex flex-wrap gap-3">
                     <Button
-                      onClick={() =>
+                      onClick={() => {
+                        saveBasic.mutate({
+                          userId: user.id,
+                          data: {
+                            avatarUrl: basic.avatarUrl || undefined,
+                            bannerUrl: basic.bannerUrl || undefined,
+                            bio: basic.bio || undefined,
+                            location: basic.location || undefined,
+                            city: basic.city || undefined,
+                            age: basic.age ? Number(basic.age) : undefined,
+                            work: basic.work || undefined,
+                            school: basic.school || undefined,
+                            about: basic.about || undefined,
+                            interests: String(basic.interests || "").split(",").map((item) => item.trim()).filter(Boolean),
+                            accentColor: basic.accentColor || undefined,
+                            themeName: basic.themeName || undefined,
+                            featuredContent: basic.featuredContent || undefined,
+                            links: String(basic.links || "")
+                              .split("\n")
+                              .map((line) => line.trim())
+                              .filter(Boolean)
+                              .map((line) => {
+                                const [label, url] = line.split("|");
+                                return { label: label?.trim() || url?.trim() || "Link", url: url?.trim() || label?.trim() || "" };
+                              })
+                              .filter((link) => link.url),
+                          },
+                        });
                         saveArtist.mutate({
                           userId: user.id,
                           data: {
                             category: artist.category,
+                            displayName: artist.displayName || undefined,
                             location: artist.location || undefined,
                             tagline: artist.tagline || undefined,
                             tags: String(artist.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean),
@@ -753,13 +1020,13 @@ export default function Settings() {
                             moduleOrder: pageModules.moduleOrder,
                             pinnedPostId: creator.pinnedPostId ? Number(creator.pinnedPostId) : null,
                           },
-                        })
-                      }
-                      disabled={saveArtist.isPending || !creator.primaryActionLabel?.trim()}
+                        });
+                      }}
+                      disabled={saveArtist.isPending || (!isStarterCreatorSetup && !creator.primaryActionLabel?.trim())}
                     >
-                      Save Creator Page
+                      {isStarterCreatorSetup ? "Create Artist Page" : "Save Creator Page"}
                     </Button>
-                    <Button
+                    {!isStarterCreatorSetup && <Button
                       variant="outline"
                       onClick={() =>
                         saveCreator.mutate({
@@ -784,12 +1051,12 @@ export default function Settings() {
                       disabled={saveCreator.isPending || !creator.primaryActionLabel?.trim()}
                     >
                       Save Action + Featured
-                    </Button>
+                    </Button>}
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="border-border/50 bg-card/50">
+              {!isStarterCreatorSetup && <Card className="border-border/50 bg-card/50">
                 <CardHeader>
                   <CardTitle>Creator Preview</CardTitle>
                   <CardDescription>This mirrors the visible identity people see on your artist page.</CardDescription>
@@ -801,19 +1068,19 @@ export default function Settings() {
                       <Badge>{creator.primaryActionLabel || "Contact Me"}</Badge>
                       <Badge variant="outline">{creator.moodPreset || "sleek"}</Badge>
                     </div>
-                    <div className="text-2xl font-bold">{user.username}</div>
-                    <div className="mt-2 text-sm text-muted-foreground">{artist.location || basic.city || "Location preview"}</div>
-                    <div className="mt-4 text-base">{artist.tagline || "Creator homepage headline preview."}</div>
-                    <div className="mt-4 whitespace-pre-wrap text-sm text-muted-foreground">{artist.bio || "Creator bio preview."}</div>
+                    <div className="text-2xl font-bold">{artist.displayName || user.username}</div>
+                    <div className="mt-2 text-sm font-medium text-foreground/75">{artist.location || basic.city || "Location preview"}</div>
+                    <div className="mt-4 text-base font-medium">{artist.tagline || "Creator homepage headline preview."}</div>
+                    <div className="mt-4 whitespace-pre-wrap text-sm text-foreground/75">{artist.bio || "Creator bio preview."}</div>
                     <div className="mt-4 flex flex-wrap gap-2">
                       {String(artist.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean).slice(0, 5).map((tag) => <Badge key={tag} variant="secondary">{tag}</Badge>)}
                     </div>
-                    <div className="mt-4 text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                    <div className="mt-4 text-xs uppercase tracking-[0.2em] text-foreground/60">
                       Layout: {creator.layoutTemplate || "portfolio"} / Font: {creator.fontPreset || "modern"}
                     </div>
                   </div>
                 </CardContent>
-              </Card>
+              </Card>}
             </div>
           </TabsContent>
         )}

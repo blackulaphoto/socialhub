@@ -2,13 +2,16 @@ import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import {
   Heart,
+  Globe2,
   MapPin,
   MessageSquare,
   MoreHorizontal,
+  Lock,
   Repeat2,
   Share2,
   SmilePlus,
   Trash2,
+  UsersRound,
 } from "lucide-react";
 import {
   useCreatePostComment,
@@ -19,6 +22,7 @@ import {
   useReactToPost,
   useRemovePostReaction,
   useRepostPost,
+  useUpdatePost,
   useUnlikePost,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -38,12 +42,16 @@ import { ReportDialog } from "@/components/report-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { extractFirstSupportedUrl, stripEmbeddedMarkup } from "@/lib/embeds";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type FeedPost = {
   id: number;
   userId: number;
+  actorSurface?: "personal" | "artist";
   content: string;
   imageUrl?: string | null;
+  visibility?: "public" | "friends" | "private";
   repostOfPostId?: number | null;
   likeCount: number;
   isLiked: boolean;
@@ -58,6 +66,7 @@ type FeedPost = {
   repostCount?: number;
   commentCount?: number;
   createdAt: string;
+  updatedAt?: string;
   media?: Array<{ id: number; type: string; url: string; title?: string | null }>;
   comments?: Array<{
     id: number;
@@ -77,6 +86,7 @@ type FeedPost = {
   author?: {
     id: number;
     username: string;
+    artistDisplayName?: string | null;
     avatarUrl?: string | null;
     city?: string | null;
     location?: string | null;
@@ -104,6 +114,7 @@ export function FeedPostCard({
   const createComment = useCreatePostComment();
   const deleteComment = useDeletePostComment();
   const { mutate: deletePost, isPending: isDeleting } = useDeletePost();
+  const updatePost = useUpdatePost();
   const [isLiked, setIsLiked] = useState(post.isLiked);
   const [likeCount, setLikeCount] = useState(post.likeCount);
   const [currentReaction, setCurrentReaction] = useState(post.currentUserReaction || (post.isLiked ? "like" : null));
@@ -112,6 +123,11 @@ export function FeedPostCard({
   const [commentCount, setCommentCount] = useState(post.commentCount || 0);
   const [commentDraft, setCommentDraft] = useState("");
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editForm, setEditForm] = useState<{ content: string; visibility: "public" | "friends" | "private" }>({
+    content: post.content,
+    visibility: post.visibility || "public",
+  });
   const { data: commentsData } = useGetPostComments(post.id, {
     query: {
       enabled: commentsOpen,
@@ -133,10 +149,15 @@ export function FeedPostCard({
     setReactionCounts(post.reactionCounts || { like: post.likeCount, heart: 0, wow: 0, angry: 0 });
     setRepostCount(post.repostCount || 0);
     setCommentCount(post.commentCount || 0);
+    setEditForm({
+      content: post.content,
+      visibility: post.visibility || "public",
+    });
   }, [post.isLiked, post.likeCount, post.currentUserReaction, post.reactionCounts, post.repostCount, post.commentCount]);
 
   const refreshPostSurfaces = () => {
     queryClient.invalidateQueries({ queryKey: ["feed"] });
+    queryClient.invalidateQueries({ queryKey: ["group-posts"] });
     queryClient.invalidateQueries({ queryKey: ["/api/users", post.userId, "posts"] });
     queryClient.invalidateQueries({ queryKey: ["/api/users", post.userId] });
     queryClient.invalidateQueries({ queryKey: [`/api/posts/${post.id}`] });
@@ -219,7 +240,7 @@ export function FeedPostCard({
     const shareText = `${url}#post-${post.id}`;
     try {
       if (navigator.share) {
-        await navigator.share({ title: post.author?.username || "Post", url: shareText });
+        await navigator.share({ title: authorDisplayName || "Post", url: shareText });
       } else if (navigator.clipboard) {
         await navigator.clipboard.writeText(shareText);
       }
@@ -259,6 +280,36 @@ export function FeedPostCard({
     );
   };
 
+  const handleUpdatePost = () => {
+    const content = editForm.content.trim();
+    if (!content) return;
+    updatePost.mutate(
+      {
+        postId: post.id,
+        data: {
+          content,
+          visibility: editForm.visibility,
+          imageUrl: post.imageUrl || undefined,
+          media: post.media?.map((item) => ({
+            type: item.type,
+            url: item.url,
+            title: item.title || undefined,
+          })),
+        },
+      },
+      {
+        onSuccess: () => {
+          setIsEditOpen(false);
+          refreshPostSurfaces();
+          toast({ title: "Post updated" });
+        },
+        onError: () => {
+          toast({ title: "Could not update post", variant: "destructive" });
+        },
+      },
+    );
+  };
+
   const handleCreateComment = () => {
     const content = commentDraft.trim();
     if (!content) return;
@@ -293,38 +344,55 @@ export function FeedPostCard({
     );
   };
 
+  const canEdit = user?.id === post.userId;
   const canDelete = user?.id === post.userId || user?.isAdmin;
+  const authorDisplayName = post.actorSurface === "artist"
+    ? (post.author?.artistDisplayName || post.author?.username || "Unknown")
+    : (post.author?.username || "Unknown");
   const authorLocation = post.author?.city || post.author?.location;
   const activeReaction = reactions.find((reaction) => reaction.type === currentReaction);
   const totalReactions = Object.values(reactionCounts).reduce((sum, value) => sum + Number(value || 0), 0);
   const comments = commentsData || post.comments || [];
   const fallbackLink = !post.media?.length ? extractFirstSupportedUrl(post.content) : null;
   const cleanedContent = stripEmbeddedMarkup(post.content);
+  const visibilityLabel = post.visibility === "friends" ? "Friends" : post.visibility === "private" ? "Private" : "Public";
+  const VisibilityIcon = post.visibility === "friends" ? UsersRound : post.visibility === "private" ? Lock : Globe2;
+  const surfaceLabel = post.actorSurface === "artist" ? "Artist Page" : "Personal";
 
   return (
-    <Card id={`post-${post.id}`} className="overflow-hidden border-border/50 bg-card/60">
+    <Card id={`post-${post.id}`} data-testid={`post-card-${post.id}`} className="overflow-hidden border-border/50 bg-card/60">
       {showAuthor && post.author && (
         <CardHeader className="flex flex-row items-start gap-3 space-y-0 pb-3">
           <Link href={`/profile/${post.author.id}`}>
             <Avatar className="h-10 w-10 cursor-pointer">
               <AvatarImage src={post.author.avatarUrl || ""} />
-              <AvatarFallback>{post.author.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+              <AvatarFallback>{authorDisplayName.slice(0, 2).toUpperCase()}</AvatarFallback>
             </Avatar>
           </Link>
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <Link href={`/profile/${post.author.id}`} className="block truncate font-semibold hover:text-primary">
-                  {post.author.username}
+                  {authorDisplayName}
                 </Link>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <span>{new Date(post.createdAt).toLocaleString()}</span>
+                  {post.updatedAt && new Date(post.updatedAt).getTime() - new Date(post.createdAt).getTime() > 60_000 ? (
+                    <span>edited</span>
+                  ) : null}
                   {authorLocation && (
                     <span className="inline-flex items-center">
                       <MapPin className="mr-1 h-3 w-3" />
                       {authorLocation}
                     </span>
                   )}
+                  <span className="inline-flex items-center rounded-full border border-border/60 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-foreground/70">
+                    {surfaceLabel}
+                  </span>
+                  <span className="inline-flex items-center">
+                    <VisibilityIcon className="mr-1 h-3 w-3" />
+                    {visibilityLabel}
+                  </span>
                 </div>
               </div>
               {canDelete && (
@@ -335,6 +403,7 @@ export function FeedPostCard({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    {canEdit ? <DropdownMenuItem onClick={() => setIsEditOpen(true)}>Edit post</DropdownMenuItem> : null}
                     <DropdownMenuItem onClick={handleDelete} className="text-destructive focus:text-destructive">
                       <Trash2 className="mr-2 h-4 w-4" /> Delete post
                     </DropdownMenuItem>
@@ -345,10 +414,76 @@ export function FeedPostCard({
           </div>
         </CardHeader>
       )}
+      {!showAuthor && canDelete ? (
+        <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 pb-3">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span className="inline-flex items-center rounded-full border border-border/60 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-foreground/70">
+              {surfaceLabel}
+            </span>
+            <span className="inline-flex items-center">
+              <VisibilityIcon className="mr-1 h-3 w-3" />
+              {visibilityLabel}
+            </span>
+            {post.updatedAt && new Date(post.updatedAt).getTime() - new Date(post.createdAt).getTime() > 60_000 ? (
+              <span>edited</span>
+            ) : null}
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" disabled={isDeleting}>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {canEdit ? <DropdownMenuItem onClick={() => setIsEditOpen(true)}>Edit post</DropdownMenuItem> : null}
+              <DropdownMenuItem onClick={handleDelete} className="text-destructive focus:text-destructive">
+                <Trash2 className="mr-2 h-4 w-4" /> Delete post
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </CardHeader>
+      ) : null}
       <CardContent className="space-y-4">
+        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Post</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <Textarea
+                value={editForm.content}
+                onChange={(e) => setEditForm((current) => ({ ...current, content: e.target.value }))}
+                className="min-h-32"
+              />
+              <div className="space-y-2">
+                <div className="text-sm font-medium">Visibility</div>
+                <Select value={editForm.visibility} onValueChange={(value) => setEditForm((current) => ({ ...current, visibility: value as "public" | "friends" | "private" }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="public">Public</SelectItem>
+                    <SelectItem value="friends">Friends only</SelectItem>
+                    <SelectItem value="private">Only me</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex justify-end gap-3">
+                <Button variant="outline" onClick={() => setIsEditOpen(false)}>Cancel</Button>
+                <Button onClick={handleUpdatePost} disabled={updatePost.isPending || !editForm.content.trim()}>
+                  Save changes
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
         {post.repostOfPostId && post.originalPost ? (
           <div className="rounded-2xl border border-dashed border-primary/35 bg-background/35 p-4 text-sm">
-            <div className="mb-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">Reposted from {post.originalPost.author?.username}</div>
+            <div className="mb-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+              Reposted from {post.originalPost.actorSurface === "artist"
+                ? (post.originalPost.author?.artistDisplayName || post.originalPost.author?.username)
+                : post.originalPost.author?.username}
+            </div>
             <div className="whitespace-pre-wrap text-muted-foreground">{post.originalPost.content}</div>
           </div>
         ) : null}
@@ -409,7 +544,7 @@ export function FeedPostCard({
                 <Repeat2 className="h-4 w-4" />
                 <span className="ml-1 text-xs">{repostCount}</span>
               </Button>
-              <Button variant="ghost" size="sm" className="h-9 rounded-full px-2" onClick={() => setCommentsOpen((open) => !open)}>
+              <Button data-testid={`toggle-comments-${post.id}`} variant="ghost" size="sm" className="h-9 rounded-full px-2" onClick={() => setCommentsOpen((open) => !open)}>
                 <MessageSquare className="h-4 w-4" />
                 <span className="ml-1 text-xs">{commentCount}</span>
               </Button>
@@ -487,7 +622,7 @@ export function FeedPostCard({
               <Repeat2 className="mr-2 h-4 w-4" />
               {repostCount}
             </Button>
-            <Button variant="ghost" size="sm" className="rounded-full" onClick={() => setCommentsOpen((open) => !open)}>
+            <Button data-testid={`toggle-comments-${post.id}`} variant="ghost" size="sm" className="rounded-full" onClick={() => setCommentsOpen((open) => !open)}>
               <MessageSquare className="mr-2 h-4 w-4" />
               {commentCount}
             </Button>
@@ -551,12 +686,13 @@ export function FeedPostCard({
             </div>
             <div className="flex flex-col gap-2 sm:flex-row">
               <Textarea
+                data-testid={`comment-input-${post.id}`}
                 placeholder="Write a comment..."
                 value={commentDraft}
                 onChange={(e) => setCommentDraft(e.target.value)}
                 className="min-h-20 bg-background/60"
               />
-              <Button onClick={handleCreateComment} disabled={createComment.isPending || !commentDraft.trim()}>
+              <Button data-testid={`submit-comment-${post.id}`} onClick={handleCreateComment} disabled={createComment.isPending || !commentDraft.trim()}>
                 Post
               </Button>
             </div>

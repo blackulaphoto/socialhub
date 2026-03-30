@@ -40,6 +40,8 @@ router.post("/register", async (req, res) => {
     userId: user.id,
     themeName: "nocturne",
     accentColor: "#8b5cf6",
+    onboardingCompleted: false,
+    onboardingStep: "profile",
     links: [],
   }).onConflictDoNothing();
 

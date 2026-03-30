@@ -11,6 +11,6 @@ export type GetFeedParams = {
   mode?: GetFeedMode;
   city?: string;
   customFeedId?: number;
-  page?: number;
+  cursor?: number;
   limit?: number;
 };

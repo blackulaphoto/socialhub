@@ -483,6 +483,44 @@ paths:
               schema:
                 $ref: "#/components/schemas/SuccessResponse"
 
+  /users/{userId}/block:
+    post:
+      operationId: blockUser
+      tags: [users]
+      summary: Block a user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Blocked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /users/{userId}/unblock:
+    post:
+      operationId: unblockUser
+      tags: [users]
+      summary: Unblock a user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Unblocked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
   /users/{userId}/followers:
     get:
       operationId: getFollowers
@@ -503,6 +541,30 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/UserSummary"
+
+  /users/{userId}/suggested-creators:
+    get:
+      operationId: getSuggestedCreators
+      tags: [users]
+      summary: Get suggested creators for the current user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 6
+      responses:
+        "200":
+          description: Suggested creators
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtistsResponse"
 
   /users/{userId}/following:
     get:
@@ -544,16 +606,15 @@ paths:
           in: query
           schema:
             type: integer
-        - name: page
+        - name: cursor
           in: query
           schema:
             type: integer
-            default: 1
         - name: limit
           in: query
           schema:
             type: integer
-            default: 20
+            default: 12
       responses:
         "200":
           description: Feed posts
@@ -616,6 +677,31 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessResponse"
+
+  /posts/{postId}/update:
+    post:
+      operationId: updatePost
+      tags: [posts]
+      summary: Update a post
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePostRequest"
+      responses:
+        "200":
+          description: Updated post
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
 
   /posts/{postId}/like:
     post:
@@ -807,16 +893,20 @@ paths:
           required: true
           schema:
             type: integer
-        - name: page
+        - name: cursor
           in: query
           schema:
             type: integer
-            default: 1
         - name: limit
           in: query
           schema:
             type: integer
-            default: 20
+            default: 12
+        - name: surface
+          in: query
+          schema:
+            type: string
+            enum: [personal, artist]
       responses:
         "200":
           description: User posts
@@ -1141,6 +1231,10 @@ paths:
           in: query
           schema:
             type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
       responses:
         "200":
           description: Search results
@@ -1349,6 +1443,34 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/GroupDetail"
+
+  /groups/{groupId}/posts:
+    get:
+      operationId: getGroupPosts
+      tags: [groups]
+      summary: Get posts for a group
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: cursor
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 12
+      responses:
+        "200":
+          description: Group posts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostsResponse"
 
   /groups/{groupId}/join:
     post:
@@ -1862,6 +1984,10 @@ components:
         themeName:
           type: string
           nullable: true
+        onboardingCompleted:
+          type: boolean
+        onboardingStep:
+          type: string
         links:
           type: array
           items:
@@ -1896,6 +2022,9 @@ components:
           type: integer
         username:
           type: string
+        artistDisplayName:
+          type: string
+          nullable: true
         avatarUrl:
           type: string
           nullable: true
@@ -1939,6 +2068,10 @@ components:
         accentColor:
           type: string
           nullable: true
+        onboardingCompleted:
+          type: boolean
+        onboardingStep:
+          type: string
         links:
           type: array
           items:
@@ -1950,7 +2083,11 @@ components:
           type: array
           items:
             type: string
-      required: [id, username, profileType, followerCount, friendCount]
+        hasBlockedUser:
+          type: boolean
+        isBlockedByUser:
+          type: boolean
+      required: [id, username, profileType, followerCount, friendCount, hasBlockedUser, isBlockedByUser]
 
     UserProfile:
       type: object
@@ -1961,6 +2098,10 @@ components:
           type: boolean
         friendship:
           $ref: "#/components/schemas/FriendshipState"
+        blockState:
+          $ref: "#/components/schemas/BlockState"
+        canInteract:
+          type: boolean
         profileReactions:
           $ref: "#/components/schemas/ReactionSummary"
         artistProfile:
@@ -1975,7 +2116,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CustomFeed"
-      required: [user, isFollowing, friendship, profileReactions, creatorSettings, customFeeds]
+      required: [user, isFollowing, friendship, blockState, canInteract, profileReactions, creatorSettings, customFeeds]
 
     UserProfileDetails:
       type: object
@@ -2013,6 +2154,10 @@ components:
         themeName:
           type: string
           nullable: true
+        onboardingCompleted:
+          type: boolean
+        onboardingStep:
+          type: string
         links:
           type: array
           items:
@@ -2107,6 +2252,10 @@ components:
         themeName:
           type: string
           nullable: true
+        onboardingCompleted:
+          type: boolean
+        onboardingStep:
+          type: string
         featuredContent:
           type: string
           nullable: true
@@ -2161,11 +2310,17 @@ components:
           type: integer
         userId:
           type: integer
+        actorSurface:
+          type: string
+          enum: [personal, artist]
         content:
           type: string
         imageUrl:
           type: string
           nullable: true
+        visibility:
+          type: string
+          enum: [public, friends, private]
         repostOfPostId:
           type: integer
           nullable: true
@@ -2205,7 +2360,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PostMedia"
-      required: [id, userId, content, likeCount, isLiked, reactionCounts, totalReactionCount, repostCount, commentCount, comments, createdAt]
+      required: [id, userId, actorSurface, content, visibility, likeCount, isLiked, reactionCounts, totalReactionCount, repostCount, commentCount, comments, createdAt]
 
     CreatePostRequest:
       type: object
@@ -2215,17 +2370,43 @@ components:
         imageUrl:
           type: string
           nullable: true
+        actorSurface:
+          type: string
+          enum: [personal, artist]
         repostOfPostId:
           type: integer
           nullable: true
         groupId:
           type: integer
           nullable: true
+        visibility:
+          type: string
+          enum: [public, friends, private]
         media:
           type: array
           items:
             $ref: "#/components/schemas/PostMediaInput"
       required: []
+
+    UpdatePostRequest:
+      type: object
+      properties:
+        content:
+          type: string
+        imageUrl:
+          type: string
+          nullable: true
+        actorSurface:
+          type: string
+          enum: [personal, artist]
+        visibility:
+          type: string
+          enum: [public, friends, private]
+        media:
+          type: array
+          items:
+            $ref: "#/components/schemas/PostMediaInput"
+      required: [content]
 
     RepostRequest:
       type: object
@@ -2315,6 +2496,17 @@ components:
           type: boolean
       required: [status, isFriend]
 
+    BlockState:
+      type: object
+      properties:
+        hasBlockedUser:
+          type: boolean
+        isBlockedByUser:
+          type: boolean
+        isBlockedEitherWay:
+          type: boolean
+      required: [hasBlockedUser, isBlockedByUser, isBlockedEitherWay]
+
     PostMediaInput:
       type: object
       properties:
@@ -2360,11 +2552,14 @@ components:
             $ref: "#/components/schemas/Post"
         total:
           type: integer
-        page:
+        limit:
           type: integer
-        totalPages:
+        nextCursor:
           type: integer
-      required: [posts, total, page, totalPages]
+          nullable: true
+        hasMore:
+          type: boolean
+      required: [posts, total, limit, nextCursor, hasMore]
 
     FeedResponse:
       allOf:
@@ -2382,6 +2577,9 @@ components:
           type: integer
         userId:
           type: integer
+        displayName:
+          type: string
+          nullable: true
         category:
           type: string
         location:
@@ -2471,6 +2669,9 @@ components:
     UpdateArtistRequest:
       type: object
       properties:
+        displayName:
+          type: string
+          nullable: true
         category:
           type: string
         location:
@@ -2755,7 +2956,11 @@ components:
             $ref: "#/components/schemas/ArtistProfile"
         total:
           type: integer
-      required: [users, artists, total]
+        usersTotal:
+          type: integer
+        artistsTotal:
+          type: integer
+      required: [users, artists, total, usersTotal, artistsTotal]
 
     CustomFeed:
       type: object
@@ -3074,10 +3279,19 @@ components:
     UploadImageResponse:
       type: object
       properties:
+        storageProvider:
+          type: string
+          enum: [local]
         url:
           type: string
+        thumbnailUrl:
+          type: string
+          nullable: true
         path:
           type: string
+        thumbnailPath:
+          type: string
+          nullable: true
         fileName:
           type: string
         scope:
@@ -3086,7 +3300,13 @@ components:
           type: string
         size:
           type: integer
-      required: [url, path, fileName, scope, mimeType, size]
+        width:
+          type: integer
+          nullable: true
+        height:
+          type: integer
+          nullable: true
+      required: [storageProvider, url, path, fileName, scope, mimeType, size]
 
     AnalyticsTopPath:
       type: object

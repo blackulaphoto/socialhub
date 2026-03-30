@@ -8,7 +8,7 @@ import {
 } from "@workspace/db";
 import { and, desc, eq, or } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth.js";
-import { formatConversationForUser } from "./helpers.js";
+import { canUsersInteract, formatConversationForUser, getBlockedUserIds } from "./helpers.js";
 import { createNotification, markConversationNotificationsRead } from "../lib/notifications.js";
 
 const router = Router();
@@ -104,6 +104,7 @@ router.get("/conversations", requireAuth, async (req, res) => {
   const conversations = await db.select().from(conversationsTable)
     .where(or(eq(conversationsTable.user1Id, userId), eq(conversationsTable.user2Id, userId)))
     .orderBy(desc(conversationsTable.lastMessageAt));
+  const blockedUserIds = await getBlockedUserIds(userId);
 
   const enriched = await Promise.all(
     conversations.map((conversation) =>
@@ -115,7 +116,7 @@ router.get("/conversations", requireAuth, async (req, res) => {
     ),
   );
 
-  res.json(enriched.filter(Boolean));
+  res.json(enriched.filter((item) => item && !blockedUserIds.includes(item.otherUser.id)));
 });
 
 router.get("/conversations/:conversationId", requireAuth, async (req, res) => {
@@ -167,6 +168,10 @@ router.post("/send", requireAuth, async (req, res) => {
     res.status(400).json({ error: "recipientId and content are required" });
     return;
   }
+  if (!(await canUsersInteract(req.session.userId, Number(recipientId)))) {
+    res.status(403).json({ error: "Blocked users cannot message each other" });
+    return;
+  }
 
   const conversation = await getOrCreateConversation(req.session.userId!, Number(recipientId));
   const [message] = await db.insert(messagesTable).values({
@@ -206,6 +211,10 @@ router.post("/inquiries/:recipientId", requireAuth, async (req, res) => {
     res.status(404).json({ error: "Recipient not found" });
     return;
   }
+  if (!(await canUsersInteract(req.session.userId, recipientId))) {
+    res.status(403).json({ error: "Blocked users cannot message each other" });
+    return;
+  }
 
   const {
     inquiryType,
@@ -236,6 +245,10 @@ router.post("/book/:artistId", requireAuth, async (req, res) => {
   const artistId = Number(req.params.artistId);
   if (Number.isNaN(artistId) || !req.body?.message) {
     res.status(400).json({ error: "Invalid booking request" });
+    return;
+  }
+  if (!(await canUsersInteract(req.session.userId, artistId))) {
+    res.status(403).json({ error: "Blocked users cannot message each other" });
     return;
   }
   res.status(201).json(await createInquiryMessage(req.session.userId!, artistId, {

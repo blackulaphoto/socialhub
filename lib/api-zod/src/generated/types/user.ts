@@ -33,6 +33,8 @@ export interface User {
   hasArtistPage?: boolean;
   accentColor?: string | null;
   themeName?: string | null;
+  onboardingCompleted?: boolean;
+  onboardingStep?: string;
   links?: LinkItem[];
   featuredContent?: string | null;
 }

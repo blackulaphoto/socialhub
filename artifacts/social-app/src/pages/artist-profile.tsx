@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   CalendarClock,
@@ -14,20 +14,22 @@ import {
   Mic2,
   Palette,
   Pin,
+  Radio,
   Share2,
   Sparkles,
   Tag,
   Video,
 } from "lucide-react";
 import {
+  getUserPosts,
+  useCreatePost,
   useFollowUser,
   useGetEvents,
   useGetUser,
-  useGetUserPosts,
   useSendInquiry,
   useUnfollowUser,
 } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -53,7 +55,12 @@ import { ReportDialog } from "@/components/report-dialog";
 import { cn } from "@/lib/utils";
 import { FriendActionButton } from "@/components/friend-action-button";
 import { ProfileReactionBar } from "@/components/profile-reaction-bar";
+import { BlockActionButton } from "@/components/block-action-button";
 import { useAuth } from "@/hooks/useAuth";
+import { useActiveIdentity } from "@/hooks/useActiveIdentity";
+import { uploadImage } from "@/lib/upload-image";
+import { getEmbedDescriptor } from "@/lib/embeds";
+import { LoadMoreSentinel } from "@/components/load-more-sentinel";
 
 const ACTION_HELPERS: Record<string, { title: string; fields: string[]; hint: string }> = {
   book: { title: "Send booking inquiry", fields: ["eventType", "eventDate", "budget", "location"], hint: "Share date, budget, and event context." },
@@ -125,11 +132,21 @@ function useSavedCreatorPages() {
 
 export default function ArtistProfile({ id }: { id: string }) {
   const { user: currentUser } = useAuth();
+  const { activeIdentity, setActiveIdentity } = useActiveIdentity();
   const userId = Number(id);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [open, setOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const [isUploadingArtistImage, setIsUploadingArtistImage] = useState(false);
+  const [artistPostForm, setArtistPostForm] = useState({
+    content: "",
+    imageUrl: "",
+    linkUrl: "",
+    visibility: "public" as "public" | "friends" | "private",
+  });
   const [form, setForm] = useState({
     message: "",
     eventType: "",
@@ -148,13 +165,42 @@ export default function ArtistProfile({ id }: { id: string }) {
   const { data: events } = useGetEvents(undefined, {
     query: { queryKey: ["/api/events", "artist-page"], enabled: Number.isFinite(userId) },
   });
-
-  const { data: postsData } = useGetUserPosts(userId, { limit: 24 }, {
-    query: { queryKey: ["/api/users", userId, "artist-page-posts"], enabled: Number.isFinite(userId) },
+  const {
+    data: artistPostsData,
+    isLoading: isLoadingArtistPosts,
+    isError: isArtistPostsError,
+    refetch: refetchArtistPosts,
+    fetchNextPage: fetchNextArtistPosts,
+    hasNextPage: hasMoreArtistPosts,
+    isFetchingNextPage: isFetchingNextArtistPosts,
+  } = useInfiniteQuery({
+    queryKey: ["/api/users", userId, "posts", "artist"],
+    enabled: Number.isFinite(userId),
+    initialPageParam: undefined as number | undefined,
+    queryFn: ({ pageParam, signal }) => getUserPosts(userId, {
+      cursor: pageParam,
+      limit: 8,
+      surface: "artist",
+    }, { signal }),
+    getNextPageParam: (lastPage) => lastPage.hasMore ? (lastPage.nextCursor ?? undefined) : undefined,
   });
 
   const follow = useFollowUser();
   const unfollow = useUnfollowUser();
+  const createPost = useCreatePost({
+    mutation: {
+      onSuccess: () => {
+        setArtistPostForm({ content: "", imageUrl: "", linkUrl: "", visibility: "public" });
+        queryClient.invalidateQueries({ queryKey: ["feed"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/users", userId, "posts", "artist"] });
+        queryClient.invalidateQueries({ queryKey: ["profile", userId] });
+        toast({ title: "Artist page post published" });
+      },
+      onError: () => {
+        toast({ title: "Could not publish artist post", variant: "destructive" });
+      },
+    },
+  });
   const inquiry = useSendInquiry({
     mutation: {
       onSuccess: (message) => {
@@ -194,6 +240,10 @@ export default function ArtistProfile({ id }: { id: string }) {
       .sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime())
       .slice(0, 4);
   }, [events, userId]);
+  const artistPosts = useMemo(
+    () => artistPostsData?.pages.flatMap((page) => page.posts) || [],
+    [artistPostsData],
+  );
 
   if (isLoading) return <div className="flex justify-center py-20"><Spinner size="lg" /></div>;
   if (isError) return <div className="mx-auto max-w-6xl px-4 py-8"><QueryErrorState title="Could not load artist page" description="The artist profile request failed. Check the API and retry." onRetry={() => refetch()} /></div>;
@@ -211,7 +261,6 @@ export default function ArtistProfile({ id }: { id: string }) {
   const enabledModules = creator?.enabledModules?.length ? creator.enabledModules : DEFAULT_MODULE_ORDER;
   const moduleOrder = (creator?.moduleOrder?.length ? creator.moduleOrder : DEFAULT_MODULE_ORDER).filter((item) => enabledModules.includes(item));
   const saved = savedIds.includes(userId);
-  const posts = postsData?.posts || [];
   const gallery = artist.gallery || [];
   const imageGallery = gallery.filter((item) => item.type === "image");
   const videoGallery = gallery.filter((item) => item.type === "video");
@@ -231,6 +280,42 @@ export default function ArtistProfile({ id }: { id: string }) {
   const mood = MOOD_STYLES[moodPreset] || MOOD_STYLES.sleek;
   const fontClass = FONT_PRESET_CLASSES[fontPreset] || "";
   const heroTagline = artist.tagline || artist.bio || profile.user.bio || "Creator page";
+  const artistPageName = artist.displayName || profile.user.username;
+  const isOwnArtistPage = currentUser?.id === userId;
+
+  const handleArtistImageUpload = async (file: File | null) => {
+    if (!file) return;
+    setIsUploadingArtistImage(true);
+    try {
+      const uploaded = await uploadImage(file, "post");
+      setArtistPostForm((current) => ({ ...current, imageUrl: uploaded.url }));
+      toast({ title: "Artist post image uploaded" });
+    } catch (error) {
+      toast({
+        title: "Could not upload image",
+        description: error instanceof Error ? error.message : undefined,
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploadingArtistImage(false);
+    }
+  };
+
+  const submitArtistPost = () => {
+    const linkMedia = artistPostForm.linkUrl.trim() ? getEmbedDescriptor(artistPostForm.linkUrl.trim()) : null;
+    createPost.mutate({
+      data: {
+        content: artistPostForm.content,
+        imageUrl: artistPostForm.imageUrl || undefined,
+        visibility: artistPostForm.visibility,
+        actorSurface: "artist",
+        media: [
+          artistPostForm.imageUrl ? { type: "image", url: artistPostForm.imageUrl } : null,
+          linkMedia ? { type: linkMedia.kind, url: linkMedia.href, title: linkMedia.label } : null,
+        ].filter(Boolean) as Array<{ type: string; url: string; title?: string }>,
+      },
+    });
+  };
 
   const handleFollowToggle = () => {
     const mutation = profile.isFollowing ? unfollow : follow;
@@ -296,10 +381,8 @@ export default function ArtistProfile({ id }: { id: string }) {
     </Card>
   );
 
-  const renderAbout = () => (
-    <Card className="border-border/50 bg-card/60">
-      <CardHeader><CardTitle>About</CardTitle></CardHeader>
-      <CardContent className="space-y-5">
+  const aboutContent = (
+    <div className="space-y-5">
         <p className="whitespace-pre-wrap text-sm leading-7 text-muted-foreground">
           {artist.bio || profile.user.bio || "No bio added yet."}
         </p>
@@ -366,8 +449,60 @@ export default function ArtistProfile({ id }: { id: string }) {
             ))}
           </div>
         )}
-      </CardContent>
-    </Card>
+    </div>
+  );
+
+  const renderAbout = () => (
+    <>
+      <Card className="border-border/50 bg-card/60 md:hidden">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle>About</CardTitle>
+            <Button variant="outline" size="sm" onClick={() => setAboutOpen(true)}>Open</Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3">
+            <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">What they do</div>
+              <div className="mt-1 text-sm font-medium">{artist.category}</div>
+            </div>
+            <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Base</div>
+              <div className="mt-1 text-sm font-medium">{artist.location || profile.user.city || profile.user.location || "Location not added yet"}</div>
+            </div>
+            {artist.availabilityStatus ? (
+              <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Availability</div>
+                <div className="mt-1 text-sm font-medium">{artist.availabilityStatus}</div>
+              </div>
+            ) : null}
+          </div>
+          <p className="line-clamp-3 text-sm leading-6 text-muted-foreground">
+            {artist.bio || profile.user.bio || "No bio added yet."}
+          </p>
+          {artist.tags?.length ? (
+            <div className="flex flex-wrap gap-2">
+              {artist.tags.slice(0, 4).map((tag: string) => <Badge key={tag} variant="secondary">{tag}</Badge>)}
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      <Dialog open={aboutOpen} onOpenChange={setAboutOpen}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto md:hidden">
+          <DialogHeader>
+            <DialogTitle>About {artistPageName}</DialogTitle>
+          </DialogHeader>
+          {aboutContent}
+        </DialogContent>
+      </Dialog>
+
+      <Card className="hidden border-border/50 bg-card/60 md:block">
+        <CardHeader><CardTitle>About</CardTitle></CardHeader>
+        <CardContent>{aboutContent}</CardContent>
+      </Card>
+    </>
   );
 
   const renderMedia = () => (
@@ -459,17 +594,115 @@ export default function ArtistProfile({ id }: { id: string }) {
   const renderPosts = () => (
     <div className="space-y-5">
       <div className="flex items-center gap-2">
-        <Sparkles className="h-5 w-5 text-primary" />
+        <Radio className="h-5 w-5 text-primary" />
         <h2 className="text-2xl font-bold">Posts and Updates</h2>
       </div>
-      {posts.length > 0 ? (
+
+      {isOwnArtistPage && (
+        <Card className="border-border/50 bg-card/60">
+          <CardHeader className="pb-3">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <CardTitle>Post as your artist page</CardTitle>
+                <div className="mt-1 text-sm text-muted-foreground">
+                  These posts stay on the creator page and publish with your artist-page identity.
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant={activeIdentity === "artist" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setActiveIdentity("artist")}
+                >
+                  Use Artist Page
+                </Button>
+                <Link href={`/profile/${userId}`}>
+                  <Button variant="ghost" size="sm" onClick={() => setActiveIdentity("personal")}>
+                    Personal Profile
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Textarea
+              placeholder="Share a release, set update, gallery drop, booking note, or artist-page announcement..."
+              value={artistPostForm.content}
+              onChange={(e) => setArtistPostForm((current) => ({ ...current, content: e.target.value }))}
+              className="min-h-32"
+            />
+            <div className="grid gap-3 md:grid-cols-2">
+              <Input
+                placeholder="Paste a video, article, or music link"
+                value={artistPostForm.linkUrl}
+                onChange={(e) => setArtistPostForm((current) => ({ ...current, linkUrl: e.target.value }))}
+              />
+              <Input
+                placeholder="Visibility: public, friends, or private"
+                value={artistPostForm.visibility}
+                readOnly
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isUploadingArtistImage}>
+                <ImageIcon className="mr-2 h-4 w-4" />
+                {artistPostForm.imageUrl ? "Replace image" : "Add image"}
+              </Button>
+              {artistPostForm.imageUrl ? (
+                <Badge variant="secondary">Image attached</Badge>
+              ) : null}
+              <select
+                value={artistPostForm.visibility}
+                onChange={(e) => setArtistPostForm((current) => ({ ...current, visibility: e.target.value as "public" | "friends" | "private" }))}
+                className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="public">Public</option>
+                <option value="friends">Friends only</option>
+                <option value="private">Only me</option>
+              </select>
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => handleArtistImageUpload(e.target.files?.[0] || null)}
+            />
+            <div className="flex justify-end">
+              <Button
+                onClick={submitArtistPost}
+                disabled={createPost.isPending || isUploadingArtistImage || !artistPostForm.content.trim()}
+              >
+                Post As Artist Page
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {isLoadingArtistPosts ? (
+        <div className="flex justify-center py-8"><Spinner /></div>
+      ) : isArtistPostsError ? (
+        <QueryErrorState title="Could not load artist posts" description="The artist page loaded, but its post stream could not be fetched." onRetry={() => refetchArtistPosts()} />
+      ) : artistPosts.length ? (
         <div className="space-y-4">
-          {posts.map((post) => <FeedPostCard key={post.id} post={post} showAuthor={false} />)}
+          {artistPosts.map((post) => (
+            <FeedPostCard key={post.id} post={post} showAuthor={false} />
+          ))}
+          <LoadMoreSentinel
+            enabled={Boolean(hasMoreArtistPosts)}
+            isLoading={isFetchingNextArtistPosts}
+            onVisible={() => {
+              if (hasMoreArtistPosts && !isFetchingNextArtistPosts) {
+                fetchNextArtistPosts();
+              }
+            }}
+          />
         </div>
       ) : (
         <Card className="border-dashed border-border/50 bg-card/40">
           <CardContent className="p-12 text-center text-muted-foreground">
-            This page has no posts yet.
+            No artist-page posts yet.
           </CardContent>
         </Card>
       )}
@@ -599,7 +832,8 @@ export default function ArtistProfile({ id }: { id: string }) {
         )}
         <div className={cn("absolute inset-0 bg-gradient-to-br", mood.shell)} />
         <div className={cn("absolute inset-0 bg-[radial-gradient(circle_at_top_left,var(--tw-gradient-stops))]", mood.glow)} />
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/55 to-background/10" />
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/78 to-background/18" />
+        <div className="absolute inset-0 bg-black/12 dark:bg-black/22" />
 
         <div className="relative z-10 mx-auto max-w-7xl px-4 py-12 md:py-16">
           <div className="grid gap-8 lg:grid-cols-[auto_1fr]">
@@ -616,9 +850,9 @@ export default function ArtistProfile({ id }: { id: string }) {
                     {(profile.user.city || artist.location) && <Badge variant="outline">{profile.user.city || artist.location}</Badge>}
                     <Badge variant="outline">{MODULE_LABELS[visibleSections[0] || "featured"] || "Creator Page"}</Badge>
                   </div>
-                  <h1 className="text-4xl font-bold md:text-6xl">{profile.user.username}</h1>
-                  <p className="mt-4 max-w-3xl text-lg text-muted-foreground">{heroTagline}</p>
-                  <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                  <h1 className="text-4xl font-bold md:text-6xl">{artistPageName}</h1>
+                  <p className="mt-4 max-w-3xl text-lg font-medium text-foreground/90">{heroTagline}</p>
+                  <div className="mt-4 flex flex-wrap items-center gap-4 text-sm font-medium text-foreground/80">
                     {(artist.location || profile.user.city || profile.user.location) && (
                       <span className="inline-flex items-center"><MapPin className="mr-1.5 h-4 w-4" /> {artist.location || profile.user.city || profile.user.location}</span>
                     )}
@@ -629,15 +863,50 @@ export default function ArtistProfile({ id }: { id: string }) {
                 </div>
 
                 <div className="flex flex-wrap gap-3 xl:max-w-md xl:justify-end">
-                  <Button onClick={handleFollowToggle} variant={profile.isFollowing ? "outline" : "default"}>
+                  {isOwnArtistPage && (
+                    <>
+                      <Link href="/settings">
+                        <Button variant="outline">
+                          <Palette className="mr-2 h-4 w-4" /> Edit Profile
+                        </Button>
+                      </Link>
+                      <Link href="/settings?tab=creator">
+                        <Button variant="outline">
+                          <Sparkles className="mr-2 h-4 w-4" /> Edit Artist Page
+                        </Button>
+                      </Link>
+                      <Button
+                        variant={activeIdentity === "artist" ? "default" : "secondary"}
+                        onClick={() => setActiveIdentity("artist")}
+                      >
+                        {activeIdentity === "artist" ? "Using Artist Page" : "Switch To Artist Page"}
+                      </Button>
+                      <Link href={`/profile/${profile.user.id}`}>
+                        <Button variant="outline" onClick={() => setActiveIdentity("personal")}>
+                          View Personal Profile
+                        </Button>
+                      </Link>
+                    </>
+                  )}
+                  {!currentUser?.hasArtistPage && (
+                    <Link href="/settings?tab=creator">
+                      <Button variant="secondary">
+                        <Palette className="mr-2 h-4 w-4" /> Create Your Artist Page
+                      </Button>
+                    </Link>
+                  )}
+                  <Button onClick={handleFollowToggle} variant={profile.isFollowing ? "outline" : "default"} disabled={!profile.canInteract}>
                     {profile.isFollowing ? "Following" : "Follow"}
                   </Button>
-                  <FriendActionButton userId={userId} friendship={profile.friendship} invalidateKeys={[["profile", userId], ["/api/users", userId]]} />
-                  <Link href={`/profile/${profile.user.id}`}>
-                    <Button variant="outline">Personal Profile</Button>
-                  </Link>
+                  {profile.canInteract ? <FriendActionButton userId={userId} friendship={profile.friendship} invalidateKeys={[["profile", userId], ["/api/users", userId]]} /> : null}
+                  <BlockActionButton userId={userId} blockState={profile.blockState} invalidateKeys={[["profile", userId], ["/api/users", userId]]} />
+                  {!isOwnArtistPage && (
+                    <Link href={`/profile/${profile.user.id}`}>
+                      <Button variant="outline">Personal Profile</Button>
+                    </Link>
+                  )}
                   <Link href="/messages">
-                    <Button variant="outline"><MessageSquare className="mr-2 h-4 w-4" /> Message</Button>
+                    <Button variant="outline" disabled={!profile.canInteract}><MessageSquare className="mr-2 h-4 w-4" /> Message</Button>
                   </Link>
                   {creator?.primaryActionUrl && (actionType === "shop" || actionType === "store") ? (
                     <a href={creator.primaryActionUrl} target="_blank" rel="noreferrer">
@@ -646,7 +915,7 @@ export default function ArtistProfile({ id }: { id: string }) {
                   ) : (
                     <Dialog open={open} onOpenChange={setOpen}>
                       <DialogTrigger asChild>
-                        <Button><CalendarClock className="mr-2 h-4 w-4" /> {actionLabel}</Button>
+                        <Button disabled={!profile.canInteract}><CalendarClock className="mr-2 h-4 w-4" /> {actionLabel}</Button>
                       </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>
@@ -733,11 +1002,18 @@ export default function ArtistProfile({ id }: { id: string }) {
               </div>
               {currentUser?.id !== userId ? (
                 <div className="flex flex-wrap items-center gap-3">
-                  <div className="inline-flex items-center rounded-2xl border border-border/50 bg-background/30 px-4 py-3 text-sm text-muted-foreground">
+                  <div className="inline-flex items-center rounded-2xl border border-border/50 bg-background/40 px-4 py-3 text-sm text-foreground/80">
                     <HeartHandshake className="mr-2 h-4 w-4 text-primary" />
                     {profile.user.friendCount} friends
                   </div>
-                  <ProfileReactionBar userId={userId} summary={profile.profileReactions} invalidateKeys={[["profile", userId], ["/api/users", userId]]} />
+                  {profile.canInteract ? <ProfileReactionBar userId={userId} summary={profile.profileReactions} invalidateKeys={[["profile", userId], ["/api/users", userId]]} /> : null}
+                </div>
+              ) : null}
+              {currentUser?.id !== userId && !profile.canInteract ? (
+                <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+                  {profile.blockState?.hasBlockedUser
+                    ? "You blocked this creator. Follow, messaging, and inquiry actions are disabled until you unblock them."
+                    : "This creator has blocked you. Social actions and inquiries are unavailable."}
                 </div>
               ) : null}
             </div>

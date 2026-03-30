@@ -10,6 +10,7 @@ import type { Post } from "./post";
 export interface PostsResponse {
   posts: Post[];
   total: number;
-  page: number;
-  totalPages: number;
+  limit: number;
+  nextCursor: number | null;
+  hasMore: boolean;
 }

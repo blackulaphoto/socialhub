@@ -5,15 +5,24 @@
   "scripts": {
     "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
+    "build:api": "pnpm --filter @workspace/api-server run build",
     "db:generate": "pnpm --filter @workspace/db run generate",
     "db:migrate": "pnpm --filter @workspace/db run migrate",
+    "railway:build": "pnpm --filter @workspace/api-server run build",
+    "railway:predeploy": "pnpm --filter @workspace/db run migrate",
+    "railway:start": "pnpm --filter @workspace/api-server run start",
     "start:api:local": "powershell -ExecutionPolicy Bypass -File .\\scripts\\start-local-api.ps1",
+    "start:api": "pnpm --filter @workspace/api-server run start",
     "stop:api:local": "powershell -ExecutionPolicy Bypass -File .\\scripts\\stop-local-api.ps1",
+    "test:api": "pnpm --filter @workspace/api-server run test",
+    "test:api:coverage": "pnpm --filter @workspace/api-server run test:coverage",
+    "test:e2e": "playwright test",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
   },
   "private": true,
   "devDependencies": {
+    "@playwright/test": "^1.54.2",
     "typescript": "~5.9.2",
     "prettier": "^3.8.1"
   }

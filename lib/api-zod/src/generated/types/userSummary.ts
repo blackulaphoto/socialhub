@@ -11,6 +11,7 @@ import type { UserSummaryProfileType } from "./userSummaryProfileType";
 export interface UserSummary {
   id: number;
   username: string;
+  artistDisplayName?: string | null;
   avatarUrl?: string | null;
   bio?: string | null;
   profileType: UserSummaryProfileType;
@@ -26,7 +27,11 @@ export interface UserSummary {
   interests?: string[];
   hasArtistPage?: boolean;
   accentColor?: string | null;
+  onboardingCompleted?: boolean;
+  onboardingStep?: string;
   links?: LinkItem[];
   category?: string | null;
   tags?: string[];
+  hasBlockedUser: boolean;
+  isBlockedByUser: boolean;
 }

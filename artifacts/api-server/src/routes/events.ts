@@ -1,8 +1,9 @@
 import { Router } from "express";
-import { db, eventArtistsTable, eventsTable } from "@workspace/db";
+import { db, eventArtistsTable, eventsTable, usersTable } from "@workspace/db";
 import { desc, eq, ilike, or } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth.js";
 import { formatEvent } from "./helpers.js";
+import { createNotificationIfMissing } from "../lib/notifications.js";
 
 const router = Router();
 
@@ -46,6 +47,23 @@ router.post("/events", requireAuth, async (req, res) => {
         isHeadliner: index === 0,
       })),
     ).onConflictDoNothing();
+  }
+
+  const [host] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!)).limit(1);
+  if (host) {
+    for (const artistUserId of artistIds) {
+      if (artistUserId === req.session.userId) continue;
+      await createNotificationIfMissing({
+        userId: artistUserId,
+        actorUserId: host.id,
+        type: "event_tag",
+        title: "Tagged in an event lineup",
+        body: `${host.username} added you to the lineup for ${event.title}.`,
+        href: `/events/${event.id}`,
+        entityType: "event",
+        entityId: event.id,
+      });
+    }
   }
 
   res.status(201).json(await formatEvent(event));

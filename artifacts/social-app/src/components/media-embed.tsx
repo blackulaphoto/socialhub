@@ -14,7 +14,7 @@ export function MediaEmbed({ type, url, title, className }: MediaEmbedProps) {
   if (!embed || !url) return null;
 
   if (embed.kind === "image") {
-    return <img src={url} alt={title || ""} className={className || "w-full max-h-[32rem] object-cover"} />;
+    return <img src={url} alt={title || ""} loading="lazy" decoding="async" className={className || "w-full max-h-[32rem] object-cover"} />;
   }
 
   if (embed.embedUrl && embed.kind === "video") {
@@ -25,6 +25,7 @@ export function MediaEmbed({ type, url, title, className }: MediaEmbedProps) {
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         allowFullScreen
         referrerPolicy="strict-origin-when-cross-origin"
+        loading="lazy"
       />
     );
   }

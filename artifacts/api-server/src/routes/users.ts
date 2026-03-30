@@ -10,19 +10,26 @@ import {
   postMediaTable,
   postsTable,
   profileReactionsTable,
+  userBlocksTable,
   userPhotoItemsTable,
   userProfileDetailsTable,
   usersTable,
 } from "@workspace/db";
-import { and, desc, eq, inArray, or } from "drizzle-orm";
+import { and, desc, eq, inArray, notInArray, or, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth.js";
 import {
   enrichPost,
+  getBlockState,
+  canUsersInteract,
+  canViewPost,
   formatArtistProfile,
   formatUser,
   getCustomFeeds,
+  getAcceptedFriendIds,
   getFriendshipState,
   getProfileReactionSummary,
+  getBlockedUserIds,
+  getUserPostsPage,
   getUserSummary,
 } from "./helpers.js";
 import { createNotification } from "../lib/notifications.js";
@@ -45,6 +52,7 @@ router.get("/:userId", async (req, res) => {
 
   let isFollowing = false;
   let friendship = { status: "none", isFriend: false };
+  const blockState = await getBlockState(req.session.userId, userId);
   if (req.session.userId && req.session.userId !== userId) {
     const [follow] = await db.select().from(followsTable)
       .where(and(eq(followsTable.followerId, req.session.userId), eq(followsTable.followingId, userId)))
@@ -61,14 +69,19 @@ router.get("/:userId", async (req, res) => {
   const pinnedPost = creatorSettings?.pinnedPostId
     ? await db.select().from(postsTable).where(eq(postsTable.id, creatorSettings.pinnedPostId)).limit(1)
     : [];
+  const visiblePinnedPost = pinnedPost[0] && await canViewPost(pinnedPost[0], req.session.userId)
+    ? pinnedPost[0]
+    : null;
 
   res.json({
     user: await formatUser(user),
     isFollowing,
     friendship,
+    blockState,
+    canInteract: !blockState.isBlockedEitherWay,
     profileReactions,
     details: details ?? null,
-    artistProfile: artistProfile ? await formatArtistProfile(artistProfile, user) : null,
+    artistProfile: artistProfile ? await formatArtistProfile(artistProfile, user, req.session.userId) : null,
     creatorSettings: {
       primaryActionType: creatorSettings?.primaryActionType ?? "contact",
       primaryActionLabel: creatorSettings?.primaryActionLabel ?? "Contact Me",
@@ -82,7 +95,7 @@ router.get("/:userId", async (req, res) => {
       fontPreset: creatorSettings?.fontPreset ?? "modern",
       enabledModules: creatorSettings?.enabledModules ?? ["featured", "about", "media", "posts", "events", "contact"],
       moduleOrder: creatorSettings?.moduleOrder ?? ["featured", "about", "media", "posts", "events", "contact"],
-      pinnedPost: pinnedPost[0] ? await enrichPost(pinnedPost[0], req.session.userId) : null,
+      pinnedPost: visiblePinnedPost ? await enrichPost(visiblePinnedPost, req.session.userId) : null,
     },
     customFeeds: req.session.userId === userId ? await getCustomFeeds(userId) : [],
   });
@@ -108,9 +121,12 @@ router.post("/:userId/update", requireAuth, async (req, res) => {
     interests,
     accentColor,
     themeName,
+    onboardingCompleted,
+    onboardingStep,
     links,
     featuredContent,
   } = req.body;
+  const [existingDetails] = await db.select().from(userProfileDetailsTable).where(eq(userProfileDetailsTable.userId, userId)).limit(1);
 
   const [updated] = await db.update(usersTable)
     .set({ bio: bio ?? null, avatarUrl: avatarUrl ?? null, updatedAt: new Date() })
@@ -129,6 +145,8 @@ router.post("/:userId/update", requireAuth, async (req, res) => {
     interests: Array.isArray(interests) ? interests : [],
     accentColor: accentColor ?? "#8b5cf6",
     themeName: themeName ?? "nocturne",
+    onboardingCompleted: typeof onboardingCompleted === "boolean" ? onboardingCompleted : (existingDetails?.onboardingCompleted ?? false),
+    onboardingStep: typeof onboardingStep === "string" ? onboardingStep : (existingDetails?.onboardingStep ?? "profile"),
     links: Array.isArray(links) ? links : [],
     featuredContent: featuredContent ?? null,
   }).onConflictDoUpdate({
@@ -144,6 +162,8 @@ router.post("/:userId/update", requireAuth, async (req, res) => {
       interests: Array.isArray(interests) ? interests : [],
       accentColor: accentColor ?? "#8b5cf6",
       themeName: themeName ?? "nocturne",
+      onboardingCompleted: typeof onboardingCompleted === "boolean" ? onboardingCompleted : (existingDetails?.onboardingCompleted ?? false),
+      onboardingStep: typeof onboardingStep === "string" ? onboardingStep : (existingDetails?.onboardingStep ?? "profile"),
       links: Array.isArray(links) ? links : [],
       featuredContent: featuredContent ?? null,
       updatedAt: new Date(),
@@ -151,6 +171,150 @@ router.post("/:userId/update", requireAuth, async (req, res) => {
   });
 
   res.json(await formatUser(updated));
+});
+
+router.get("/:userId/suggested-creators", requireAuth, async (req, res) => {
+  const userId = Number(req.params.userId);
+  if (Number.isNaN(userId) || userId !== req.session.userId) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const limit = Math.min(Math.max(Number(req.query.limit || 6), 1), 12);
+  const [details] = await db.select().from(userProfileDetailsTable).where(eq(userProfileDetailsTable.userId, userId)).limit(1);
+  const blockedUserIds = await getBlockedUserIds(userId);
+  const interestTerms = (details?.interests || []).map((item) => item.trim()).filter(Boolean);
+  const locationTerm = details?.city || details?.location || "";
+
+  const scoreParts = [
+    sql<number>`case when ${artistProfilesTable.userId} = ${userId} then -1000 else 0 end`,
+    locationTerm
+      ? sql<number>`case when coalesce(${artistProfilesTable.location}, '') ilike ${`%${locationTerm}%`} then 5 else 0 end`
+      : sql<number>`0`,
+    interestTerms.length > 0
+      ? sql<number>`cardinality(array(select unnest(coalesce(${artistProfilesTable.tags}, '{}')) intersect select unnest(ARRAY[${sql.join(interestTerms.map((term) => sql`${term}`), sql`, `)}]::text[]))) * 3`
+      : sql<number>`0`,
+    interestTerms.length > 0
+      ? sql<number>`case when ${artistProfilesTable.category} ilike any(ARRAY[${sql.join(interestTerms.map((term) => sql`${`%${term}%`}`), sql`, `)}]::text[]) then 2 else 0 end`
+      : sql<number>`0`,
+  ];
+
+  const results = await db.select().from(artistProfilesTable)
+    .innerJoin(usersTable, eq(artistProfilesTable.userId, usersTable.id))
+    .where(and(
+      blockedUserIds.length ? notInArray(artistProfilesTable.userId, blockedUserIds) : undefined,
+      sql`${artistProfilesTable.userId} <> ${userId}`,
+    ))
+    .orderBy(desc(sql.join(scoreParts, sql` + `)), desc(artistProfilesTable.updatedAt))
+    .limit(limit);
+
+  const followRows = results.length > 0
+    ? await db.select({ followingId: followsTable.followingId }).from(followsTable).where(and(
+      eq(followsTable.followerId, userId),
+      inArray(followsTable.followingId, results.map((row) => row.artist_profiles.userId)),
+    ))
+    : [];
+  const followingSet = new Set(followRows.map((row) => row.followingId));
+
+  const artists = await Promise.all(
+    results.map(async (row) => ({
+      ...(await formatArtistProfile(row.artist_profiles, row.users, req.session.userId)),
+      isFollowing: followingSet.has(row.artist_profiles.userId),
+    })),
+  );
+
+  res.json({ artists, total: artists.length });
+});
+
+router.get("/:userId/suggested-people", requireAuth, async (req, res) => {
+  const userId = Number(req.params.userId);
+  if (Number.isNaN(userId) || userId !== req.session.userId) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const limit = Math.min(Math.max(Number(req.query.limit || 6), 1), 12);
+  const [details] = await db.select().from(userProfileDetailsTable).where(eq(userProfileDetailsTable.userId, userId)).limit(1);
+  const blockedUserIds = await getBlockedUserIds(userId);
+  const currentFriendIds = await getAcceptedFriendIds(userId);
+  const currentFriendSet = new Set(currentFriendIds);
+  const interestTerms = (details?.interests || []).map((item) => item.trim().toLowerCase()).filter(Boolean);
+  const locationTerms = [details?.city, details?.location].map((item) => item?.trim().toLowerCase()).filter(Boolean) as string[];
+
+  const excludedIds = [...new Set([userId, ...blockedUserIds, ...currentFriendIds])];
+  const candidates = await db.select().from(usersTable).where(
+    excludedIds.length ? notInArray(usersTable.id, excludedIds) : undefined,
+  ).limit(40);
+
+  const candidateIds = candidates.map((candidate) => candidate.id);
+  const candidateDetails = candidateIds.length > 0
+    ? await db.select().from(userProfileDetailsTable).where(inArray(userProfileDetailsTable.userId, candidateIds))
+    : [];
+  const candidateDetailsMap = new Map(candidateDetails.map((row) => [row.userId, row]));
+
+  const acceptedFriendships = candidateIds.length > 0
+    ? await db.select().from(friendshipsTable).where(
+      and(
+        eq(friendshipsTable.status, "accepted"),
+        or(
+          inArray(friendshipsTable.requesterUserId, candidateIds),
+          inArray(friendshipsTable.addresseeUserId, candidateIds),
+        ),
+      ),
+    )
+    : [];
+
+  const candidateFriendMap = new Map<number, Set<number>>();
+  for (const candidateId of candidateIds) {
+    candidateFriendMap.set(candidateId, new Set<number>());
+  }
+  for (const friendship of acceptedFriendships) {
+    if (candidateFriendMap.has(friendship.requesterUserId)) {
+      candidateFriendMap.get(friendship.requesterUserId)!.add(friendship.addresseeUserId);
+    }
+    if (candidateFriendMap.has(friendship.addresseeUserId)) {
+      candidateFriendMap.get(friendship.addresseeUserId)!.add(friendship.requesterUserId);
+    }
+  }
+
+  const followRows = candidateIds.length > 0
+    ? await db.select({ followingId: followsTable.followingId }).from(followsTable).where(and(
+      eq(followsTable.followerId, userId),
+      inArray(followsTable.followingId, candidateIds),
+    ))
+    : [];
+  const followingSet = new Set(followRows.map((row) => row.followingId));
+
+  const scoredCandidates = await Promise.all(
+    candidates.map(async (candidate) => {
+      const candidateProfile = candidateDetailsMap.get(candidate.id);
+      const mutualFriendCount = Array.from(candidateFriendMap.get(candidate.id) ?? []).filter((friendId) => currentFriendSet.has(friendId)).length;
+      const candidateLocation = [candidateProfile?.city, candidateProfile?.location].map((item) => item?.trim().toLowerCase()).filter(Boolean).join(" ");
+      const locationScore = locationTerms.some((term) => candidateLocation.includes(term)) ? 4 : 0;
+      const candidateInterests = (candidateProfile?.interests || []).map((item) => item.trim().toLowerCase()).filter(Boolean);
+      const sharedInterestCount = candidateInterests.filter((interest) => interestTerms.includes(interest)).length;
+
+      return {
+        summary: await getUserSummary(candidate, userId),
+        friendship: await getFriendshipState(userId, candidate.id),
+        isFollowing: followingSet.has(candidate.id),
+        mutualFriendCount,
+        score: mutualFriendCount * 5 + sharedInterestCount * 3 + locationScore,
+      };
+    }),
+  );
+
+  const users = scoredCandidates
+    .sort((a, b) => b.score - a.score || b.mutualFriendCount - a.mutualFriendCount || a.summary.username.localeCompare(b.summary.username))
+    .slice(0, limit)
+    .map((item) => ({
+      ...item.summary,
+      friendship: item.friendship,
+      isFollowing: item.isFollowing,
+      mutualFriendCount: item.mutualFriendCount,
+    }));
+
+  res.json({ users, total: users.length });
 });
 
 router.post("/:userId/follow", requireAuth, async (req, res) => {
@@ -161,6 +325,10 @@ router.post("/:userId/follow", requireAuth, async (req, res) => {
   }
   if (userId === req.session.userId) {
     res.status(400).json({ error: "Cannot follow yourself" });
+    return;
+  }
+  if (!(await canUsersInteract(req.session.userId, userId))) {
+    res.status(403).json({ error: "Blocked users cannot follow each other" });
     return;
   }
 
@@ -209,6 +377,10 @@ router.post("/:userId/friend-request", requireAuth, async (req, res) => {
   }
   if (userId === req.session.userId) {
     res.status(400).json({ error: "Cannot friend yourself" });
+    return;
+  }
+  if (!(await canUsersInteract(req.session.userId, userId))) {
+    res.status(403).json({ error: "Blocked users cannot friend each other" });
     return;
   }
 
@@ -319,6 +491,10 @@ router.post("/:userId/react", requireAuth, async (req, res) => {
     res.status(400).json({ error: "Invalid reaction type" });
     return;
   }
+  if (!(await canUsersInteract(req.session.userId, userId))) {
+    res.status(403).json({ error: "Blocked users cannot react to each other" });
+    return;
+  }
 
   const [targetUser] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
   if (!targetUser) {
@@ -412,16 +588,17 @@ router.get("/:userId/posts", async (req, res) => {
     res.status(400).json({ error: "Invalid ID" });
     return;
   }
-
-  const posts = await db.select().from(postsTable)
-    .where(eq(postsTable.userId, userId))
-    .orderBy(desc(postsTable.createdAt));
+  const cursor = req.query.cursor ? Number(req.query.cursor) : undefined;
+  const limit = req.query.limit ? Number(req.query.limit) : undefined;
+  const surface = req.query.surface === "artist" ? "artist" : req.query.surface === "personal" ? "personal" : undefined;
+  const page = await getUserPostsPage(userId, req.session.userId, { cursor, limit, surface });
 
   res.json({
-    posts: await Promise.all(posts.map((post) => enrichPost(post, req.session.userId))),
-    total: posts.length,
-    page: 1,
-    totalPages: 1,
+    posts: page.posts,
+    total: page.posts.length,
+    limit: Math.min(Math.max(limit ?? 12, 1), 30),
+    nextCursor: page.nextCursor,
+    hasMore: page.hasMore,
   });
 });
 
@@ -431,12 +608,66 @@ router.get("/:userId/photos", async (req, res) => {
     res.status(400).json({ error: "Invalid ID" });
     return;
   }
+  const blockState = await getBlockState(req.session.userId, userId);
+  if (blockState.isBlockedEitherWay && req.session.userId !== userId) {
+    res.json([]);
+    return;
+  }
 
   const photos = await db.select().from(userPhotoItemsTable)
     .where(eq(userPhotoItemsTable.userId, userId))
     .orderBy(desc(userPhotoItemsTable.createdAt));
 
   res.json(photos);
+});
+
+router.post("/:userId/block", requireAuth, async (req, res) => {
+  const userId = Number(req.params.userId);
+  if (Number.isNaN(userId)) {
+    res.status(400).json({ error: "Invalid ID" });
+    return;
+  }
+  if (userId === req.session.userId) {
+    res.status(400).json({ error: "Cannot block yourself" });
+    return;
+  }
+
+  await db.insert(userBlocksTable).values({
+    blockerUserId: req.session.userId!,
+    blockedUserId: userId,
+  }).onConflictDoNothing();
+
+  await db.delete(followsTable).where(
+    or(
+      and(eq(followsTable.followerId, req.session.userId!), eq(followsTable.followingId, userId)),
+      and(eq(followsTable.followerId, userId), eq(followsTable.followingId, req.session.userId!)),
+    ),
+  );
+  await db.delete(friendshipsTable).where(
+    or(
+      and(eq(friendshipsTable.requesterUserId, req.session.userId!), eq(friendshipsTable.addresseeUserId, userId)),
+      and(eq(friendshipsTable.requesterUserId, userId), eq(friendshipsTable.addresseeUserId, req.session.userId!)),
+    ),
+  );
+
+  res.json({ success: true, message: "User blocked" });
+});
+
+router.post("/:userId/unblock", requireAuth, async (req, res) => {
+  const userId = Number(req.params.userId);
+  if (Number.isNaN(userId)) {
+    res.status(400).json({ error: "Invalid ID" });
+    return;
+  }
+
+  await db.delete(userBlocksTable).where(
+    and(
+      eq(userBlocksTable.blockerUserId, req.session.userId!),
+      eq(userBlocksTable.blockedUserId, userId),
+    ),
+  );
+
+  res.json({ success: true, message: "User unblocked" });
 });
 
 router.post("/:userId/photos", requireAuth, async (req, res) => {

@@ -3,13 +3,16 @@ import {
   Bell,
   CalendarRange,
   Compass,
+  Palette,
   Home,
   LogOut,
   MessageSquare,
+  Moon,
   Search,
   Settings,
   ShieldAlert,
   Sidebar as SidebarIcon,
+  Sun,
   User as UserIcon,
   Users,
 } from "lucide-react";
@@ -42,10 +45,12 @@ import {
   useReadNotification,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useTheme } from "next-themes";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useActiveIdentity } from "@/hooks/useActiveIdentity";
 
 function getPageMeta(location: string) {
   if (location === "/") return { title: "ArtistHub", subtitle: "Following, local, discovery, and custom collections." };
@@ -62,13 +67,28 @@ function getPageMeta(location: string) {
 }
 
 function ActivityTypeBadge({ type }: { type: string }) {
-  const label = type === "inquiry" ? "Inquiry" : type === "message" ? "Message" : type === "follow" ? "Follow" : "Like";
+  const label = type === "inquiry"
+    ? "Inquiry"
+    : type === "message"
+      ? "Message"
+      : type === "follow"
+        ? "Follow"
+        : type === "mention"
+          ? "Mention"
+          : type === "event_tag"
+            ? "Event Tag"
+            : type === "event_reminder"
+              ? "Reminder"
+              : type === "comment"
+                ? "Comment"
+                : "Like";
   return <Badge variant="outline" className="text-[10px] uppercase tracking-[0.18em]">{label}</Badge>;
 }
 
 export function AppSidebar() {
   const [location] = useLocation();
   const { user } = useAuth();
+  const { setActiveIdentity } = useActiveIdentity();
 
   const navItems = [
     { title: "Home", url: "/", icon: Home },
@@ -78,6 +98,7 @@ export function AppSidebar() {
     { title: "Search", url: "/search", icon: Search },
     { title: "Messages", url: "/messages", icon: MessageSquare },
     { title: "Profile", url: `/profile/${user?.id}`, icon: UserIcon },
+    { title: user?.hasArtistPage ? "Artist Page" : "Create Artist Page", url: "/settings?tab=creator", icon: Palette },
     { title: "Settings", url: "/settings", icon: Settings },
   ];
 
@@ -107,7 +128,13 @@ export function AppSidebar() {
                     isActive={location === item.url || (item.url !== "/" && location.startsWith(item.url))}
                     tooltip={item.title}
                   >
-                    <Link href={item.url}>
+                    <Link
+                      href={item.url}
+                      onClick={() => {
+                        if (item.title === "Profile") setActiveIdentity("personal");
+                        if (item.title === "Artist Page") setActiveIdentity("artist");
+                      }}
+                    >
                       <item.icon />
                       <span>{item.title}</span>
                     </Link>
@@ -131,6 +158,8 @@ export function AppSidebar() {
 function HeaderActions() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
+  const { activeIdentity, setActiveIdentity, canUseArtistIdentity } = useActiveIdentity();
+  const { theme, setTheme } = useTheme();
   const { mutate: logout } = useLogout();
   const { mutate: readNotification } = useReadNotification();
   const queryClient = useQueryClient();
@@ -172,6 +201,42 @@ function HeaderActions() {
 
   return (
     <div className="flex items-center gap-2">
+      {canUseArtistIdentity && (
+        <div className="hidden items-center rounded-full border border-border/60 bg-background/60 p-1 md:flex">
+          <Button
+            variant={activeIdentity === "personal" ? "default" : "ghost"}
+            size="sm"
+            className="h-8 rounded-full px-3"
+            onClick={() => {
+              setActiveIdentity("personal");
+              setLocation(`/profile/${user?.id}`);
+            }}
+          >
+            Personal
+          </Button>
+          <Button
+            variant={activeIdentity === "artist" ? "default" : "ghost"}
+            size="sm"
+            className="h-8 rounded-full px-3"
+            onClick={() => {
+              setActiveIdentity("artist");
+              setLocation(`/artists/${user?.id}`);
+            }}
+          >
+            Artist Page
+          </Button>
+        </div>
+      )}
+      <Button
+        variant="ghost"
+        size="sm"
+        className="hidden rounded-full md:inline-flex"
+        onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+      >
+        {theme === "dark" ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
+        {theme === "dark" ? "Light" : "Dark"}
+      </Button>
+
       <Link href="/messages">
         <Button variant="ghost" size="icon" className="relative rounded-full">
           <MessageSquare className="w-4 h-4" />
@@ -266,11 +331,35 @@ function HeaderActions() {
           <DropdownMenuItem asChild>
             <Link href={`/profile/${user?.id}`}>Profile</Link>
           </DropdownMenuItem>
+          {canUseArtistIdentity ? (
+            <>
+              <DropdownMenuItem
+                onClick={() => {
+                  setActiveIdentity("personal");
+                  setLocation(`/profile/${user?.id}`);
+                }}
+              >
+                Use Personal Profile
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  setActiveIdentity("artist");
+                  setLocation(`/artists/${user?.id}`);
+                }}
+              >
+                Use Artist Page
+              </DropdownMenuItem>
+            </>
+          ) : null}
           <DropdownMenuItem asChild>
             <Link href="/settings">Settings</Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <Link href="/notifications">Notifications</Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
+            {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            {theme === "dark" ? "Light mode" : "Dark mode"}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
@@ -284,6 +373,8 @@ function HeaderActions() {
 
 function AppHeader() {
   const [location] = useLocation();
+  const { user } = useAuth();
+  const { activeIdentity, canUseArtistIdentity } = useActiveIdentity();
   const meta = getPageMeta(location);
 
   return (
@@ -298,6 +389,19 @@ function AppHeader() {
           <div className="text-sm font-semibold">{meta.title}</div>
           <div className="hidden md:block text-xs text-muted-foreground truncate">{meta.subtitle}</div>
         </div>
+        {canUseArtistIdentity && (
+          <Badge variant={activeIdentity === "artist" ? "default" : "secondary"} className="hidden rounded-full px-3 py-1 md:inline-flex">
+            {activeIdentity === "artist" ? "Posting as artist page" : "Posting as personal"}
+          </Badge>
+        )}
+        {!user?.hasArtistPage && (
+          <Link href="/settings?tab=creator">
+            <Button size="sm" className="hidden rounded-full lg:inline-flex">
+              <Palette className="mr-2 h-4 w-4" />
+              Create Artist Page
+            </Button>
+          </Link>
+        )}
         <HeaderActions />
       </div>
     </header>

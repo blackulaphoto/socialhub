@@ -12,4 +12,6 @@ export interface SearchResponse {
   users: UserSummary[];
   artists: ArtistProfile[];
   total: number;
+  usersTotal: number;
+  artistsTotal: number;
 }

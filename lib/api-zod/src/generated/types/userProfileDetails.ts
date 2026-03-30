@@ -19,6 +19,8 @@ export interface UserProfileDetails {
   interests?: string[];
   accentColor?: string | null;
   themeName?: string | null;
+  onboardingCompleted?: boolean;
+  onboardingStep?: string;
   links?: LinkItem[];
   featuredContent?: string | null;
   createdAt?: Date;

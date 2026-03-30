@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { useCreatePost, useGetGroup, useJoinGroup, useLeaveGroup } from "@workspace/api-client-react";
+import { useMemo, useState } from "react";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { getGroupPosts, useCreatePost, useGetGroup, useJoinGroup, useLeaveGroup } from "@workspace/api-client-react";
 import { Eye, Lock, MapPin, Users } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -15,6 +15,7 @@ import { QueryErrorState } from "@/components/query-error-state";
 import { ReportDialog } from "@/components/report-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { uploadImage } from "@/lib/upload-image";
+import { LoadMoreSentinel } from "@/components/load-more-sentinel";
 
 export default function GroupDetail({ id }: { id: string }) {
   const groupId = Number(id);
@@ -29,6 +30,21 @@ export default function GroupDetail({ id }: { id: string }) {
       queryKey: ["group", groupId],
       enabled: Number.isFinite(groupId),
     },
+  });
+  const {
+    data: groupPostsData,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ["group-posts", groupId],
+    enabled: Number.isFinite(groupId),
+    initialPageParam: undefined as number | undefined,
+    queryFn: ({ pageParam, signal }) => getGroupPosts(groupId, {
+      cursor: pageParam,
+      limit: 10,
+    }, { signal }),
+    getNextPageParam: (lastPage) => lastPage.hasMore ? (lastPage.nextCursor ?? undefined) : undefined,
   });
 
   const joinGroup = useJoinGroup({
@@ -54,6 +70,7 @@ export default function GroupDetail({ id }: { id: string }) {
       onSuccess: () => {
         setPostForm({ content: "", imageUrl: "", videoUrl: "", audioUrl: "" });
         queryClient.invalidateQueries({ queryKey: ["group", groupId] });
+        queryClient.invalidateQueries({ queryKey: ["group-posts", groupId] });
         queryClient.invalidateQueries({ queryKey: ["groups"] });
         queryClient.invalidateQueries({ queryKey: ["feed"] });
         toast({ title: "Post added to group" });
@@ -88,6 +105,10 @@ export default function GroupDetail({ id }: { id: string }) {
 
   const isOwner = data.group.ownerId === user?.id;
   const canPost = Boolean(data.group.isMember || isOwner);
+  const groupPosts = useMemo(
+    () => groupPostsData?.pages.flatMap((page) => page.posts) || data.posts || [],
+    [data.posts, groupPostsData],
+  );
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-8 p-4 md:py-8">
@@ -218,10 +239,19 @@ export default function GroupDetail({ id }: { id: string }) {
             </CardContent>
           </Card>
 
-          {data.posts?.map((post) => (
+          {groupPosts.map((post) => (
             <FeedPostCard key={post.id} post={post} />
           ))}
-          {(!data.posts || data.posts.length === 0) && <Card className="border-border/50 bg-card/40"><CardContent className="p-8 text-muted-foreground">No posts in this group yet.</CardContent></Card>}
+          <LoadMoreSentinel
+            enabled={Boolean(hasNextPage)}
+            isLoading={isFetchingNextPage}
+            onVisible={() => {
+              if (hasNextPage && !isFetchingNextPage) {
+                fetchNextPage();
+              }
+            }}
+          />
+          {groupPosts.length === 0 && <Card className="border-border/50 bg-card/40"><CardContent className="p-8 text-muted-foreground">No posts in this group yet.</CardContent></Card>}
         </div>
       </div>
     </div>

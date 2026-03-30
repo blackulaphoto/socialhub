@@ -42,9 +42,11 @@ import type {
   GetArtistsParams,
   GetEventsParams,
   GetFeedParams,
+  GetGroupPostsParams,
   GetGroupsParams,
   GetMessagesParams,
   GetNotificationsParams,
+  GetSuggestedCreatorsParams,
   GetUserPostsParams,
   Group,
   GroupDetail,
@@ -71,6 +73,7 @@ import type {
   SuccessResponse,
   UpdateArtistRequest,
   UpdateCreatorSettingsRequest,
+  UpdatePostRequest,
   UpdateProfileRequest,
   UploadImageBody,
   UploadImageResponse,
@@ -1835,6 +1838,174 @@ export const useUnfollowUser = <
 };
 
 /**
+ * @summary Block a user
+ */
+export const getBlockUserUrl = (userId: number) => {
+  return `/api/users/${userId}/block`;
+};
+
+export const blockUser = async (
+  userId: number,
+  options?: RequestInit,
+): Promise<SuccessResponse> => {
+  return customFetch<SuccessResponse>(getBlockUserUrl(userId), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getBlockUserMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof blockUser>>,
+    TError,
+    { userId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof blockUser>>,
+  TError,
+  { userId: number },
+  TContext
+> => {
+  const mutationKey = ["blockUser"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof blockUser>>,
+    { userId: number }
+  > = (props) => {
+    const { userId } = props ?? {};
+
+    return blockUser(userId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type BlockUserMutationResult = NonNullable<
+  Awaited<ReturnType<typeof blockUser>>
+>;
+
+export type BlockUserMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Block a user
+ */
+export const useBlockUser = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof blockUser>>,
+    TError,
+    { userId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof blockUser>>,
+  TError,
+  { userId: number },
+  TContext
+> => {
+  return useMutation(getBlockUserMutationOptions(options));
+};
+
+/**
+ * @summary Unblock a user
+ */
+export const getUnblockUserUrl = (userId: number) => {
+  return `/api/users/${userId}/unblock`;
+};
+
+export const unblockUser = async (
+  userId: number,
+  options?: RequestInit,
+): Promise<SuccessResponse> => {
+  return customFetch<SuccessResponse>(getUnblockUserUrl(userId), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getUnblockUserMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof unblockUser>>,
+    TError,
+    { userId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof unblockUser>>,
+  TError,
+  { userId: number },
+  TContext
+> => {
+  const mutationKey = ["unblockUser"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof unblockUser>>,
+    { userId: number }
+  > = (props) => {
+    const { userId } = props ?? {};
+
+    return unblockUser(userId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UnblockUserMutationResult = NonNullable<
+  Awaited<ReturnType<typeof unblockUser>>
+>;
+
+export type UnblockUserMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Unblock a user
+ */
+export const useUnblockUser = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof unblockUser>>,
+    TError,
+    { userId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof unblockUser>>,
+  TError,
+  { userId: number },
+  TContext
+> => {
+  return useMutation(getUnblockUserMutationOptions(options));
+};
+
+/**
  * @summary Get user followers
  */
 export const getGetFollowersUrl = (userId: number) => {
@@ -1913,6 +2084,126 @@ export function useGetFollowers<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetFollowersQueryOptions(userId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get suggested creators for the current user
+ */
+export const getGetSuggestedCreatorsUrl = (
+  userId: number,
+  params?: GetSuggestedCreatorsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/users/${userId}/suggested-creators?${stringifiedParams}`
+    : `/api/users/${userId}/suggested-creators`;
+};
+
+export const getSuggestedCreators = async (
+  userId: number,
+  params?: GetSuggestedCreatorsParams,
+  options?: RequestInit,
+): Promise<ArtistsResponse> => {
+  return customFetch<ArtistsResponse>(
+    getGetSuggestedCreatorsUrl(userId, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetSuggestedCreatorsQueryKey = (
+  userId: number,
+  params?: GetSuggestedCreatorsParams,
+) => {
+  return [
+    `/api/users/${userId}/suggested-creators`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetSuggestedCreatorsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getSuggestedCreators>>,
+  TError = ErrorType<unknown>,
+>(
+  userId: number,
+  params?: GetSuggestedCreatorsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSuggestedCreators>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetSuggestedCreatorsQueryKey(userId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getSuggestedCreators>>
+  > = ({ signal }) =>
+    getSuggestedCreators(userId, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!userId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getSuggestedCreators>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetSuggestedCreatorsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getSuggestedCreators>>
+>;
+export type GetSuggestedCreatorsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get suggested creators for the current user
+ */
+
+export function useGetSuggestedCreators<
+  TData = Awaited<ReturnType<typeof getSuggestedCreators>>,
+  TError = ErrorType<unknown>,
+>(
+  userId: number,
+  params?: GetSuggestedCreatorsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSuggestedCreators>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetSuggestedCreatorsQueryOptions(
+    userId,
+    params,
+    options,
+  );
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
@@ -2339,6 +2630,93 @@ export const useDeletePost = <
   TContext
 > => {
   return useMutation(getDeletePostMutationOptions(options));
+};
+
+/**
+ * @summary Update a post
+ */
+export const getUpdatePostUrl = (postId: number) => {
+  return `/api/posts/${postId}/update`;
+};
+
+export const updatePost = async (
+  postId: number,
+  updatePostRequest: UpdatePostRequest,
+  options?: RequestInit,
+): Promise<Post> => {
+  return customFetch<Post>(getUpdatePostUrl(postId), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updatePostRequest),
+  });
+};
+
+export const getUpdatePostMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updatePost>>,
+    TError,
+    { postId: number; data: BodyType<UpdatePostRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updatePost>>,
+  TError,
+  { postId: number; data: BodyType<UpdatePostRequest> },
+  TContext
+> => {
+  const mutationKey = ["updatePost"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updatePost>>,
+    { postId: number; data: BodyType<UpdatePostRequest> }
+  > = (props) => {
+    const { postId, data } = props ?? {};
+
+    return updatePost(postId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdatePostMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updatePost>>
+>;
+export type UpdatePostMutationBody = BodyType<UpdatePostRequest>;
+export type UpdatePostMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update a post
+ */
+export const useUpdatePost = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updatePost>>,
+    TError,
+    { postId: number; data: BodyType<UpdatePostRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updatePost>>,
+  TError,
+  { postId: number; data: BodyType<UpdatePostRequest> },
+  TContext
+> => {
+  return useMutation(getUpdatePostMutationOptions(options));
 };
 
 /**
@@ -5138,6 +5516,115 @@ export function useGetGroup<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetGroupQueryOptions(groupId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get posts for a group
+ */
+export const getGetGroupPostsUrl = (
+  groupId: number,
+  params?: GetGroupPostsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/groups/${groupId}/posts?${stringifiedParams}`
+    : `/api/groups/${groupId}/posts`;
+};
+
+export const getGroupPosts = async (
+  groupId: number,
+  params?: GetGroupPostsParams,
+  options?: RequestInit,
+): Promise<PostsResponse> => {
+  return customFetch<PostsResponse>(getGetGroupPostsUrl(groupId, params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetGroupPostsQueryKey = (
+  groupId: number,
+  params?: GetGroupPostsParams,
+) => {
+  return [`/api/groups/${groupId}/posts`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetGroupPostsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getGroupPosts>>,
+  TError = ErrorType<unknown>,
+>(
+  groupId: number,
+  params?: GetGroupPostsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getGroupPosts>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetGroupPostsQueryKey(groupId, params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getGroupPosts>>> = ({
+    signal,
+  }) => getGroupPosts(groupId, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!groupId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getGroupPosts>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetGroupPostsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getGroupPosts>>
+>;
+export type GetGroupPostsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get posts for a group
+ */
+
+export function useGetGroupPosts<
+  TData = Awaited<ReturnType<typeof getGroupPosts>>,
+  TError = ErrorType<unknown>,
+>(
+  groupId: number,
+  params?: GetGroupPostsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getGroupPosts>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetGroupPostsQueryOptions(groupId, params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

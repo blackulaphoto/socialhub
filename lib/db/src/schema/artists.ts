@@ -8,6 +8,7 @@ export const galleryItemTypeEnum = pgEnum("gallery_item_type", ["image", "video"
 export const artistProfilesTable = pgTable("artist_profiles", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }).unique(),
+  displayName: text("display_name"),
   category: text("category").notNull(),
   location: text("location"),
   tagline: text("tagline"),

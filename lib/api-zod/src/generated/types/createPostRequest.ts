@@ -5,12 +5,16 @@
  * ArtistHub Social Platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { CreatePostRequestActorSurface } from "./createPostRequestActorSurface";
+import type { CreatePostRequestVisibility } from "./createPostRequestVisibility";
 import type { PostMediaInput } from "./postMediaInput";
 
 export interface CreatePostRequest {
   content?: string;
   imageUrl?: string | null;
+  actorSurface?: CreatePostRequestActorSurface;
   repostOfPostId?: number | null;
   groupId?: number | null;
+  visibility?: CreatePostRequestVisibility;
   media?: PostMediaInput[];
 }

@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ArtistProfile } from "./artistProfile";
+import type { BlockState } from "./blockState";
 import type { CreatorSettings } from "./creatorSettings";
 import type { CustomFeed } from "./customFeed";
 import type { FriendshipState } from "./friendshipState";
@@ -17,6 +18,8 @@ export interface UserProfile {
   user: User;
   isFollowing: boolean;
   friendship: FriendshipState;
+  blockState: BlockState;
+  canInteract: boolean;
   profileReactions: ReactionSummary;
   artistProfile?: ArtistProfile | null;
   details?: UserProfileDetails | null;

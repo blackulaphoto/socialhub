@@ -5,17 +5,21 @@
  * ArtistHub Social Platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { PostActorSurface } from "./postActorSurface";
 import type { PostComment } from "./postComment";
 import type { PostCurrentUserReaction } from "./postCurrentUserReaction";
 import type { PostMedia } from "./postMedia";
+import type { PostVisibility } from "./postVisibility";
 import type { ReactionCounts } from "./reactionCounts";
 import type { UserSummary } from "./userSummary";
 
 export interface Post {
   id: number;
   userId: number;
+  actorSurface: PostActorSurface;
   content: string;
   imageUrl?: string | null;
+  visibility: PostVisibility;
   repostOfPostId?: number | null;
   likeCount: number;
   isLiked: boolean;

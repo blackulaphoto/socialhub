@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db, groupMembersTable, groupPostsTable, groupsTable, postsTable } from "@workspace/db";
 import { and, desc, eq, ilike, or } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth.js";
-import { enrichPost, formatGroup, normalizeSlug } from "./helpers.js";
+import { formatGroup, getGroupPostsPage, normalizeSlug } from "./helpers.js";
 
 const router = Router();
 
@@ -35,17 +35,31 @@ router.get("/groups/:groupId", async (req, res) => {
     return;
   }
 
-  const groupPosts = await db.select().from(groupPostsTable)
-    .where(eq(groupPostsTable.groupId, groupId))
-    .orderBy(desc(groupPostsTable.createdAt));
-  const postIds = groupPosts.map((entry) => entry.postId);
-  const posts = postIds.length
-    ? await db.select().from(postsTable).where(or(...postIds.map((id) => eq(postsTable.id, id))))
-    : [];
+  const page = await getGroupPostsPage(groupId, req.session.userId, { limit: 10 });
 
   res.json({
     group: await formatGroup(group, req.session.userId),
-    posts: await Promise.all(posts.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).map((post) => enrichPost(post, req.session.userId))),
+    posts: page.posts,
+  });
+});
+
+router.get("/groups/:groupId/posts", async (req, res) => {
+  const groupId = Number(req.params.groupId);
+  if (Number.isNaN(groupId)) {
+    res.status(400).json({ error: "Invalid ID" });
+    return;
+  }
+
+  const cursor = req.query.cursor ? Number(req.query.cursor) : undefined;
+  const limit = req.query.limit ? Number(req.query.limit) : undefined;
+  const page = await getGroupPostsPage(groupId, req.session.userId, { cursor, limit });
+
+  res.json({
+    posts: page.posts,
+    total: page.posts.length,
+    limit: Math.min(Math.max(limit ?? 12, 1), 30),
+    nextCursor: page.nextCursor,
+    hasMore: page.hasMore,
   });
 });
 

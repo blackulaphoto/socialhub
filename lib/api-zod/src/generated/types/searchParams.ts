@@ -13,4 +13,5 @@ export type SearchParams = {
   location?: string;
   category?: string;
   tags?: string;
+  limit?: number;
 };

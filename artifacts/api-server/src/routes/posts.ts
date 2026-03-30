@@ -16,8 +16,16 @@ import {
 } from "@workspace/db";
 import { and, count, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth.js";
-import { enrichPost, formatUser, getPostsForUserIds, getUserSummary } from "./helpers.js";
+import {
+  canUsersInteract,
+  canViewPost,
+  enrichPost,
+  formatUser,
+  getPostsForUserIds,
+  getUserSummary,
+} from "./helpers.js";
 import { createNotification } from "../lib/notifications.js";
+import { notifyMentionedUsers } from "../lib/mentions.js";
 
 const router = Router();
 const REACTION_TYPES = ["like", "heart", "wow", "angry"] as const;
@@ -83,15 +91,28 @@ router.get("/feed", async (req, res) => {
   const mode = String(req.query.mode || (req.session.userId ? "following" : "discovery"));
   const city = typeof req.query.city === "string" ? req.query.city : undefined;
   const customFeedId = req.query.customFeedId ? Number(req.query.customFeedId) : undefined;
+  const cursor = req.query.cursor ? Number(req.query.cursor) : undefined;
+  const limit = req.query.limit ? Number(req.query.limit) : undefined;
   const userIds = await resolveFeedUserIds(req.session.userId, mode, city, customFeedId);
-  const posts = await getPostsForUserIds(userIds, req.session.userId);
-  res.json({ posts, total: posts.length, page: 1, totalPages: 1, mode });
+  const page = await getPostsForUserIds(userIds, req.session.userId, { cursor, limit });
+  res.json({
+    posts: page.posts,
+    total: page.posts.length,
+    limit: Math.min(Math.max(limit ?? 12, 1), 30),
+    nextCursor: page.nextCursor,
+    hasMore: page.hasMore,
+    mode,
+  });
 });
 
 router.post("/posts", requireAuth, async (req, res) => {
-  const { content, imageUrl, media, groupId, repostOfPostId } = req.body;
+  const { content, imageUrl, media, groupId, repostOfPostId, visibility, actorSurface } = req.body;
   const normalizedContent = typeof content === "string" ? content.trim() : "";
   const normalizedRepostOfPostId = repostOfPostId ? Number(repostOfPostId) : null;
+  const normalizedVisibility = typeof visibility === "string" && ["public", "friends", "private"].includes(visibility)
+    ? visibility
+    : "public";
+  const normalizedActorSurface = actorSurface === "artist" ? "artist" : "personal";
 
   if (!normalizedContent && !normalizedRepostOfPostId) {
     res.status(400).json({ error: "Content is required" });
@@ -136,8 +157,10 @@ router.post("/posts", requireAuth, async (req, res) => {
 
   const [post] = await db.insert(postsTable).values({
     userId: req.session.userId!,
+    actorSurface: normalizedActorSurface,
     content: normalizedContent,
     imageUrl: imageUrl || media?.[0]?.url || null,
+    visibility: normalizedVisibility,
     repostOfPostId: normalizedRepostOfPostId,
   }).returning();
 
@@ -158,7 +181,77 @@ router.post("/posts", requireAuth, async (req, res) => {
     await db.insert(groupPostsTable).values({ groupId: Number(groupId), postId: post.id }).onConflictDoNothing();
   }
 
+  await notifyMentionedUsers({
+    actorUserId: req.session.userId!,
+    content: normalizedContent,
+    href: `/profile/${req.session.userId}#post-${post.id}`,
+    title: "You were mentioned in a post",
+    body: "You were mentioned in a post.",
+    entityType: "post",
+    entityId: post.id,
+  });
+
   res.status(201).json(await enrichPost(post, req.session.userId));
+});
+
+router.post("/posts/:postId/update", requireAuth, async (req, res) => {
+  const postId = Number(req.params.postId);
+  if (Number.isNaN(postId)) {
+    res.status(400).json({ error: "Invalid ID" });
+    return;
+  }
+
+  const [post] = await db.select().from(postsTable).where(eq(postsTable.id, postId)).limit(1);
+  if (!post) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  if (post.userId !== req.session.userId) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const { content, imageUrl, media, visibility, actorSurface } = req.body;
+  const normalizedContent = typeof content === "string" ? content.trim() : post.content;
+  const normalizedVisibility = typeof visibility === "string" && ["public", "friends", "private"].includes(visibility)
+    ? visibility
+    : post.visibility;
+  const normalizedActorSurface = actorSurface === "artist" ? "artist" : actorSurface === "personal" ? "personal" : post.actorSurface;
+
+  const [updated] = await db.update(postsTable).set({
+    actorSurface: normalizedActorSurface,
+    content: normalizedContent,
+    imageUrl: typeof imageUrl === "string" ? imageUrl : null,
+    visibility: normalizedVisibility,
+    updatedAt: new Date(),
+  }).where(eq(postsTable.id, postId)).returning();
+
+  if (Array.isArray(media)) {
+    await db.delete(postMediaTable).where(eq(postMediaTable.postId, postId));
+    if (media.length > 0) {
+      await db.insert(postMediaTable).values(
+        media.map((item: { type: string; url: string; title?: string; thumbnailUrl?: string }) => ({
+          postId,
+          type: item.type,
+          url: item.url,
+          title: item.title || null,
+          thumbnailUrl: item.thumbnailUrl || null,
+        })),
+      );
+    }
+  }
+
+  await notifyMentionedUsers({
+    actorUserId: req.session.userId!,
+    content: normalizedContent,
+    href: `/profile/${req.session.userId}#post-${postId}`,
+    title: "You were mentioned in an updated post",
+    body: "You were mentioned in an updated post.",
+    entityType: "post",
+    entityId: postId,
+  });
+
+  res.json(await enrichPost(updated, req.session.userId));
 });
 
 router.get("/posts/:postId", async (req, res) => {
@@ -171,6 +264,10 @@ router.get("/posts/:postId", async (req, res) => {
   const [post] = await db.select().from(postsTable).where(eq(postsTable.id, postId)).limit(1);
   if (!post) {
     res.status(404).json({ error: "Not found" });
+    return;
+  }
+  if (!(await canViewPost(post, req.session.userId))) {
+    res.status(403).json({ error: "You cannot view this post" });
     return;
   }
 
@@ -188,6 +285,10 @@ router.delete("/posts/:postId", requireAuth, async (req, res) => {
   const [me] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!)).limit(1);
   if (!post) {
     res.status(404).json({ error: "Not found" });
+    return;
+  }
+  if (!(await canViewPost(post, req.session.userId)) || !(await canUsersInteract(req.session.userId, post.userId))) {
+    res.status(403).json({ error: "You cannot react to this post" });
     return;
   }
   if (post.userId !== req.session.userId && !me?.isAdmin) {
@@ -209,6 +310,10 @@ router.post("/posts/:postId/like", requireAuth, async (req, res) => {
   const [post] = await db.select().from(postsTable).where(eq(postsTable.id, postId)).limit(1);
   if (!post) {
     res.status(404).json({ error: "Not found" });
+    return;
+  }
+  if (!(await canViewPost(post, req.session.userId)) || !(await canUsersInteract(req.session.userId, post.userId))) {
+    res.status(403).json({ error: "You cannot react to this post" });
     return;
   }
 
@@ -342,9 +447,14 @@ router.post("/posts/:postId/repost", requireAuth, async (req, res) => {
     res.status(404).json({ error: "Not found" });
     return;
   }
+  if (!(await canViewPost(originalPost, req.session.userId)) || !(await canUsersInteract(req.session.userId, originalPost.userId))) {
+    res.status(403).json({ error: "You cannot repost this post" });
+    return;
+  }
 
   const [repost] = await db.insert(postsTable).values({
     userId: req.session.userId!,
+    actorSurface: originalPost.actorSurface ?? "personal",
     content,
     repostOfPostId: postId,
     imageUrl: null,
@@ -381,6 +491,10 @@ router.get("/posts/:postId/comments", async (req, res) => {
     res.status(404).json({ error: "Not found" });
     return;
   }
+  if (!(await canViewPost(post, req.session.userId))) {
+    res.status(403).json({ error: "You cannot view comments for this post" });
+    return;
+  }
 
   res.json((await enrichPost(post, req.session.userId)).comments || []);
 });
@@ -407,6 +521,10 @@ router.post("/posts/:postId/comments", requireAuth, async (req, res) => {
     res.status(404).json({ error: "Not found" });
     return;
   }
+  if (!(await canViewPost(post, req.session.userId)) || !(await canUsersInteract(req.session.userId, post.userId))) {
+    res.status(403).json({ error: "You cannot comment on this post" });
+    return;
+  }
 
   const [comment] = await db.insert(postCommentsTable).values({
     postId,
@@ -430,6 +548,16 @@ router.post("/posts/:postId/comments", requireAuth, async (req, res) => {
       });
     }
   }
+
+  await notifyMentionedUsers({
+    actorUserId: req.session.userId!,
+    content,
+    href: `/profile/${post.userId}#post-${postId}`,
+    title: "You were mentioned in a comment",
+    body: "You were mentioned in a comment.",
+    entityType: "post_comment",
+    entityId: comment.id,
+  });
 
   res.status(201).json((await enrichPost(post, req.session.userId)).comments || []);
 });
