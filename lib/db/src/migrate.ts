@@ -57,6 +57,34 @@ async function ensureMigrationBaseline(migrationsFolder: string) {
   console.log(`Baselined existing schema with migration ${latestMigration.tag}`);
 }
 
+async function ensureArtistProfileBrandingColumns() {
+  const result = await pool.query<{ column_name: string }>(`
+    select column_name
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'artist_profiles'
+      and column_name in ('avatar_url', 'banner_url')
+  `);
+
+  const existing = new Set(result.rows.map((row) => row.column_name));
+  const statements: string[] = [];
+
+  if (!existing.has("avatar_url")) {
+    statements.push(`alter table "artist_profiles" add column "avatar_url" text`);
+  }
+  if (!existing.has("banner_url")) {
+    statements.push(`alter table "artist_profiles" add column "banner_url" text`);
+  }
+
+  for (const statement of statements) {
+    await pool.query(statement);
+  }
+
+  if (statements.length > 0) {
+    console.log("Applied artist profile branding compatibility patch");
+  }
+}
+
 async function main() {
   const migrationsFolder = path.resolve(import.meta.dirname, "..", "migrations");
 
@@ -68,6 +96,7 @@ async function main() {
 
   await ensureMigrationBaseline(migrationsFolder);
   await migrate(db, { migrationsFolder });
+  await ensureArtistProfileBrandingColumns();
   await pool.end();
   console.log(`Applied migrations from ${migrationsFolder}`);
 }
