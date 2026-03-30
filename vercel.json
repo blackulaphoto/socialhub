@@ -5,6 +5,14 @@
   "outputDirectory": "artifacts/social-app/dist/public",
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "https://api-server-production-83f6.up.railway.app/api/:path*"
+    },
+    {
+      "source": "/uploads/:path*",
+      "destination": "https://api-server-production-83f6.up.railway.app/uploads/:path*"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
