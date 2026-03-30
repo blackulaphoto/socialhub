@@ -29,7 +29,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { MediaEmbed } from "@/components/media-embed";
 import { useToast } from "@/hooks/use-toast";
+import { useActiveIdentity } from "@/hooks/useActiveIdentity";
 import { uploadImage } from "@/lib/upload-image";
+import { cn } from "@/lib/utils";
 import { Image as ImageIcon, UploadCloud } from "lucide-react";
 
 const ACTION_OPTIONS = [
@@ -73,6 +75,23 @@ const MODULE_OPTIONS = [
   { value: "contact", label: "Contact" },
 ];
 
+const CREATOR_MOOD_PREVIEW_STYLES: Record<string, string> = {
+  sleek: "from-slate-950 via-slate-900 to-cyan-950",
+  underground: "from-zinc-950 via-stone-900 to-red-950",
+  dreamy: "from-slate-950 via-indigo-950 to-sky-900",
+  luxe: "from-neutral-950 via-zinc-900 to-amber-900",
+  gritty: "from-stone-950 via-neutral-900 to-orange-950",
+  minimal: "from-slate-900 via-slate-800 to-slate-700",
+  neon: "from-slate-950 via-fuchsia-950 to-cyan-950",
+  vintage: "from-stone-950 via-amber-950 to-rose-950",
+};
+
+const CREATOR_FONT_PREVIEW_CLASSES: Record<string, string> = {
+  modern: "",
+  editorial: "font-serif",
+  mono: "font-mono",
+};
+
 function actionTypeFromLabel(label: string) {
   const lowered = label.toLowerCase();
   if (lowered.includes("book")) return "book";
@@ -86,6 +105,7 @@ function actionTypeFromLabel(label: string) {
 
 export default function Settings() {
   const { user } = useAuth();
+  const { setActiveIdentity } = useActiveIdentity();
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -202,8 +222,8 @@ export default function Settings() {
   useEffect(() => {
     const rawSearch = typeof window !== "undefined" ? window.location.search : "";
     const tab = new URLSearchParams(rawSearch).get("tab");
-    if (tab === "creator" && (profile?.artistProfile || !profile?.artistProfile)) {
-      setActiveTab(profile?.artistProfile ? "creator" : "profile");
+    if (tab === "creator") {
+      setActiveTab("creator");
       if (!profile?.artistProfile) {
         setIsCreatingArtistPage(true);
         setCreatorSetupStage("starter");
@@ -340,6 +360,17 @@ export default function Settings() {
   const headerLocation = useCreatorIdentityPreview
     ? [artist.location].filter(Boolean).join(" / ")
     : [basic.city, basic.location].filter(Boolean).join(" / ");
+  const creatorPreviewMoodClass = CREATOR_MOOD_PREVIEW_STYLES[creator.moodPreset || "sleek"] || CREATOR_MOOD_PREVIEW_STYLES.sleek;
+  const creatorPreviewFontClass = CREATOR_FONT_PREVIEW_CLASSES[creator.fontPreset || "modern"] || "";
+  const creatorPreviewLayoutClass = creator.layoutTemplate === "editorial"
+    ? "lg:grid-cols-[0.75fr_1.25fr]"
+    : creator.layoutTemplate === "music"
+      ? "lg:grid-cols-[1.3fr_0.7fr]"
+      : creator.layoutTemplate === "performer"
+        ? "lg:grid-cols-[0.9fr_1.1fr]"
+        : creator.layoutTemplate === "shop"
+          ? "lg:grid-cols-[1fr_1fr]"
+          : "lg:grid-cols-[1.15fr_0.85fr]";
 
   return (
     <div className="mx-auto w-full max-w-6xl p-4 md:py-8">
@@ -1033,11 +1064,21 @@ export default function Settings() {
                             moduleOrder: pageModules.moduleOrder,
                             pinnedPostId: creator.pinnedPostId ? Number(creator.pinnedPostId) : null,
                           },
+                        }, {
+                          onSuccess: () => {
+                            setActiveTab("creator");
+                            setActiveIdentity("artist");
+                            setLocation(`/artists/${user.id}`);
+                            toast({
+                              title: isStarterCreatorSetup ? "Artist page created" : "Artist page updated",
+                              description: "You are now viewing the public creator page.",
+                            });
+                          },
                         });
                       }}
                       disabled={saveArtist.isPending || (!isStarterCreatorSetup && !creator.primaryActionLabel?.trim())}
                     >
-                      {isStarterCreatorSetup ? "Create Artist Page" : "Save Creator Page"}
+                      {isStarterCreatorSetup ? "Create Artist Page" : "Save And View Artist Page"}
                     </Button>
                     {!isStarterCreatorSetup && <Button
                       variant="outline"
@@ -1076,14 +1117,14 @@ export default function Settings() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div
-                    className="overflow-hidden rounded-2xl border border-border/50 bg-background/40"
+                    className={cn("overflow-hidden rounded-2xl border border-border/50 bg-background/40", creatorPreviewFontClass)}
                     style={{
                       backgroundImage: artist.bannerUrl ? `linear-gradient(rgba(10,10,14,0.45), rgba(10,10,14,0.8)), url(${artist.bannerUrl})` : undefined,
                       backgroundSize: "cover",
                       backgroundPosition: "center",
                     }}
                   >
-                    <div className="p-5">
+                    <div className={cn("bg-gradient-to-br p-5 text-white", creatorPreviewMoodClass)}>
                     <div className="mb-4 flex items-center gap-4">
                       <Avatar className="h-16 w-16 border-2 border-background/90 shadow-xl">
                         <AvatarImage src={artist.avatarUrl || ""} />
@@ -1108,6 +1149,28 @@ export default function Settings() {
                     </div>
                     <div className="mt-4 text-xs uppercase tracking-[0.2em] text-foreground/60">
                       Layout: {creator.layoutTemplate || "portfolio"} / Font: {creator.fontPreset || "modern"}
+                    </div>
+                    <div className={cn("mt-5 grid gap-3", creatorPreviewLayoutClass)}>
+                      <div className="rounded-2xl border border-white/15 bg-white/8 p-4 backdrop-blur">
+                        <div className="text-xs uppercase tracking-[0.18em] text-white/60">Lead module</div>
+                        <div className="mt-2 text-sm font-medium">
+                          {creator.layoutTemplate === "music"
+                            ? "Featured release, player, and upcoming shows"
+                            : creator.layoutTemplate === "performer"
+                              ? "Showcase reel, bookings, and event lineup"
+                              : creator.layoutTemplate === "shop"
+                                ? "Featured product, gallery, and shop CTA"
+                                : creator.layoutTemplate === "editorial"
+                                  ? "Story-driven intro with polished modules"
+                                  : "Balanced portfolio with featured work first"}
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border border-white/15 bg-black/20 p-4 backdrop-blur">
+                        <div className="text-xs uppercase tracking-[0.18em] text-white/60">Side module</div>
+                        <div className="mt-2 text-sm text-white/85">
+                          Mood and layout now change the public artist-page structure, not just the saved data.
+                        </div>
+                      </div>
                     </div>
                     </div>
                   </div>

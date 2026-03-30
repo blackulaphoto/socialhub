@@ -279,11 +279,28 @@ export default function ArtistProfile({ id }: { id: string }) {
   const storeLinks = (profile.user.links || []).filter((link) => /shop|store/i.test(link.label) || /shop|store/i.test(link.url));
   const mood = MOOD_STYLES[moodPreset] || MOOD_STYLES.sleek;
   const fontClass = FONT_PRESET_CLASSES[fontPreset] || "";
+  const headingClass = fontPreset === "editorial"
+    ? "font-serif tracking-tight"
+    : fontPreset === "mono"
+      ? "font-mono uppercase tracking-[0.08em]"
+      : "";
   const heroTagline = artist.tagline || artist.bio || "Creator page";
   const artistPageName = artist.displayName || profile.user.username;
   const artistPageAvatar = artist.avatarUrl || null;
   const artistPageBanner = artist.bannerUrl || null;
   const isOwnArtistPage = currentUser?.id === userId;
+  const heroGridClass = layoutTemplate === "editorial"
+    ? "lg:grid-cols-[1.2fr_0.8fr]"
+    : layoutTemplate === "music"
+      ? "lg:grid-cols-[0.9fr_1.1fr]"
+      : layoutTemplate === "performer"
+        ? "lg:grid-cols-[1fr_1fr]"
+        : "lg:grid-cols-[auto_1fr]";
+  const heroActionsClass = layoutTemplate === "music"
+    ? "xl:max-w-sm xl:flex-col xl:items-stretch"
+    : layoutTemplate === "editorial"
+      ? "xl:max-w-sm"
+      : "xl:max-w-md xl:justify-end";
 
   const handleArtistImageUpload = async (file: File | null) => {
     if (!file) return;
@@ -838,7 +855,7 @@ export default function ArtistProfile({ id }: { id: string }) {
         <div className="absolute inset-0 bg-black/12 dark:bg-black/22" />
 
         <div className="relative z-10 mx-auto max-w-7xl px-4 py-12 md:py-16">
-          <div className="grid gap-8 lg:grid-cols-[auto_1fr]">
+          <div className={cn("grid gap-8", heroGridClass)}>
             <Avatar className="h-32 w-32 border-4 border-background/80 shadow-2xl md:h-40 md:w-40">
               <AvatarImage src={artistPageAvatar || ""} />
               <AvatarFallback>{artistPageName.slice(0, 2).toUpperCase()}</AvatarFallback>
@@ -851,9 +868,11 @@ export default function ArtistProfile({ id }: { id: string }) {
                     <Badge variant="secondary">{artist.category}</Badge>
                     {(profile.user.city || artist.location) && <Badge variant="outline">{profile.user.city || artist.location}</Badge>}
                     <Badge variant="outline">{MODULE_LABELS[visibleSections[0] || "featured"] || "Creator Page"}</Badge>
+                    <Badge variant="outline">{layoutTemplate}</Badge>
+                    <Badge variant="outline">{fontPreset}</Badge>
                   </div>
-                  <h1 className="text-4xl font-bold md:text-6xl">{artistPageName}</h1>
-                  <p className="mt-4 max-w-3xl text-lg font-medium text-foreground/90">{heroTagline}</p>
+                  <h1 className={cn("text-4xl font-bold md:text-6xl", headingClass)}>{artistPageName}</h1>
+                  <p className={cn("mt-4 max-w-3xl text-lg font-medium text-foreground/95", layoutTemplate === "editorial" && "max-w-2xl text-xl", layoutTemplate === "music" && "text-xl")}>{heroTagline}</p>
                   <div className="mt-4 flex flex-wrap items-center gap-4 text-sm font-medium text-foreground/80">
                     {(artist.location || profile.user.city || profile.user.location) && (
                       <span className="inline-flex items-center"><MapPin className="mr-1.5 h-4 w-4" /> {artist.location || profile.user.city || profile.user.location}</span>
@@ -864,7 +883,7 @@ export default function ArtistProfile({ id }: { id: string }) {
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-3 xl:max-w-md xl:justify-end">
+                <div className={cn("flex flex-wrap gap-3", heroActionsClass)}>
                   {isOwnArtistPage && (
                     <>
                       <Link href="/settings">
