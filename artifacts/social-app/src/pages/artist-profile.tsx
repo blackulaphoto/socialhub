@@ -12,6 +12,7 @@ import {
   MapPin,
   MessageSquare,
   Mic2,
+  MoreHorizontal,
   Palette,
   Pin,
   Radio,
@@ -34,6 +35,13 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -368,6 +376,10 @@ export default function ArtistProfile({ id }: { id: string }) {
       toast({ title: "Could not share page", variant: "destructive" });
     }
   };
+
+  const primaryActionKind = !isOwnArtistPage && profile.canInteract
+    ? (creator?.primaryActionLabel ? "contact" : "follow")
+    : null;
 
   const renderFeatured = () => (
     <Card className="overflow-hidden border-border/50 bg-card/60">
@@ -883,138 +895,173 @@ export default function ArtistProfile({ id }: { id: string }) {
                   </div>
                 </div>
 
-                <div className={cn("flex flex-wrap gap-3", heroActionsClass)}>
-                  {isOwnArtistPage && (
-                    <>
-                      <Link href="/settings">
-                        <Button variant="outline">
-                          <Palette className="mr-2 h-4 w-4" /> Edit Profile
-                        </Button>
-                      </Link>
-                      <Link href="/settings?tab=creator">
-                        <Button variant="outline">
-                          <Sparkles className="mr-2 h-4 w-4" /> Edit Artist Page
-                        </Button>
-                      </Link>
-                      <Button
-                        variant={activeIdentity === "artist" ? "default" : "secondary"}
-                        onClick={() => setActiveIdentity("artist")}
-                      >
-                        {activeIdentity === "artist" ? "Using Artist Page" : "Switch To Artist Page"}
-                      </Button>
-                      <Link href={`/profile/${profile.user.id}`}>
-                        <Button variant="outline" onClick={() => setActiveIdentity("personal")}>
-                          View Personal Profile
-                        </Button>
-                      </Link>
-                    </>
-                  )}
+                <div className={cn("flex flex-wrap items-center gap-2 md:gap-3", heroActionsClass)}>
                   {!currentUser?.hasArtistPage && (
                     <Link href="/settings?tab=creator">
-                      <Button variant="secondary">
+                      <Button variant="outline" className="border-border/60 bg-background/30">
                         <Palette className="mr-2 h-4 w-4" /> Create Your Artist Page
                       </Button>
                     </Link>
                   )}
-                  <Button onClick={handleFollowToggle} variant={profile.isFollowing ? "outline" : "default"} disabled={!profile.canInteract}>
-                    {profile.isFollowing ? "Following" : "Follow"}
-                  </Button>
-                  {profile.canInteract ? <FriendActionButton userId={userId} friendship={profile.friendship} invalidateKeys={[["profile", userId], ["/api/users", userId]]} /> : null}
-                  <BlockActionButton userId={userId} blockState={profile.blockState} invalidateKeys={[["profile", userId], ["/api/users", userId]]} />
-                  {!isOwnArtistPage && (
-                    <Link href={`/profile/${profile.user.id}`}>
-                      <Button variant="outline">Personal Profile</Button>
-                    </Link>
-                  )}
-                  <Link href="/messages">
-                    <Button variant="outline" disabled={!profile.canInteract}><MessageSquare className="mr-2 h-4 w-4" /> Message</Button>
-                  </Link>
-                  {creator?.primaryActionUrl && (actionType === "shop" || actionType === "store") ? (
-                    <a href={creator.primaryActionUrl} target="_blank" rel="noreferrer">
-                      <Button><ExternalLink className="mr-2 h-4 w-4" /> {actionLabel}</Button>
-                    </a>
-                  ) : (
-                    <Dialog open={open} onOpenChange={setOpen}>
-                      <DialogTrigger asChild>
-                        <Button disabled={!profile.canInteract}><CalendarClock className="mr-2 h-4 w-4" /> {actionLabel}</Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>{actionMeta.title}</DialogTitle>
-                          <DialogDescription>{actionMeta.hint}</DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4">
-                          {actionMeta.fields.includes("eventType") && (
-                            <div className="space-y-2">
-                              <Label>Event or project type</Label>
-                              <Input value={form.eventType} onChange={(e) => setForm({ ...form, eventType: e.target.value })} />
-                            </div>
-                          )}
-                          {actionMeta.fields.includes("eventDate") && (
-                            <div className="space-y-2">
-                              <Label>Date</Label>
-                              <Input type="date" value={form.eventDate} onChange={(e) => setForm({ ...form, eventDate: e.target.value })} />
-                            </div>
-                          )}
-                          {actionMeta.fields.includes("budget") && (
-                            <div className="space-y-2">
-                              <Label>Budget</Label>
-                              <Input value={form.budget} onChange={(e) => setForm({ ...form, budget: e.target.value })} placeholder="$500 - $1500" />
-                            </div>
-                          )}
-                          {actionMeta.fields.includes("location") && (
-                            <div className="space-y-2">
-                              <Label>Location</Label>
-                              <Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="City / venue / remote" />
-                            </div>
-                          )}
-                          {actionMeta.fields.includes("timeframe") && (
-                            <div className="space-y-2">
-                              <Label>Timeframe</Label>
-                              <Input value={form.timeframe} onChange={(e) => setForm({ ...form, timeframe: e.target.value })} placeholder="2 weeks / summer / open-ended" />
-                            </div>
-                          )}
-                          {actionMeta.fields.includes("projectDetails") && (
-                            <div className="space-y-2">
-                              <Label>Project details</Label>
-                              <Input value={form.projectDetails} onChange={(e) => setForm({ ...form, projectDetails: e.target.value })} />
-                            </div>
-                          )}
-                          <div className="space-y-2">
-                            <Label>Message</Label>
-                            <Textarea value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} className="min-h-32" />
-                          </div>
-                        </div>
-                        <DialogFooter>
-                          <Button
-                            onClick={() =>
-                              inquiry.mutate({
-                                recipientId: userId,
-                                data: {
-                                  inquiryType: actionType,
-                                  eventType: form.eventType || undefined,
-                                  eventDate: form.eventDate || undefined,
-                                  budget: form.budget || undefined,
-                                  projectDetails: [form.projectDetails, form.timeframe, form.location].filter(Boolean).join(" / ") || undefined,
-                                  message: form.message,
-                                },
-                              })
-                            }
-                            disabled={inquiry.isPending || !form.message.trim()}
-                          >
-                            <Mail className="mr-2 h-4 w-4" /> Send Inquiry
+                  {primaryActionKind === "follow" ? (
+                    <Button onClick={handleFollowToggle} disabled={!profile.canInteract} className="min-w-[8rem]">
+                      {profile.isFollowing ? "Following" : "Follow"}
+                    </Button>
+                  ) : null}
+                  {primaryActionKind === "contact" ? (
+                    creator?.primaryActionUrl && (actionType === "shop" || actionType === "store") ? (
+                      <a href={creator.primaryActionUrl} target="_blank" rel="noreferrer">
+                        <Button className="min-w-[8rem]">
+                          <ExternalLink className="mr-2 h-4 w-4" /> {actionLabel}
+                        </Button>
+                      </a>
+                    ) : (
+                      <Dialog open={open} onOpenChange={setOpen}>
+                        <DialogTrigger asChild>
+                          <Button className="min-w-[8rem]" disabled={!profile.canInteract}>
+                            <CalendarClock className="mr-2 h-4 w-4" /> {actionLabel}
                           </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-                  )}
-                  <Button variant={saved ? "default" : "outline"} onClick={handleSaveToggle}>
-                    <Heart className={cn("mr-2 h-4 w-4", saved && "fill-current")} /> {saved ? "Saved" : "Save"}
-                  </Button>
-                  <Button variant="outline" onClick={handleShare}>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>{actionMeta.title}</DialogTitle>
+                            <DialogDescription>{actionMeta.hint}</DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            {actionMeta.fields.includes("eventType") && (
+                              <div className="space-y-2">
+                                <Label>Event or project type</Label>
+                                <Input value={form.eventType} onChange={(e) => setForm({ ...form, eventType: e.target.value })} />
+                              </div>
+                            )}
+                            {actionMeta.fields.includes("eventDate") && (
+                              <div className="space-y-2">
+                                <Label>Date</Label>
+                                <Input type="date" value={form.eventDate} onChange={(e) => setForm({ ...form, eventDate: e.target.value })} />
+                              </div>
+                            )}
+                            {actionMeta.fields.includes("budget") && (
+                              <div className="space-y-2">
+                                <Label>Budget</Label>
+                                <Input value={form.budget} onChange={(e) => setForm({ ...form, budget: e.target.value })} placeholder="$500 - $1500" />
+                              </div>
+                            )}
+                            {actionMeta.fields.includes("location") && (
+                              <div className="space-y-2">
+                                <Label>Location</Label>
+                                <Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="City / venue / remote" />
+                              </div>
+                            )}
+                            {actionMeta.fields.includes("timeframe") && (
+                              <div className="space-y-2">
+                                <Label>Timeframe</Label>
+                                <Input value={form.timeframe} onChange={(e) => setForm({ ...form, timeframe: e.target.value })} placeholder="2 weeks / summer / open-ended" />
+                              </div>
+                            )}
+                            {actionMeta.fields.includes("projectDetails") && (
+                              <div className="space-y-2">
+                                <Label>Project details</Label>
+                                <Input value={form.projectDetails} onChange={(e) => setForm({ ...form, projectDetails: e.target.value })} />
+                              </div>
+                            )}
+                            <div className="space-y-2">
+                              <Label>Message</Label>
+                              <Textarea value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} className="min-h-32" />
+                            </div>
+                          </div>
+                          <DialogFooter>
+                            <Button
+                              onClick={() =>
+                                inquiry.mutate({
+                                  recipientId: userId,
+                                  data: {
+                                    inquiryType: actionType,
+                                    eventType: form.eventType || undefined,
+                                    eventDate: form.eventDate || undefined,
+                                    budget: form.budget || undefined,
+                                    projectDetails: [form.projectDetails, form.timeframe, form.location].filter(Boolean).join(" / ") || undefined,
+                                    message: form.message,
+                                  },
+                                })
+                              }
+                              disabled={inquiry.isPending || !form.message.trim()}
+                            >
+                              <Mail className="mr-2 h-4 w-4" /> Send Inquiry
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+                    )
+                  ) : null}
+                  {!isOwnArtistPage ? (
+                    <Link href="/messages">
+                      <Button variant="outline" className="border-border/60 bg-background/30" disabled={!profile.canInteract}>
+                        <MessageSquare className="mr-2 h-4 w-4" /> Message
+                      </Button>
+                    </Link>
+                  ) : null}
+                  {!isOwnArtistPage ? (
+                    <Button variant="outline" className="border-border/60 bg-background/30" onClick={handleSaveToggle}>
+                      <Heart className={cn("mr-2 h-4 w-4", saved && "fill-current")} /> {saved ? "Saved" : "Save"}
+                    </Button>
+                  ) : null}
+                  <Button variant="outline" className="border-border/60 bg-background/30" onClick={handleShare}>
                     <Share2 className="mr-2 h-4 w-4" /> Share
                   </Button>
-                  <ReportDialog targetType="profile" targetId={profile.user.id} variant="outline" />
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="icon" className="border-border/60 bg-background/30">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-64">
+                      {isOwnArtistPage ? (
+                        <>
+                          <DropdownMenuItem asChild>
+                            <Link href="/settings">
+                              <Palette className="mr-2 h-4 w-4" /> Edit Profile
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link href="/settings?tab=creator">
+                              <Sparkles className="mr-2 h-4 w-4" /> Edit Artist Page
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setActiveIdentity("artist")}>
+                            <Sparkles className="mr-2 h-4 w-4" /> {activeIdentity === "artist" ? "Using Artist Page" : "Switch To Artist Page"}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link href={`/profile/${profile.user.id}`} onClick={() => setActiveIdentity("personal")}>
+                              <MessageSquare className="mr-2 h-4 w-4" /> View Personal Profile
+                            </Link>
+                          </DropdownMenuItem>
+                        </>
+                      ) : (
+                        <>
+                          {primaryActionKind !== "follow" ? (
+                            <DropdownMenuItem onClick={handleFollowToggle} disabled={!profile.canInteract}>
+                              <Heart className="mr-2 h-4 w-4" /> {profile.isFollowing ? "Unfollow" : "Follow"}
+                            </DropdownMenuItem>
+                          ) : null}
+                          <DropdownMenuItem asChild>
+                            <Link href={`/profile/${profile.user.id}`}>
+                              <MessageSquare className="mr-2 h-4 w-4" /> View Personal Profile
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <div className="px-2 py-1">
+                            {profile.canInteract ? <FriendActionButton userId={userId} friendship={profile.friendship} invalidateKeys={[["profile", userId], ["/api/users", userId]]} /> : null}
+                          </div>
+                          <div className="px-2 py-1">
+                            <BlockActionButton userId={userId} blockState={profile.blockState} invalidateKeys={[["profile", userId], ["/api/users", userId]]} />
+                          </div>
+                          <div className="px-2 py-1">
+                            <ReportDialog targetType="profile" targetId={profile.user.id} variant="outline" />
+                          </div>
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
 
