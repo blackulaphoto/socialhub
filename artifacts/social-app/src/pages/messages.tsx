@@ -113,7 +113,7 @@ export default function Messages({ conversationId }: { conversationId?: string }
       byId.set(artist.userId, {
         id: artist.userId,
         name: artist.displayName || artist.user.username,
-        avatarUrl: artist.user.avatarUrl || null,
+        avatarUrl: artist.avatarUrl || artist.user.avatarUrl || null,
         subtitle: [artist.category, artist.location].filter(Boolean).join(" · ") || "Suggested creator",
       });
     }
@@ -123,7 +123,7 @@ export default function Messages({ conversationId }: { conversationId?: string }
       byId.set(artist.userId, {
         id: artist.userId,
         name: artist.displayName || artist.user.username,
-        avatarUrl: artist.user.avatarUrl || null,
+        avatarUrl: artist.avatarUrl || artist.user.avatarUrl || null,
         subtitle: [artist.category, artist.location].filter(Boolean).join(" · ") || "Creator page",
       });
     }

@@ -9,6 +9,8 @@ import type { ProfileCustomField } from "./profileCustomField";
 
 export interface UpdateArtistRequest {
   displayName?: string | null;
+  avatarUrl?: string | null;
+  bannerUrl?: string | null;
   category?: string;
   location?: string | null;
   tagline?: string | null;

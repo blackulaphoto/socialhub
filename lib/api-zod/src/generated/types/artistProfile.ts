@@ -14,6 +14,8 @@ export interface ArtistProfile {
   id: number;
   userId: number;
   displayName?: string | null;
+  avatarUrl?: string | null;
+  bannerUrl?: string | null;
   category: string;
   location?: string | null;
   tagline?: string | null;

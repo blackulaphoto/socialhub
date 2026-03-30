@@ -83,6 +83,8 @@ router.post("/artists/:userId/update", requireAuth, async (req, res) => {
 
   const {
     displayName,
+    avatarUrl,
+    bannerUrl,
     category,
     location,
     tagline,
@@ -118,6 +120,8 @@ router.post("/artists/:userId/update", requireAuth, async (req, res) => {
     [profile] = await db.insert(artistProfilesTable).values({
       userId,
       displayName: displayName || null,
+      avatarUrl: avatarUrl || null,
+      bannerUrl: bannerUrl || null,
       category: category || "General Creator",
       location: location || null,
       tagline: tagline || null,
@@ -137,6 +141,8 @@ router.post("/artists/:userId/update", requireAuth, async (req, res) => {
   } else {
     [profile] = await db.update(artistProfilesTable).set({
       displayName: displayName ?? null,
+      avatarUrl: avatarUrl ?? null,
+      bannerUrl: bannerUrl ?? null,
       category: category ?? profile.category,
       location: location ?? null,
       tagline: tagline ?? null,

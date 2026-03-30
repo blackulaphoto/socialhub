@@ -113,7 +113,7 @@ export default function Home() {
       if (!response.ok) {
         throw new Error("Could not load suggested creators");
       }
-      return response.json() as Promise<{ artists: Array<{ userId: number; category: string; location?: string | null; tagline?: string | null; tags?: string[]; user: { username: string; avatarUrl?: string | null } }> }>;
+      return response.json() as Promise<{ artists: Array<{ userId: number; displayName?: string | null; avatarUrl?: string | null; category: string; location?: string | null; tagline?: string | null; tags?: string[]; user: { username: string; avatarUrl?: string | null } }> }>;
     },
   });
 
@@ -606,11 +606,11 @@ export default function Home() {
                       className="flex items-start gap-3 rounded-2xl border border-border/50 bg-background/30 p-3 transition-colors hover:border-primary/30"
                     >
                       <Avatar className="h-11 w-11">
-                        <AvatarImage src={artist.user.avatarUrl || ""} />
-                        <AvatarFallback>{artist.user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                        <AvatarImage src={artist.avatarUrl || artist.user.avatarUrl || ""} />
+                        <AvatarFallback>{(artist.displayName || artist.user.username).slice(0, 2).toUpperCase()}</AvatarFallback>
                       </Avatar>
                       <div className="min-w-0 flex-1">
-                        <div className="truncate font-medium">{artist.user.username}</div>
+                        <div className="truncate font-medium">{artist.displayName || artist.user.username}</div>
                         <div className="text-xs text-muted-foreground">{[artist.category, artist.location].filter(Boolean).join(" · ")}</div>
                         {artist.tagline ? <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">{artist.tagline}</div> : null}
                       </div>

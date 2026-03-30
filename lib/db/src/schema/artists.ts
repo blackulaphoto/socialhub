@@ -9,6 +9,8 @@ export const artistProfilesTable = pgTable("artist_profiles", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }).unique(),
   displayName: text("display_name"),
+  avatarUrl: text("avatar_url"),
+  bannerUrl: text("banner_url"),
   category: text("category").notNull(),
   location: text("location"),
   tagline: text("tagline"),

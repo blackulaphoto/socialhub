@@ -13,11 +13,13 @@ export interface UserSummary {
   username: string;
   artistDisplayName?: string | null;
   avatarUrl?: string | null;
+  artistAvatarUrl?: string | null;
   bio?: string | null;
   profileType: UserSummaryProfileType;
   followerCount: number;
   friendCount: number;
   bannerUrl?: string | null;
+  artistBannerUrl?: string | null;
   location?: string | null;
   city?: string | null;
   age?: number | null;

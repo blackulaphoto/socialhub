@@ -25,6 +25,8 @@ type DiscoverArtist = {
   id: number;
   userId: number;
   displayName?: string | null;
+  avatarUrl?: string | null;
+  bannerUrl?: string | null;
   category: string;
   location?: string | null;
   tagline?: string | null;
@@ -235,7 +237,7 @@ export default function Discover() {
                 <CardContent className="space-y-4 p-5">
                   <div className="flex items-start gap-3">
                     <Avatar className="w-12 h-12 border border-border">
-                      <AvatarImage src={artist.user.avatarUrl || ""} />
+                      <AvatarImage src={artist.avatarUrl || artist.user.avatarUrl || ""} />
                       <AvatarFallback>{(artist.displayName || artist.user.username).slice(0, 2).toUpperCase()}</AvatarFallback>
                     </Avatar>
                     <div className="min-w-0 flex-1">

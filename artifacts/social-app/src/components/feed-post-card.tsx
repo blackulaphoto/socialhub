@@ -88,6 +88,7 @@ type FeedPost = {
     username: string;
     artistDisplayName?: string | null;
     avatarUrl?: string | null;
+    artistAvatarUrl?: string | null;
     city?: string | null;
     location?: string | null;
     category?: string | null;
@@ -346,9 +347,15 @@ export function FeedPostCard({
 
   const canEdit = user?.id === post.userId;
   const canDelete = user?.id === post.userId || user?.isAdmin;
+  const authorHref = post.actorSurface === "artist"
+    ? `/artists/${post.author?.id ?? post.userId}`
+    : `/profile/${post.author?.id ?? post.userId}`;
   const authorDisplayName = post.actorSurface === "artist"
     ? (post.author?.artistDisplayName || post.author?.username || "Unknown")
     : (post.author?.username || "Unknown");
+  const authorAvatar = post.actorSurface === "artist"
+    ? (post.author?.artistAvatarUrl || post.author?.avatarUrl || "")
+    : (post.author?.avatarUrl || "");
   const authorLocation = post.author?.city || post.author?.location;
   const activeReaction = reactions.find((reaction) => reaction.type === currentReaction);
   const totalReactions = Object.values(reactionCounts).reduce((sum, value) => sum + Number(value || 0), 0);
@@ -363,16 +370,16 @@ export function FeedPostCard({
     <Card id={`post-${post.id}`} data-testid={`post-card-${post.id}`} className="overflow-hidden border-border/50 bg-card/60">
       {showAuthor && post.author && (
         <CardHeader className="flex flex-row items-start gap-3 space-y-0 pb-3">
-          <Link href={`/profile/${post.author.id}`}>
+          <Link href={authorHref}>
             <Avatar className="h-10 w-10 cursor-pointer">
-              <AvatarImage src={post.author.avatarUrl || ""} />
+              <AvatarImage src={authorAvatar} />
               <AvatarFallback>{authorDisplayName.slice(0, 2).toUpperCase()}</AvatarFallback>
             </Avatar>
           </Link>
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <Link href={`/profile/${post.author.id}`} className="block truncate font-semibold hover:text-primary">
+                <Link href={authorHref} className="block truncate font-semibold hover:text-primary">
                   {authorDisplayName}
                 </Link>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">

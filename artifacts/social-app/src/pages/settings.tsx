@@ -162,6 +162,8 @@ export default function Settings() {
     });
     setArtist({
       displayName: profile.artistProfile?.displayName || "",
+      avatarUrl: profile.artistProfile?.avatarUrl || "",
+      bannerUrl: profile.artistProfile?.bannerUrl || "",
       category: profile.artistProfile?.category || "General Creator",
       location: profile.artistProfile?.location || "",
       tagline: profile.artistProfile?.tagline || "",
@@ -325,12 +327,19 @@ export default function Settings() {
   if (isLoading || !profile || !user) return <div className="flex justify-center py-20"><Spinner size="lg" /></div>;
 
   const accent = basic.accentColor || "#8b5cf6";
-  const previewBio = artist.bio || basic.bio || basic.about || "Your profile preview updates live as you edit.";
+  const previewBio = artist.bio || "Your profile preview updates live as you edit.";
   const previewInterests = String(basic.interests || "")
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean)
     .slice(0, 6);
+  const useCreatorIdentityPreview = activeTab === "creator" && showCreatorTools;
+  const headerBannerUrl = useCreatorIdentityPreview ? artist.bannerUrl : basic.bannerUrl;
+  const headerAvatarUrl = useCreatorIdentityPreview ? artist.avatarUrl : basic.avatarUrl;
+  const headerName = useCreatorIdentityPreview ? (artist.displayName || "Artist page name") : user.username;
+  const headerLocation = useCreatorIdentityPreview
+    ? [artist.location].filter(Boolean).join(" / ")
+    : [basic.city, basic.location].filter(Boolean).join(" / ");
 
   return (
     <div className="mx-auto w-full max-w-6xl p-4 md:py-8">
@@ -344,15 +353,15 @@ export default function Settings() {
           className="relative min-h-64"
           style={{ background: `linear-gradient(135deg, ${accent}30, rgba(20,20,30,0.92) 40%, rgba(20,28,44,0.96))` }}
         >
-          {basic.bannerUrl && (
-            <div className="absolute inset-0 bg-cover bg-center opacity-35" style={{ backgroundImage: `url(${basic.bannerUrl})` }} />
+          {headerBannerUrl && (
+            <div className="absolute inset-0 bg-cover bg-center opacity-35" style={{ backgroundImage: `url(${headerBannerUrl})` }} />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/65 to-background/10" />
           <div className="relative z-10 flex flex-col gap-6 px-6 py-8 md:px-8 md:py-10">
             <div className="flex flex-col gap-5 md:flex-row md:items-end">
               <Avatar className="h-24 w-24 border-4 border-background shadow-2xl md:h-32 md:w-32">
-                <AvatarImage src={basic.avatarUrl || ""} />
-                <AvatarFallback>{user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                <AvatarImage src={headerAvatarUrl || ""} />
+                <AvatarFallback>{headerName.slice(0, 2).toUpperCase()}</AvatarFallback>
               </Avatar>
               <div className="flex-1">
                 <div className="mb-3 flex flex-wrap gap-2">
@@ -360,12 +369,12 @@ export default function Settings() {
                   {showCreatorTools && artist.category && <Badge variant="secondary">{artist.category}</Badge>}
                   {showCreatorTools && creator.primaryActionLabel && <Badge>{creator.primaryActionLabel}</Badge>}
                 </div>
-                <div className="text-3xl font-bold md:text-4xl">{user.username}</div>
-                {showCreatorTools && artist.displayName ? (
+                <div className="text-3xl font-bold md:text-4xl">{headerName}</div>
+                {showCreatorTools && artist.displayName && !useCreatorIdentityPreview ? (
                   <div className="mt-1 text-sm font-medium text-foreground/80">Artist page name: {artist.displayName}</div>
                 ) : null}
                 <div className="mt-2 text-sm text-muted-foreground">
-                  {[basic.city, basic.location].filter(Boolean).join(" / ") || "Location preview"}
+                  {headerLocation || "Location preview"}
                 </div>
                 <p className="mt-4 max-w-3xl whitespace-pre-wrap text-sm text-muted-foreground">{previewBio}</p>
               </div>
@@ -552,6 +561,8 @@ export default function Settings() {
                         category: current.category || "General Creator",
                         location: current.location || basic.location || "",
                         bio: current.bio || basic.about || basic.bio || "",
+                        avatarUrl: current.avatarUrl || "",
+                        bannerUrl: current.bannerUrl || "",
                       }));
                     }}
                   >
@@ -576,27 +587,27 @@ export default function Settings() {
                     <div className="rounded-3xl border border-border/50 bg-background/40 p-5">
                       <div className="flex flex-col gap-5 md:flex-row md:items-center">
                         <Avatar className="h-24 w-24 border-4 border-background shadow-xl">
-                          <AvatarImage src={basic.avatarUrl || ""} />
-                          <AvatarFallback>{user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                          <AvatarImage src={artist.avatarUrl || ""} />
+                          <AvatarFallback>{(artist.displayName || user.username).slice(0, 2).toUpperCase()}</AvatarFallback>
                         </Avatar>
                         <div className="grid flex-1 gap-4 md:grid-cols-2">
                           <div className="space-y-2">
                             <Label>Artist page profile photo</Label>
-                            <Input placeholder="https://..." value={basic.avatarUrl || ""} onChange={(e) => setBasic({ ...basic, avatarUrl: e.target.value })} />
+                            <Input placeholder="https://..." value={artist.avatarUrl || ""} onChange={(e) => setArtist({ ...artist, avatarUrl: e.target.value })} />
                             <Input
                               type="file"
                               accept="image/*"
-                              onChange={(e) => handleImageUpload(e.target.files?.[0] || null, "avatar", (url) => setBasic((current) => ({ ...current, avatarUrl: url })))}
+                              onChange={(e) => handleImageUpload(e.target.files?.[0] || null, "avatar", (url) => setArtist((current) => ({ ...current, avatarUrl: url })))}
                               disabled={uploading.avatar}
                             />
                           </div>
                           <div className="space-y-2">
                             <Label>Artist page header image</Label>
-                            <Input placeholder="https://..." value={basic.bannerUrl || ""} onChange={(e) => setBasic({ ...basic, bannerUrl: e.target.value })} />
+                            <Input placeholder="https://..." value={artist.bannerUrl || ""} onChange={(e) => setArtist({ ...artist, bannerUrl: e.target.value })} />
                             <Input
                               type="file"
                               accept="image/*"
-                              onChange={(e) => handleImageUpload(e.target.files?.[0] || null, "banner", (url) => setBasic((current) => ({ ...current, bannerUrl: url })))}
+                              onChange={(e) => handleImageUpload(e.target.files?.[0] || null, "banner", (url) => setArtist((current) => ({ ...current, bannerUrl: url })))}
                               disabled={uploading.banner}
                             />
                           </div>
@@ -604,7 +615,7 @@ export default function Settings() {
                       </div>
                       <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
                         <Badge variant="outline"><UploadCloud className="mr-1 h-3 w-3" /> Upload or paste a URL</Badge>
-                        <Badge variant="outline"><ImageIcon className="mr-1 h-3 w-3" /> Uses the same avatar/banner as your personal profile for now</Badge>
+                        <Badge variant="outline"><ImageIcon className="mr-1 h-3 w-3" /> Separate from your personal profile branding</Badge>
                       </div>
                     </div>
                   </CardContent>
@@ -984,6 +995,8 @@ export default function Settings() {
                           data: {
                             category: artist.category,
                             displayName: artist.displayName || undefined,
+                            avatarUrl: artist.avatarUrl || undefined,
+                            bannerUrl: artist.bannerUrl || undefined,
                             location: artist.location || undefined,
                             tagline: artist.tagline || undefined,
                             tags: String(artist.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean),
@@ -1062,13 +1075,31 @@ export default function Settings() {
                   <CardDescription>This mirrors the visible identity people see on your artist page.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="rounded-2xl border border-border/50 bg-background/40 p-5">
+                  <div
+                    className="overflow-hidden rounded-2xl border border-border/50 bg-background/40"
+                    style={{
+                      backgroundImage: artist.bannerUrl ? `linear-gradient(rgba(10,10,14,0.45), rgba(10,10,14,0.8)), url(${artist.bannerUrl})` : undefined,
+                      backgroundSize: "cover",
+                      backgroundPosition: "center",
+                    }}
+                  >
+                    <div className="p-5">
+                    <div className="mb-4 flex items-center gap-4">
+                      <Avatar className="h-16 w-16 border-2 border-background/90 shadow-xl">
+                        <AvatarImage src={artist.avatarUrl || ""} />
+                        <AvatarFallback>{(artist.displayName || user.username).slice(0, 2).toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <div className="text-xs uppercase tracking-[0.2em] text-foreground/70">Page identity</div>
+                        <div className="truncate text-lg font-semibold">{artist.displayName || "Artist page name"}</div>
+                      </div>
+                    </div>
                     <div className="mb-3 flex flex-wrap gap-2">
                       <Badge variant="secondary">{artist.category || "General Creator"}</Badge>
                       <Badge>{creator.primaryActionLabel || "Contact Me"}</Badge>
                       <Badge variant="outline">{creator.moodPreset || "sleek"}</Badge>
                     </div>
-                    <div className="text-2xl font-bold">{artist.displayName || user.username}</div>
+                    <div className="text-2xl font-bold">{artist.displayName || "Artist page name"}</div>
                     <div className="mt-2 text-sm font-medium text-foreground/75">{artist.location || basic.city || "Location preview"}</div>
                     <div className="mt-4 text-base font-medium">{artist.tagline || "Creator homepage headline preview."}</div>
                     <div className="mt-4 whitespace-pre-wrap text-sm text-foreground/75">{artist.bio || "Creator bio preview."}</div>
@@ -1077,6 +1108,7 @@ export default function Settings() {
                     </div>
                     <div className="mt-4 text-xs uppercase tracking-[0.2em] text-foreground/60">
                       Layout: {creator.layoutTemplate || "portfolio"} / Font: {creator.fontPreset || "modern"}
+                    </div>
                     </div>
                   </div>
                 </CardContent>

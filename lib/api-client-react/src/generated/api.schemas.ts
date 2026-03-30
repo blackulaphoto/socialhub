@@ -92,11 +92,13 @@ export interface UserSummary {
   username: string;
   artistDisplayName?: string | null;
   avatarUrl?: string | null;
+  artistAvatarUrl?: string | null;
   bio?: string | null;
   profileType: UserSummaryProfileType;
   followerCount: number;
   friendCount: number;
   bannerUrl?: string | null;
+  artistBannerUrl?: string | null;
   location?: string | null;
   city?: string | null;
   age?: number | null;
@@ -279,6 +281,8 @@ export interface ArtistProfile {
   id: number;
   userId: number;
   displayName?: string | null;
+  avatarUrl?: string | null;
+  bannerUrl?: string | null;
   category: string;
   location?: string | null;
   tagline?: string | null;
@@ -504,6 +508,8 @@ export type FeedResponse = PostsResponse & {
 
 export interface UpdateArtistRequest {
   displayName?: string | null;
+  avatarUrl?: string | null;
+  bannerUrl?: string | null;
   category?: string;
   location?: string | null;
   tagline?: string | null;

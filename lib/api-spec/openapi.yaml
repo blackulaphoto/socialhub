@@ -2028,6 +2028,9 @@ components:
         avatarUrl:
           type: string
           nullable: true
+        artistAvatarUrl:
+          type: string
+          nullable: true
         bio:
           type: string
           nullable: true
@@ -2039,6 +2042,9 @@ components:
         friendCount:
           type: integer
         bannerUrl:
+          type: string
+          nullable: true
+        artistBannerUrl:
           type: string
           nullable: true
         location:
@@ -2580,6 +2586,12 @@ components:
         displayName:
           type: string
           nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+        bannerUrl:
+          type: string
+          nullable: true
         category:
           type: string
         location:
@@ -2670,6 +2682,12 @@ components:
       type: object
       properties:
         displayName:
+          type: string
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+        bannerUrl:
           type: string
           nullable: true
         category:

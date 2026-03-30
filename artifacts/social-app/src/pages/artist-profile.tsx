@@ -279,8 +279,10 @@ export default function ArtistProfile({ id }: { id: string }) {
   const storeLinks = (profile.user.links || []).filter((link) => /shop|store/i.test(link.label) || /shop|store/i.test(link.url));
   const mood = MOOD_STYLES[moodPreset] || MOOD_STYLES.sleek;
   const fontClass = FONT_PRESET_CLASSES[fontPreset] || "";
-  const heroTagline = artist.tagline || artist.bio || profile.user.bio || "Creator page";
+  const heroTagline = artist.tagline || artist.bio || "Creator page";
   const artistPageName = artist.displayName || profile.user.username;
+  const artistPageAvatar = artist.avatarUrl || null;
+  const artistPageBanner = artist.bannerUrl || null;
   const isOwnArtistPage = currentUser?.id === userId;
 
   const handleArtistImageUpload = async (file: File | null) => {
@@ -359,7 +361,7 @@ export default function ArtistProfile({ id }: { id: string }) {
         <CardTitle className="text-2xl">{creator?.featuredTitle || "Lead with what matters most"}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {creator?.featuredDescription && <p className="max-w-3xl text-sm text-muted-foreground">{creator.featuredDescription}</p>}
+          {creator?.featuredDescription && <p className="max-w-3xl text-sm text-muted-foreground">{creator.featuredDescription}</p>}
         {creator?.pinnedPost ? (
           <FeedPostCard post={creator.pinnedPost} showAuthor={false} />
         ) : creator?.featuredUrl ? (
@@ -384,7 +386,7 @@ export default function ArtistProfile({ id }: { id: string }) {
   const aboutContent = (
     <div className="space-y-5">
         <p className="whitespace-pre-wrap text-sm leading-7 text-muted-foreground">
-          {artist.bio || profile.user.bio || "No bio added yet."}
+          {artist.bio || "No bio added yet."}
         </p>
 
         {artist.influences && (
@@ -827,8 +829,8 @@ export default function ArtistProfile({ id }: { id: string }) {
   return (
     <div className={cn("w-full pb-20", fontClass)}>
       <section className="relative overflow-hidden border-b border-border">
-        {profile.user.bannerUrl && (
-          <div className="absolute inset-0 bg-cover bg-center opacity-35" style={{ backgroundImage: `url(${profile.user.bannerUrl})` }} />
+        {artistPageBanner && (
+          <div className="absolute inset-0 bg-cover bg-center opacity-35" style={{ backgroundImage: `url(${artistPageBanner})` }} />
         )}
         <div className={cn("absolute inset-0 bg-gradient-to-br", mood.shell)} />
         <div className={cn("absolute inset-0 bg-[radial-gradient(circle_at_top_left,var(--tw-gradient-stops))]", mood.glow)} />
@@ -838,8 +840,8 @@ export default function ArtistProfile({ id }: { id: string }) {
         <div className="relative z-10 mx-auto max-w-7xl px-4 py-12 md:py-16">
           <div className="grid gap-8 lg:grid-cols-[auto_1fr]">
             <Avatar className="h-32 w-32 border-4 border-background/80 shadow-2xl md:h-40 md:w-40">
-              <AvatarImage src={profile.user.avatarUrl || ""} />
-              <AvatarFallback>{profile.user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+              <AvatarImage src={artistPageAvatar || ""} />
+              <AvatarFallback>{artistPageName.slice(0, 2).toUpperCase()}</AvatarFallback>
             </Avatar>
 
             <div className="space-y-6">

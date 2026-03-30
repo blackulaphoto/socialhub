@@ -37,6 +37,8 @@ type SearchArtist = {
   id: number;
   userId: number;
   displayName?: string | null;
+  avatarUrl?: string | null;
+  bannerUrl?: string | null;
   category: string;
   location?: string | null;
   tagline?: string | null;
@@ -192,11 +194,11 @@ export default function Search() {
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                 {data.artists.map((artist) => (
                   <Card key={artist.id} className="bg-card/60 border-border/50 overflow-hidden">
-                    <div className="h-28 bg-gradient-to-r from-primary/15 via-background to-cyan-500/10" style={artist.user.bannerUrl ? { backgroundImage: `url(${artist.user.bannerUrl})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined} />
+                    <div className="h-28 bg-gradient-to-r from-primary/15 via-background to-cyan-500/10" style={(artist.bannerUrl || artist.user.bannerUrl) ? { backgroundImage: `url(${artist.bannerUrl || artist.user.bannerUrl})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined} />
                     <CardContent className="p-4 space-y-4">
                       <div className="flex gap-4">
                         <Avatar className="w-14 h-14 -mt-10 border-4 border-background">
-                          <AvatarImage src={artist.user.avatarUrl || ""} />
+                          <AvatarImage src={artist.avatarUrl || artist.user.avatarUrl || ""} />
                           <AvatarFallback>{(artist.displayName || artist.user.username).slice(0, 2).toUpperCase()}</AvatarFallback>
                         </Avatar>
                         <div className="min-w-0 flex-1">
