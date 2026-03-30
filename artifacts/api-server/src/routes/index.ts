@@ -13,6 +13,7 @@ import activityRouter from "./activity.js";
 import reportsRouter from "./reports.js";
 import analyticsRouter from "./analytics.js";
 import uploadsRouter from "./uploads.js";
+import siteRouter from "./site.js";
 
 const router = Router();
 
@@ -29,6 +30,7 @@ router.use(eventsRouter);
 router.use(reportsRouter);
 router.use(analyticsRouter);
 router.use(uploadsRouter);
+router.use(siteRouter);
 router.use(adminRouter);
 
 export default router;

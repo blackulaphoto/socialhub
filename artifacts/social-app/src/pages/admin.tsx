@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ShieldAlert, Trash2 } from "lucide-react";
 import {
@@ -20,17 +20,24 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { QueryErrorState } from "@/components/query-error-state";
 import { useToast } from "@/hooks/use-toast";
+import { uploadImage } from "@/lib/upload-image";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 export default function Admin() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [reportNotes, setReportNotes] = useState<Record<number, string>>({});
+  const [siteForm, setSiteForm] = useState({ siteName: "", logoUrl: "", faviconUrl: "" });
+  const [savingSiteSettings, setSavingSiteSettings] = useState(false);
+  const [uploadingAsset, setUploadingAsset] = useState<"logo" | "favicon" | null>(null);
+  const siteSettingsQuery = useSiteSettings();
 
   const usersQuery = useAdminGetUsers({ page: 1, limit: 100 }, { query: { enabled: !!user?.isAdmin, queryKey: ["/api/admin/users"] } });
   const postsQuery = useAdminGetPosts({ page: 1, limit: 100 }, { query: { enabled: !!user?.isAdmin, queryKey: ["/api/admin/posts"] } });
@@ -45,6 +52,15 @@ export default function Admin() {
   const deleteGroup = useAdminDeleteGroup();
   const deleteEvent = useAdminDeleteEvent();
   const updateReport = useAdminUpdateReportStatus();
+
+  useEffect(() => {
+    if (!siteSettingsQuery.data) return;
+    setSiteForm({
+      siteName: siteSettingsQuery.data.siteName || "ArtistHub",
+      logoUrl: siteSettingsQuery.data.logoUrl || "",
+      faviconUrl: siteSettingsQuery.data.faviconUrl || "",
+    });
+  }, [siteSettingsQuery.data]);
 
   if (!user?.isAdmin) {
     return <div className="flex h-full items-center justify-center p-8 text-muted-foreground">Admin access required.</div>;
@@ -90,12 +106,141 @@ export default function Admin() {
 
       <Tabs defaultValue="reports">
         <TabsList className="mb-8 border border-border/50 bg-card/50">
+          <TabsTrigger value="design">Site Design</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="posts">Posts</TabsTrigger>
           <TabsTrigger value="groups">Groups</TabsTrigger>
           <TabsTrigger value="events">Events</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="design">
+          <Card className="border-border/50 bg-card/50">
+            <CardHeader>
+              <CardTitle>Site Design</CardTitle>
+              <p className="text-sm text-muted-foreground">Manage the global site name, logo, and favicon used across the app shell.</p>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {siteSettingsQuery.isError ? (
+                <QueryErrorState title="Could not load site settings" description="The global branding settings could not be loaded." onRetry={() => siteSettingsQuery.refetch()} />
+              ) : (
+                <>
+                  <div className="grid gap-6 md:grid-cols-[1.2fr_0.8fr]">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="site-name">Site name</Label>
+                        <Input id="site-name" value={siteForm.siteName} onChange={(e) => setSiteForm((current) => ({ ...current, siteName: e.target.value }))} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="site-logo-url">Logo image</Label>
+                        <Input id="site-logo-url" value={siteForm.logoUrl} onChange={(e) => setSiteForm((current) => ({ ...current, logoUrl: e.target.value }))} placeholder="https://..." />
+                        <Input
+                          type="file"
+                          accept="image/*"
+                          disabled={uploadingAsset === "logo"}
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            setUploadingAsset("logo");
+                            try {
+                              const uploaded = await uploadImage(file, "avatar");
+                              setSiteForm((current) => ({ ...current, logoUrl: uploaded.url }));
+                              toast({ title: "Logo uploaded" });
+                            } catch (error) {
+                              toast({ title: "Could not upload logo", description: error instanceof Error ? error.message : undefined, variant: "destructive" });
+                            } finally {
+                              setUploadingAsset(null);
+                            }
+                          }}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="site-favicon-url">Favicon</Label>
+                        <Input id="site-favicon-url" value={siteForm.faviconUrl} onChange={(e) => setSiteForm((current) => ({ ...current, faviconUrl: e.target.value }))} placeholder="https://..." />
+                        <Input
+                          type="file"
+                          accept="image/*"
+                          disabled={uploadingAsset === "favicon"}
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            setUploadingAsset("favicon");
+                            try {
+                              const uploaded = await uploadImage(file, "avatar");
+                              setSiteForm((current) => ({ ...current, faviconUrl: uploaded.url }));
+                              toast({ title: "Favicon uploaded" });
+                            } catch (error) {
+                              toast({ title: "Could not upload favicon", description: error instanceof Error ? error.message : undefined, variant: "destructive" });
+                            } finally {
+                              setUploadingAsset(null);
+                            }
+                          }}
+                        />
+                      </div>
+                      <div className="flex gap-3">
+                        <Button
+                          disabled={savingSiteSettings || siteSettingsQuery.isLoading}
+                          onClick={async () => {
+                            setSavingSiteSettings(true);
+                            try {
+                              const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || ""}/api/admin/site-settings`, {
+                                method: "POST",
+                                credentials: "include",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify(siteForm),
+                              });
+
+                              if (!response.ok) {
+                                const error = await response.json().catch(() => null);
+                                throw new Error(error?.message || error?.error || `Save failed with status ${response.status}`);
+                              }
+
+                              await response.json();
+                              await queryClient.invalidateQueries({ queryKey: ["/api/site/settings"] });
+                              toast({ title: "Site design updated" });
+                            } catch (error) {
+                              toast({ title: "Could not save site design", description: error instanceof Error ? error.message : undefined, variant: "destructive" });
+                            } finally {
+                              setSavingSiteSettings(false);
+                            }
+                          }}
+                        >
+                          Save Site Design
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="rounded-3xl border border-border/50 bg-background/50 p-5">
+                      <div className="text-sm font-medium">Live preview</div>
+                      <div className="mt-4 flex items-center gap-3">
+                        {siteForm.logoUrl ? (
+                          <img src={siteForm.logoUrl} alt={siteForm.siteName || "Site logo"} className="h-14 w-14 rounded-2xl object-cover ring-1 ring-border/60" />
+                        ) : (
+                          <div className="grid h-14 w-14 place-items-center rounded-2xl bg-primary text-primary-foreground">A</div>
+                        )}
+                        <div>
+                          <div className="text-xl font-semibold">{siteForm.siteName || "ArtistHub"}</div>
+                          <div className="text-sm text-muted-foreground">Sidebar, header, browser tab, and favicon</div>
+                        </div>
+                      </div>
+                      <div className="mt-6">
+                        <div className="mb-2 text-xs uppercase tracking-[0.2em] text-muted-foreground">Favicon</div>
+                        <div className="flex items-center gap-3 rounded-2xl border border-border/50 bg-background px-3 py-3">
+                          {siteForm.faviconUrl ? (
+                            <img src={siteForm.faviconUrl} alt="Favicon preview" className="h-8 w-8 rounded-lg object-cover ring-1 ring-border/60" />
+                          ) : (
+                            <div className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-xs font-bold text-primary-foreground">A</div>
+                          )}
+                          <div className="text-sm text-muted-foreground">Shown in browser tabs and bookmarks.</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="reports">
           {reportsQuery.isError ? (

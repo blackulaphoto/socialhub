@@ -213,3 +213,13 @@ export const pageViewsTable = pgTable("page_views", {
   userAgent: text("user_agent"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+export const siteSettingsTable = pgTable("site_settings", {
+  id: integer("id").primaryKey().notNull().default(1),
+  siteName: text("site_name").notNull().default("ArtistHub"),
+  logoUrl: text("logo_url"),
+  faviconUrl: text("favicon_url"),
+  updatedByUserId: integer("updated_by_user_id").references(() => usersTable.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});

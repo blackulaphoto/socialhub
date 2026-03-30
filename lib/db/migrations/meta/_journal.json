@@ -92,6 +92,13 @@
       "when": 1774850400000,
       "tag": "0012_bold_landing",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1774854000000,
+      "tag": "0013_site_branding",
+      "breakpoints": true
     }
   ]
 }

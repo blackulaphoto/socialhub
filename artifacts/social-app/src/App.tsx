@@ -27,6 +27,7 @@ import EventDetail from "@/pages/event-detail";
 import Notifications from "@/pages/notifications";
 import Onboarding from "@/pages/onboarding";
 import { ActiveIdentityProvider } from "@/hooks/useActiveIdentity";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -58,6 +59,30 @@ function AnalyticsTracker() {
       },
     });
   }, [location, trackPageView]);
+
+  return null;
+}
+
+function SiteBranding() {
+  const { data } = useSiteSettings();
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const siteName = data?.siteName || "ArtistHub";
+    document.title = siteName;
+
+    const faviconHref = data?.faviconUrl || "/favicon.png";
+    let link = document.querySelector("link[rel='icon']") as HTMLLinkElement | null;
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = "icon";
+      document.head.appendChild(link);
+    }
+
+    link.type = faviconHref.endsWith(".svg") ? "image/svg+xml" : "image/png";
+    link.href = faviconHref;
+  }, [data]);
 
   return null;
 }
@@ -131,6 +156,7 @@ function App() {
             <AuthProvider>
               <ActiveIdentityProvider>
                 <AnalyticsTracker />
+                <SiteBranding />
                 <Router />
               </ActiveIdentityProvider>
             </AuthProvider>

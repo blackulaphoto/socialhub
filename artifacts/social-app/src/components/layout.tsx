@@ -51,6 +51,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useActiveIdentity } from "@/hooks/useActiveIdentity";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 function getPageMeta(location: string) {
   if (location === "/") return { title: "ArtistHub", subtitle: "Following, local, discovery, and custom collections." };
@@ -89,6 +90,7 @@ export function AppSidebar() {
   const [location] = useLocation();
   const { user } = useAuth();
   const { setActiveIdentity } = useActiveIdentity();
+  const { data: siteSettings } = useSiteSettings();
 
   const navItems = [
     { title: "Home", url: "/", icon: Home },
@@ -109,12 +111,22 @@ export function AppSidebar() {
   return (
     <Sidebar className="border-r border-sidebar-border">
       <SidebarHeader className="p-4">
-        <h1 className="text-2xl font-bold text-primary flex items-center gap-2">
-          <span className="bg-primary text-primary-foreground p-1 rounded-md">
-            <Compass className="w-5 h-5" />
-          </span>
-          ArtistHub
-        </h1>
+        <div className="flex items-center gap-3">
+          {siteSettings?.logoUrl ? (
+            <img
+              src={siteSettings.logoUrl}
+              alt={siteSettings.siteName || "Site logo"}
+              className="h-10 w-10 rounded-xl object-cover ring-1 ring-border/60"
+            />
+          ) : (
+            <span className="rounded-md bg-primary p-1 text-primary-foreground">
+              <Compass className="h-5 w-5" />
+            </span>
+          )}
+          <div className="min-w-0">
+            <h1 className="truncate text-2xl font-bold text-primary">{siteSettings?.siteName || "ArtistHub"}</h1>
+          </div>
+        </div>
       </SidebarHeader>
 
       <SidebarContent>
@@ -422,6 +434,7 @@ function AppHeader() {
   const [location] = useLocation();
   const { user } = useAuth();
   const { activeIdentity, canUseArtistIdentity } = useActiveIdentity();
+  const { data: siteSettings } = useSiteSettings();
   const meta = getPageMeta(location);
 
   return (
@@ -433,7 +446,7 @@ function AppHeader() {
           </SidebarTrigger>
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold">{meta.title}</div>
+          <div className="text-sm font-semibold">{location === "/" ? (siteSettings?.siteName || meta.title) : meta.title}</div>
           <div className="hidden md:block text-xs text-muted-foreground truncate">{meta.subtitle}</div>
         </div>
         {canUseArtistIdentity && (
