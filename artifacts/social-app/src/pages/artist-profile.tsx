@@ -201,6 +201,14 @@ export default function ArtistProfile({ id }: { id: string }) {
     getNextPageParam: (lastPage) => lastPage.hasMore ? (lastPage.nextCursor ?? undefined) : undefined,
   });
 
+  const isOwnArtistPage = currentUser?.id === userId;
+
+  useEffect(() => {
+    if (isOwnArtistPage) {
+      setActiveIdentity("artist");
+    }
+  }, [isOwnArtistPage, setActiveIdentity]);
+
   const follow = useFollowUser();
   const unfollow = useUnfollowUser();
   const createPost = useCreatePost({
@@ -306,13 +314,6 @@ export default function ArtistProfile({ id }: { id: string }) {
   const artistPageBanner = artist.bannerUrl || null;
   const artistBaseLocation = formatPlace([artist.location, profile.user.city, profile.user.location]);
   const primaryTag = artist.tags?.[0] || null;
-  const isOwnArtistPage = currentUser?.id === userId;
-
-  useEffect(() => {
-    if (isOwnArtistPage) {
-      setActiveIdentity("artist");
-    }
-  }, [isOwnArtistPage, setActiveIdentity]);
   const heroGridClass = layoutTemplate === "editorial"
     ? "lg:grid-cols-[1.2fr_0.8fr]"
     : layoutTemplate === "music"
