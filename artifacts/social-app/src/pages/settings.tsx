@@ -28,8 +28,10 @@ import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { MediaEmbed } from "@/components/media-embed";
+import { LocationInput } from "@/components/location-input";
 import { useToast } from "@/hooks/use-toast";
 import { useActiveIdentity } from "@/hooks/useActiveIdentity";
+import { formatCityRegion, parseCityRegion } from "@/lib/locations";
 import { uploadImage } from "@/lib/upload-image";
 import { cn } from "@/lib/utils";
 import { Check, Image as ImageIcon, Loader2, UploadCloud } from "lucide-react";
@@ -583,16 +585,20 @@ export default function Settings() {
                   <Input id="headline" placeholder="What should people understand about you immediately?" value={basic.bio || ""} onChange={(e) => setBasic({ ...basic, bio: e.target.value })} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="location">State / region</Label>
-                  <Input id="location" placeholder="California" value={basic.location || ""} onChange={(e) => setBasic({ ...basic, location: e.target.value })} />
+                  <Label htmlFor="profile-location">City / state</Label>
+                  <LocationInput
+                    value={formatCityRegion(basic.city, basic.location)}
+                    placeholder="Los Angeles, California"
+                    onValueChange={(value) => {
+                      const parsed = parseCityRegion(value);
+                      setBasic({ ...basic, city: parsed.city, location: parsed.region });
+                    }}
+                    onOptionSelect={(option) => setBasic({ ...basic, city: option.city, location: option.region })}
+                  />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <div className="space-y-2">
-                  <Label htmlFor="city">City</Label>
-                  <Input id="city" placeholder="Los Angeles" value={basic.city || ""} onChange={(e) => setBasic({ ...basic, city: e.target.value })} />
-                </div>
                 <div className="space-y-2">
                   <Label htmlFor="age">Age</Label>
                   <Input id="age" type="number" min="13" max="120" placeholder="27" value={basic.age || ""} onChange={(e) => setBasic({ ...basic, age: e.target.value })} />
@@ -859,7 +865,12 @@ export default function Settings() {
                     </div>
                     <div className="space-y-2">
                       <Label>Base location</Label>
-                      <Input placeholder="Los Angeles, CA" value={artist.location || ""} onChange={(e) => setArtist({ ...artist, location: e.target.value })} />
+                      <LocationInput
+                        value={artist.location || ""}
+                        placeholder="Los Angeles, California"
+                        onValueChange={(value) => setArtist({ ...artist, location: value })}
+                        onOptionSelect={(option) => setArtist({ ...artist, location: option.label })}
+                      />
                     </div>
                   </div>
 
@@ -1146,77 +1157,80 @@ export default function Settings() {
                       onClick={async () => {
                         setSaveState((current) => ({ ...current, artistPage: "saving" }));
                         try {
+                          const basicPayload = {
+                            avatarUrl: basic.avatarUrl || undefined,
+                            bannerUrl: basic.bannerUrl || undefined,
+                            bio: basic.bio || undefined,
+                            location: basic.location || undefined,
+                            city: basic.city || undefined,
+                            age: basic.age ? Number(basic.age) : undefined,
+                            work: basic.work || undefined,
+                            school: basic.school || undefined,
+                            about: basic.about || undefined,
+                            interests: String(basic.interests || "").split(",").map((item) => item.trim()).filter(Boolean),
+                            accentColor: basic.accentColor || undefined,
+                            themeName: basic.themeName || undefined,
+                            featuredContent: basic.featuredContent || undefined,
+                            links: String(basic.links || "")
+                              .split("\n")
+                              .map((line) => line.trim())
+                              .filter(Boolean)
+                              .map((line) => {
+                                const [label, url] = line.split("|");
+                                return { label: label?.trim() || url?.trim() || "Link", url: url?.trim() || label?.trim() || "" };
+                              })
+                              .filter((link) => link.url),
+                          };
+                          const artistPayload = {
+                            category: artist.category,
+                            displayName: artist.displayName || undefined,
+                            avatarUrl: artist.avatarUrl || undefined,
+                            bannerUrl: artist.bannerUrl || undefined,
+                            location: artist.location || undefined,
+                            tagline: artist.tagline || undefined,
+                            tags: String(artist.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean),
+                            bio: artist.bio || undefined,
+                            influences: artist.influences || undefined,
+                            availabilityStatus: artist.availabilityStatus || undefined,
+                            pronouns: artist.pronouns || undefined,
+                            yearsActive: artist.yearsActive || undefined,
+                            representedBy: artist.representedBy || undefined,
+                            openForCommissions: creator.openForCommissions === "true",
+                            touring: creator.touring === "true",
+                            acceptsCollaborations: creator.acceptsCollaborations !== "false",
+                            customFields: String(artist.customFields || "")
+                              .split("\n")
+                              .map((line) => line.trim())
+                              .filter(Boolean)
+                              .map((line) => {
+                                const [label, value] = line.split("|");
+                                return { label: label?.trim() || "Field", value: value?.trim() || "" };
+                              })
+                              .filter((field) => field.value),
+                            bookingEmail: artist.bookingEmail || undefined,
+                            primaryActionType: creator.primaryActionType,
+                            primaryActionLabel: creator.primaryActionLabel,
+                            primaryActionUrl: creator.primaryActionUrl || undefined,
+                            featuredTitle: creator.featuredTitle || undefined,
+                            featuredDescription: creator.featuredDescription || undefined,
+                            featuredUrl: creator.featuredUrl || undefined,
+                            featuredType: creator.featuredType || "highlight",
+                            moodPreset: creator.moodPreset || "sleek",
+                            layoutTemplate: creator.layoutTemplate || "portfolio",
+                            fontPreset: creator.fontPreset || "modern",
+                            enabledModules: pageModules.enabledModules,
+                            moduleOrder: pageModules.moduleOrder,
+                            pinnedPostId: creator.pinnedPostId ? Number(creator.pinnedPostId) : null,
+                          };
                           await saveBasic.mutateAsync({
                             userId: user.id,
-                            data: {
-                              avatarUrl: basic.avatarUrl || undefined,
-                              bannerUrl: basic.bannerUrl || undefined,
-                              bio: basic.bio || undefined,
-                              location: basic.location || undefined,
-                              city: basic.city || undefined,
-                              age: basic.age ? Number(basic.age) : undefined,
-                              work: basic.work || undefined,
-                              school: basic.school || undefined,
-                              about: basic.about || undefined,
-                              interests: String(basic.interests || "").split(",").map((item) => item.trim()).filter(Boolean),
-                              accentColor: basic.accentColor || undefined,
-                              themeName: basic.themeName || undefined,
-                              featuredContent: basic.featuredContent || undefined,
-                              links: String(basic.links || "")
-                                .split("\n")
-                                .map((line) => line.trim())
-                                .filter(Boolean)
-                                .map((line) => {
-                                  const [label, url] = line.split("|");
-                                  return { label: label?.trim() || url?.trim() || "Link", url: url?.trim() || label?.trim() || "" };
-                                })
-                                .filter((link) => link.url),
-                            },
+                            data: basicPayload,
                           });
                           await saveArtist.mutateAsync({
                             userId: user.id,
-                            data: {
-                              category: artist.category,
-                              displayName: artist.displayName || undefined,
-                              avatarUrl: artist.avatarUrl || undefined,
-                              bannerUrl: artist.bannerUrl || undefined,
-                              location: artist.location || undefined,
-                              tagline: artist.tagline || undefined,
-                              tags: String(artist.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean),
-                              bio: artist.bio || undefined,
-                              influences: artist.influences || undefined,
-                              availabilityStatus: artist.availabilityStatus || undefined,
-                              pronouns: artist.pronouns || undefined,
-                              yearsActive: artist.yearsActive || undefined,
-                              representedBy: artist.representedBy || undefined,
-                              openForCommissions: creator.openForCommissions === "true",
-                              touring: creator.touring === "true",
-                              acceptsCollaborations: creator.acceptsCollaborations !== "false",
-                              customFields: String(artist.customFields || "")
-                                .split("\n")
-                                .map((line) => line.trim())
-                                .filter(Boolean)
-                                .map((line) => {
-                                  const [label, value] = line.split("|");
-                                  return { label: label?.trim() || "Field", value: value?.trim() || "" };
-                                })
-                                .filter((field) => field.value),
-                              bookingEmail: artist.bookingEmail || undefined,
-                              primaryActionType: creator.primaryActionType,
-                              primaryActionLabel: creator.primaryActionLabel,
-                              primaryActionUrl: creator.primaryActionUrl || undefined,
-                              featuredTitle: creator.featuredTitle || undefined,
-                              featuredDescription: creator.featuredDescription || undefined,
-                              featuredUrl: creator.featuredUrl || undefined,
-                              featuredType: creator.featuredType || "highlight",
-                              moodPreset: creator.moodPreset || "sleek",
-                              layoutTemplate: creator.layoutTemplate || "portfolio",
-                              fontPreset: creator.fontPreset || "modern",
-                              enabledModules: pageModules.enabledModules,
-                              moduleOrder: pageModules.moduleOrder,
-                              pinnedPostId: creator.pinnedPostId ? Number(creator.pinnedPostId) : null,
-                            },
+                            data: artistPayload,
                           });
+                          await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
                           setActiveTab("creator");
                           setActiveIdentity("artist");
                           setLocation(`/artists/${user.id}`);
@@ -1304,10 +1318,10 @@ export default function Settings() {
                     }}
                   >
                     <div className="relative overflow-hidden">
-                      <div className={cn("absolute inset-0 bg-gradient-to-br", creatorPreviewLiveMood.shell)} />
-                      <div className={cn("absolute inset-0 bg-[radial-gradient(circle_at_top_left,var(--tw-gradient-stops))]", creatorPreviewLiveMood.glow)} />
-                      <div className="absolute inset-0 bg-gradient-to-t from-background via-background/78 to-background/18" />
-                      <div className="absolute inset-0 bg-black/12 dark:bg-black/22" />
+                      <div className={cn("absolute inset-0", artist.bannerUrl ? "bg-gradient-to-br opacity-70" : "bg-gradient-to-br", creatorPreviewLiveMood.shell)} />
+                      <div className={cn("absolute inset-0 bg-[radial-gradient(circle_at_top_left,var(--tw-gradient-stops))]", artist.bannerUrl ? "opacity-60" : "", creatorPreviewLiveMood.glow)} />
+                      <div className={cn("absolute inset-0", artist.bannerUrl ? "bg-gradient-to-t from-background/72 via-background/38 to-background/8 dark:from-background/78 dark:via-background/28 dark:to-background/6" : "bg-gradient-to-t from-background via-background/78 to-background/18")} />
+                      <div className={cn("absolute inset-0", artist.bannerUrl ? "bg-black/6 dark:bg-black/14" : "bg-black/12 dark:bg-black/22")} />
                       <div className="relative z-10 p-5 text-white">
                         <div className="mb-4 flex items-center gap-4">
                           <Avatar className="h-16 w-16 border-2 border-background/90 shadow-xl">

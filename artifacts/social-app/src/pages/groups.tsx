@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { QueryErrorState } from "@/components/query-error-state";
+import { LocationInput } from "@/components/location-input";
 import { uploadImage } from "@/lib/upload-image";
 import { useToast } from "@/hooks/use-toast";
 
@@ -81,7 +82,11 @@ export default function Groups() {
               <Textarea placeholder="What is this group for?" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <Input placeholder="Category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
-                <Input placeholder="Location" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
+                <LocationInput
+                  placeholder="City / state"
+                  value={form.location}
+                  onValueChange={(value) => setForm({ ...form, location: value })}
+                />
               </div>
               <div className="space-y-2">
                 <Input placeholder="Cover image URL" value={form.coverImageUrl} onChange={(e) => setForm({ ...form, coverImageUrl: e.target.value })} />
@@ -122,7 +127,12 @@ export default function Groups() {
       <Card className="bg-card/50 border-border/50">
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-3 p-4">
           <Input placeholder="Search groups..." value={search} onChange={(e) => setSearch(e.target.value)} className="bg-card/50" />
-          <Input placeholder="Filter by location..." value={location} onChange={(e) => setLocation(e.target.value)} className="bg-card/50" />
+          <LocationInput
+            placeholder="Filter by city / state..."
+            value={location}
+            onValueChange={setLocation}
+            className="bg-card/50"
+          />
         </CardContent>
       </Card>
 

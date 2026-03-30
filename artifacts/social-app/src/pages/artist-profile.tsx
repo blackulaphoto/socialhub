@@ -906,12 +906,15 @@ export default function ArtistProfile({ id }: { id: string }) {
     <div className={cn("w-full pb-20", fontClass)}>
       <section className="relative overflow-hidden border-b border-border">
         {artistPageBanner && (
-          <div className="absolute inset-0 bg-cover bg-center opacity-35" style={{ backgroundImage: `url(${artistPageBanner})` }} />
+          <div
+            className="absolute inset-0 bg-cover bg-center opacity-60"
+            style={{ backgroundImage: `url(${artistPageBanner})` }}
+          />
         )}
-        <div className={cn("absolute inset-0 bg-gradient-to-br", mood.shell)} />
-        <div className={cn("absolute inset-0 bg-[radial-gradient(circle_at_top_left,var(--tw-gradient-stops))]", mood.glow)} />
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/78 to-background/18" />
-        <div className="absolute inset-0 bg-black/12 dark:bg-black/22" />
+        <div className={cn("absolute inset-0", artistPageBanner ? "bg-gradient-to-br opacity-70" : "bg-gradient-to-br", mood.shell)} />
+        <div className={cn("absolute inset-0 bg-[radial-gradient(circle_at_top_left,var(--tw-gradient-stops))]", artistPageBanner ? "opacity-60" : "", mood.glow)} />
+        <div className={cn("absolute inset-0", artistPageBanner ? "bg-gradient-to-t from-background/72 via-background/38 to-background/8 dark:from-background/78 dark:via-background/28 dark:to-background/6" : "bg-gradient-to-t from-background via-background/78 to-background/18")} />
+        <div className={cn("absolute inset-0", artistPageBanner ? "bg-black/6 dark:bg-black/14" : "bg-black/12 dark:bg-black/22")} />
 
         <div className="relative z-10 mx-auto max-w-7xl px-4 py-14 md:py-20">
           <div className={cn("grid gap-10 md:gap-12", heroGridClass)}>

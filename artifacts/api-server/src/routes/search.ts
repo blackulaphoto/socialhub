@@ -2,6 +2,7 @@ import { Router } from "express";
 import { artistProfilesTable, db, eventsTable, followsTable, groupsTable, pool, usersTable } from "@workspace/db";
 import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { formatArtistProfile, formatEvent, formatGroup, getBlockedUserIds, getFriendshipState, getUserSummary } from "./helpers.js";
+import { expandLocationTerms } from "../lib/locations.js";
 
 const router = Router();
 
@@ -15,7 +16,7 @@ function clampLimit(value: string | undefined) {
 
 async function searchUserIds(input: {
   q: string;
-  location: string;
+  locationTerms: string[];
   blockedUserIds: number[];
   limit: number;
 }) {
@@ -51,9 +52,14 @@ async function searchUserIds(input: {
         similarity(coalesce(d.city, ''), $1) > 0.16
       )
       and (
-        $2 = '' or
-        coalesce(d.location, '') ilike ('%' || $2 || '%') or
-        coalesce(d.city, '') ilike ('%' || $2 || '%')
+        cardinality($2::text[]) = 0 or
+        exists (
+          select 1
+          from unnest($2::text[]) as term
+          where
+            coalesce(d.location, '') ilike ('%' || term || '%') or
+            coalesce(d.city, '') ilike ('%' || term || '%')
+        )
       )
       and (
         cardinality($3::int[]) = 0 or
@@ -69,7 +75,7 @@ async function searchUserIds(input: {
 
   const result = await pool.query<{ id: number }>(query, [
     input.q,
-    input.location,
+    input.locationTerms,
     input.blockedUserIds,
     input.limit,
   ]);
@@ -79,7 +85,7 @@ async function searchUserIds(input: {
 
 async function searchArtistUserIds(input: {
   q: string;
-  location: string;
+  locationTerms: string[];
   category: string;
   tagList: string[];
   blockedUserIds: number[];
@@ -128,10 +134,15 @@ async function searchArtistUserIds(input: {
         similarity(array_to_string(coalesce(a.tags, '{}'), ' '), $1) > 0.14
       )
       and (
-        $2 = '' or
-        coalesce(a.location, '') ilike ('%' || $2 || '%') or
-        coalesce(d.city, '') ilike ('%' || $2 || '%') or
-        coalesce(d.location, '') ilike ('%' || $2 || '%')
+        cardinality($2::text[]) = 0 or
+        exists (
+          select 1
+          from unnest($2::text[]) as term
+          where
+            coalesce(a.location, '') ilike ('%' || term || '%') or
+            coalesce(d.city, '') ilike ('%' || term || '%') or
+            coalesce(d.location, '') ilike ('%' || term || '%')
+        )
       )
       and ($3 = '' or coalesce(a.category, '') ilike ('%' || $3 || '%'))
       and (
@@ -152,7 +163,7 @@ async function searchArtistUserIds(input: {
 
   const result = await pool.query<{ userId: number }>(query, [
     input.q,
-    input.location,
+    input.locationTerms,
     input.category,
     input.tagList,
     input.blockedUserIds,
@@ -164,7 +175,7 @@ async function searchArtistUserIds(input: {
 
 async function searchGroupIds(input: {
   q: string;
-  location: string;
+  locationTerms: string[];
   category: string;
   tagList: string[];
   limit: number;
@@ -177,8 +188,8 @@ async function searchGroupIds(input: {
       ilike(groupsTable.category, `%${input.q}%`),
     ));
   }
-  if (input.location) {
-    conditions.push(ilike(groupsTable.location, `%${input.location}%`));
+  if (input.locationTerms.length > 0) {
+    conditions.push(or(...input.locationTerms.map((term) => ilike(groupsTable.location, `%${term}%`))));
   }
   if (input.category) {
     conditions.push(ilike(groupsTable.category, `%${input.category}%`));
@@ -197,7 +208,7 @@ async function searchGroupIds(input: {
 
 async function searchEventIds(input: {
   q: string;
-  location: string;
+  locationTerms: string[];
   tagList: string[];
   limit: number;
 }) {
@@ -209,10 +220,12 @@ async function searchEventIds(input: {
       ilike(eventsTable.location, `%${input.q}%`),
     ));
   }
-  if (input.location) {
+  if (input.locationTerms.length > 0) {
     conditions.push(or(
-      ilike(eventsTable.location, `%${input.location}%`),
-      ilike(eventsTable.city, `%${input.location}%`),
+      ...input.locationTerms.flatMap((term) => [
+        ilike(eventsTable.location, `%${term}%`),
+        ilike(eventsTable.city, `%${term}%`),
+      ]),
     ));
   }
   if (input.tagList.length > 0) {
@@ -239,6 +252,7 @@ router.get("/search", async (req, res) => {
 
   const normalizedQuery = q.trim();
   const normalizedLocation = location.trim();
+  const locationTerms = expandLocationTerms(normalizedLocation);
   const normalizedCategory = category.trim();
   const tagList = tags
     .split(",")
@@ -247,7 +261,7 @@ router.get("/search", async (req, res) => {
   const safeType: SearchType = type === "users" || type === "artists" || type === "groups" || type === "events" ? type : "all";
   const safeLimit = clampLimit(limit);
 
-  if (!normalizedQuery && !normalizedLocation && !normalizedCategory && tagList.length === 0) {
+  if (!normalizedQuery && locationTerms.length === 0 && !normalizedCategory && tagList.length === 0) {
     res.json({ users: [], artists: [], groups: [], events: [], total: 0, usersTotal: 0, artistsTotal: 0, groupsTotal: 0, eventsTotal: 0 });
     return;
   }
@@ -257,7 +271,7 @@ router.get("/search", async (req, res) => {
   const userIds = safeType === "all" || safeType === "users"
     ? await searchUserIds({
       q: normalizedQuery,
-      location: normalizedLocation,
+      locationTerms,
       blockedUserIds,
       limit: safeLimit,
     })
@@ -266,7 +280,7 @@ router.get("/search", async (req, res) => {
   const artistUserIds = safeType === "all" || safeType === "artists"
     ? await searchArtistUserIds({
       q: normalizedQuery,
-      location: normalizedLocation,
+      locationTerms,
       category: normalizedCategory,
       tagList,
       blockedUserIds,
@@ -277,7 +291,7 @@ router.get("/search", async (req, res) => {
   const groupIds = safeType === "all" || safeType === "groups"
     ? await searchGroupIds({
       q: normalizedQuery,
-      location: normalizedLocation,
+      locationTerms,
       category: normalizedCategory,
       tagList,
       limit: safeLimit,
@@ -287,7 +301,7 @@ router.get("/search", async (req, res) => {
   const eventIds = safeType === "all" || safeType === "events"
     ? await searchEventIds({
       q: normalizedQuery,
-      location: normalizedLocation,
+      locationTerms,
       tagList,
       limit: safeLimit,
     })

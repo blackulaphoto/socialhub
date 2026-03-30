@@ -4,11 +4,13 @@ import {
   CalendarRange,
   Compass,
   Menu,
+  ChevronDown,
   Palette,
   Home,
   LogOut,
   MessageSquare,
   Moon,
+  Plus,
   Search,
   Settings,
   ShieldAlert,
@@ -100,7 +102,7 @@ export function AppSidebar() {
     { title: "Search", url: "/search", icon: Search },
     { title: "Messages", url: "/messages", icon: MessageSquare },
     { title: "Profile", url: `/profile/${user?.id}`, icon: UserIcon },
-    { title: user?.hasArtistPage ? "Artist Page" : "Create Artist Page", url: "/settings?tab=creator", icon: Palette },
+    { title: user?.hasArtistPage ? "Artist Page" : "Create Artist Page", url: user?.hasArtistPage ? `/artists/${user?.id}` : "/settings?tab=creator", icon: Palette },
     { title: "Settings", url: "/settings", icon: Settings },
   ];
 
@@ -213,94 +215,15 @@ function HeaderActions() {
 
   return (
     <div className="flex items-center gap-2">
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="rounded-full md:hidden" aria-label="Open header menu">
-            <Menu className="h-5 w-5" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-64 md:hidden">
-          <DropdownMenuLabel>Quick actions</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          {canUseArtistIdentity ? (
-            <>
-              {activeIdentity === "artist" ? (
-                <DropdownMenuItem
-                  onClick={() => {
-                    setActiveIdentity("personal");
-                    setLocation(`/profile/${user?.id}`);
-                  }}
-                >
-                  Switch To Personal Profile
-                </DropdownMenuItem>
-              ) : (
-                <DropdownMenuItem
-                  onClick={() => {
-                    setActiveIdentity("artist");
-                    setLocation(`/artists/${user?.id}`);
-                  }}
-                >
-                  Switch To Artist Page
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuSeparator />
-            </>
-          ) : null}
-          {!user?.hasArtistPage ? (
-            <>
-              <DropdownMenuItem asChild>
-                <Link href="/settings?tab=creator">Create Artist Page</Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-            </>
-          ) : null}
-          <DropdownMenuItem onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
-            {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            {theme === "dark" ? "Light mode" : "Dark mode"}
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link href="/settings">Settings</Link>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-      {canUseArtistIdentity && (
-        <div className="hidden items-center rounded-full border border-border/60 bg-background/60 p-1 md:flex">
-          <Button
-            variant={activeIdentity === "personal" ? "default" : "ghost"}
-            size="sm"
-            className="h-8 rounded-full px-3"
-            onClick={() => {
-              setActiveIdentity("personal");
-              setLocation(`/profile/${user?.id}`);
-            }}
-          >
-            Personal
-          </Button>
-          <Button
-            variant={activeIdentity === "artist" ? "default" : "ghost"}
-            size="sm"
-            className="h-8 rounded-full px-3"
-            onClick={() => {
-              setActiveIdentity("artist");
-              setLocation(`/artists/${user?.id}`);
-            }}
-          >
-            Artist Page
-          </Button>
-        </div>
-      )}
-      <Button
-        variant="ghost"
-        size="sm"
-        className="hidden rounded-full md:inline-flex"
-        onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-      >
-        {theme === "dark" ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
-        {theme === "dark" ? "Light" : "Dark"}
-      </Button>
+      <Link href="/">
+        <Button variant="ghost" size="sm" className="hidden rounded-full px-4 lg:inline-flex">
+          <Plus className="mr-2 h-4 w-4" />
+          Create
+        </Button>
+      </Link>
 
       <Link href="/messages">
-        <Button variant="ghost" size="icon" className="relative rounded-full">
+        <Button variant="ghost" size="icon" className="relative rounded-full transition-colors hover:bg-accent/70">
           <MessageSquare className="w-4 h-4" />
           {(activity?.unreadMessages || 0) > 0 && (
             <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-primary text-primary-foreground text-[11px] font-bold grid place-items-center">
@@ -312,7 +235,7 @@ function HeaderActions() {
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="relative rounded-full">
+          <Button variant="ghost" size="icon" className="relative rounded-full transition-colors hover:bg-accent/70">
             <Bell className="w-4 h-4" />
             {(activity?.unreadNotifications || 0) > 0 && (
               <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-primary text-primary-foreground text-[11px] font-bold grid place-items-center">
@@ -373,15 +296,16 @@ function HeaderActions() {
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="h-11 rounded-full px-2">
+          <Button variant="ghost" className="h-11 rounded-full px-2 transition-colors hover:bg-accent/70">
             <Avatar className="w-9 h-9 border border-border">
               <AvatarImage src={user?.avatarUrl || ""} />
               <AvatarFallback>{user?.username?.substring(0, 2).toUpperCase()}</AvatarFallback>
             </Avatar>
             <div className="hidden md:block text-left ml-2">
-        <div className="text-sm font-medium leading-none">{user?.username}</div>
+              <div className="text-sm font-medium leading-none">{user?.username}</div>
               <div className="text-[11px] text-muted-foreground mt-1">{user?.hasArtistPage ? "Personal + artist page" : "Personal profile"}</div>
             </div>
+            <ChevronDown className="ml-2 hidden h-4 w-4 text-muted-foreground md:block" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
@@ -395,13 +319,28 @@ function HeaderActions() {
           </DropdownMenuItem>
           {canUseArtistIdentity ? (
             activeIdentity === "artist" ? (
+              <DropdownMenuItem asChild>
+                <Link href={`/artists/${user?.id}`}>Edit Artist Page</Link>
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem asChild>
+                <Link href={`/profile/${user?.id}`}>Edit Profile</Link>
+              </DropdownMenuItem>
+            )
+          ) : (
+            <DropdownMenuItem asChild>
+              <Link href={`/profile/${user?.id}`}>Edit Profile</Link>
+            </DropdownMenuItem>
+          )}
+          {canUseArtistIdentity ? (
+            activeIdentity === "artist" ? (
               <DropdownMenuItem
                 onClick={() => {
                   setActiveIdentity("personal");
                   setLocation(`/profile/${user?.id}`);
                 }}
               >
-                Switch To Personal Profile
+                Switch To Personal
               </DropdownMenuItem>
             ) : (
               <DropdownMenuItem
@@ -414,11 +353,13 @@ function HeaderActions() {
               </DropdownMenuItem>
             )
           ) : null}
+          {!user?.hasArtistPage ? (
+            <DropdownMenuItem asChild>
+              <Link href="/settings?tab=creator">Create Artist Page</Link>
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuItem asChild>
             <Link href="/settings">Settings</Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link href="/notifications">Notifications</Link>
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
             {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
@@ -435,37 +376,60 @@ function HeaderActions() {
 }
 
 function AppHeader() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const { user } = useAuth();
-  const { activeIdentity, canUseArtistIdentity } = useActiveIdentity();
+  const { activeIdentity, setActiveIdentity, canUseArtistIdentity } = useActiveIdentity();
   const { data: siteSettings } = useSiteSettings();
   const meta = getPageMeta(location);
 
   return (
     <header className="sticky top-0 z-30 border-b border-border/60 bg-background/80 backdrop-blur-xl">
-      <div className="px-4 md:px-6 h-16 flex items-center gap-3">
-        <div className="md:hidden">
+      <div className="px-4 md:px-6 h-16 flex items-center gap-3 md:gap-6">
+        <div className="flex min-w-0 items-center gap-3">
           <SidebarTrigger>
             <Menu className="w-5 h-5" />
           </SidebarTrigger>
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold">{location === "/" ? (siteSettings?.siteName || meta.title) : meta.title}</div>
-          <div className="hidden md:block text-xs text-muted-foreground truncate">{meta.subtitle}</div>
-        </div>
-        {canUseArtistIdentity && (
-          <Badge variant={activeIdentity === "artist" ? "default" : "secondary"} className="hidden rounded-full px-3 py-1 md:inline-flex">
-            {activeIdentity === "artist" ? "Posting as artist page" : "Posting as personal"}
-          </Badge>
-        )}
-        {!user?.hasArtistPage && (
-          <Link href="/settings?tab=creator">
-            <Button size="sm" className="hidden rounded-full lg:inline-flex">
-              <Palette className="mr-2 h-4 w-4" />
-              Create Artist Page
-            </Button>
+          <Link href="/" className="min-w-0">
+            <div className="text-lg font-semibold leading-none">{siteSettings?.siteName || "ArtistHub"}</div>
+            <div className="hidden text-xs text-muted-foreground md:block">{location === "/" ? meta.subtitle : meta.title}</div>
           </Link>
-        )}
+        </div>
+
+        <div className="flex flex-1 justify-center">
+          {canUseArtistIdentity ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="h-10 rounded-full px-4 shadow-sm transition-colors hover:border-primary/35 hover:bg-accent/60">
+                  {activeIdentity === "artist" ? "Artist Page" : "Personal"}
+                  <ChevronDown className="ml-2 h-4 w-4 text-muted-foreground" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="center" className="w-52">
+                <DropdownMenuLabel>Viewing as</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => {
+                    setActiveIdentity("personal");
+                    setLocation(`/profile/${user?.id}`);
+                  }}
+                >
+                  Personal
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    setActiveIdentity("artist");
+                    setLocation(`/artists/${user?.id}`);
+                  }}
+                >
+                  Artist Page
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <div className="hidden text-sm text-muted-foreground md:block">{location === "/" ? "Home" : meta.title}</div>
+          )}
+        </div>
+
         <HeaderActions />
       </div>
     </header>

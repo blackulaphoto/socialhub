@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Camera,
   Compass,
@@ -12,6 +12,7 @@ import {
   Share2,
   Sparkles,
   Tag,
+  X,
 } from "lucide-react";
 import {
   useFollowUser,
@@ -70,6 +71,7 @@ export default function Profile({ id }: { id: string }) {
   const { setActiveIdentity } = useActiveIdentity();
   const queryClient = useQueryClient();
   const isOwnProfile = currentUser?.id === userId;
+  const [activePhotoIndex, setActivePhotoIndex] = useState<number | null>(null);
 
   const {
     data: profile,
@@ -118,6 +120,43 @@ export default function Profile({ id }: { id: string }) {
     () => postsData?.pages.flatMap((page) => page.posts) || [],
     [postsData],
   );
+  const photoGalleryItems = useMemo(() => {
+    const photoMap = new Map<string, { url: string; caption?: string | null; createdAt?: string | null }>();
+
+    (userPhotos || []).forEach((photo) => {
+      if (!photo.imageUrl) return;
+      photoMap.set(photo.imageUrl, {
+        url: photo.imageUrl,
+        caption: photo.caption || null,
+        createdAt: photo.createdAt,
+      });
+    });
+
+    profilePosts.forEach((post) => {
+      if (post.imageUrl) {
+        photoMap.set(post.imageUrl, {
+          url: post.imageUrl,
+          caption: post.content || null,
+          createdAt: post.createdAt,
+        });
+      }
+      post.media?.forEach((media) => {
+        if (media.type === "image" && media.url) {
+          photoMap.set(media.url, {
+            url: media.url,
+            caption: post.content || media.title || null,
+            createdAt: post.createdAt,
+          });
+        }
+      });
+    });
+
+    return Array.from(photoMap.values()).sort((a, b) => {
+      const left = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const right = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return right - left;
+    });
+  }, [profilePosts, userPhotos]);
   const handleShare = async () => {
     const url = `${window.location.origin}/profile/${userId}`;
     try {
@@ -156,8 +195,6 @@ export default function Profile({ id }: { id: string }) {
   const accent = user.accentColor || "#8b5cf6";
   const locationLine = formatPlace([user.city, user.location]);
   const profileTheme = PROFILE_THEME_STYLES[user.themeName || "nocturne"] || PROFILE_THEME_STYLES.nocturne;
-  const photoPosts = profilePosts.filter((post) => post.imageUrl || post.media?.some((media) => media.type === "image"));
-
   return (
     <div className="w-full pb-14">
       <section
@@ -359,51 +396,37 @@ export default function Profile({ id }: { id: string }) {
             </TabsContent>
 
             <TabsContent value="photos" className="pt-6">
-              <div className="space-y-6">
-                <Card className="border-border/50 bg-card/50">
-                  <CardHeader>
-                    <CardTitle>Photo Gallery</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {userPhotos?.length ? (
-                      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                        {userPhotos.map((photo) => (
-                          <div key={photo.id} className="overflow-hidden rounded-2xl border border-border/50 bg-background/40">
-                            <img src={photo.imageUrl} alt={photo.caption || `${user.username} photo`} loading="lazy" decoding="async" className="h-56 w-full object-cover" />
-                            <div className="space-y-2 p-4">
-                              {photo.caption && <div className="text-sm">{photo.caption}</div>}
-                              <div className="text-xs text-muted-foreground">{new Date(photo.createdAt).toLocaleDateString()}</div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="rounded-xl border border-dashed border-border/50 bg-card/20 py-12 text-center text-muted-foreground">
-                        No gallery photos yet.
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card className="border-border/50 bg-card/50">
-                  <CardHeader>
-                    <CardTitle>Photo Posts</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {photoPosts.length ? (
-                      <div className="space-y-4">
-                        {photoPosts.map((post) => (
-                          <FeedPostCard key={post.id} post={post} showAuthor={false} />
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="rounded-xl border border-dashed border-border/50 bg-card/20 py-12 text-center text-muted-foreground">
-                        No image posts yet.
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
+              <Card className="border-border/50 bg-card/50">
+                <CardHeader>
+                  <CardTitle>Photo Gallery</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {photoGalleryItems.length ? (
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                      {photoGalleryItems.map((photo, index) => (
+                        <button
+                          key={`${photo.url}-${index}`}
+                          type="button"
+                          onClick={() => setActivePhotoIndex(index)}
+                          className="group overflow-hidden rounded-2xl bg-background/40 text-left shadow-sm transition-transform hover:scale-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                        >
+                          <img
+                            src={photo.url}
+                            alt={photo.caption || `${user.username} photo`}
+                            loading="lazy"
+                            decoding="async"
+                            className="aspect-square w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-border/50 bg-card/20 py-12 text-center text-muted-foreground">
+                      No photos yet.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </TabsContent>
 
             <TabsContent value="about" className="pt-6">
@@ -545,6 +568,43 @@ export default function Profile({ id }: { id: string }) {
           ) : null}
         </aside>
       </div>
+
+      {activePhotoIndex !== null && photoGalleryItems[activePhotoIndex] ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm"
+          onClick={() => setActivePhotoIndex(null)}
+        >
+          <button
+            type="button"
+            className="absolute right-4 top-4 rounded-full border border-white/20 bg-black/40 p-2 text-white"
+            onClick={() => setActivePhotoIndex(null)}
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <div
+            className="max-h-[90vh] max-w-5xl overflow-hidden rounded-3xl bg-black/20"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <img
+              src={photoGalleryItems[activePhotoIndex].url}
+              alt={photoGalleryItems[activePhotoIndex].caption || `${user.username} photo`}
+              className="max-h-[80vh] w-full object-contain"
+            />
+            {(photoGalleryItems[activePhotoIndex].caption || photoGalleryItems[activePhotoIndex].createdAt) ? (
+              <div className="space-y-2 bg-black/65 px-5 py-4 text-white">
+                {photoGalleryItems[activePhotoIndex].caption ? (
+                  <div className="text-sm">{photoGalleryItems[activePhotoIndex].caption}</div>
+                ) : null}
+                {photoGalleryItems[activePhotoIndex].createdAt ? (
+                  <div className="text-xs text-white/70">
+                    {new Date(photoGalleryItems[activePhotoIndex].createdAt as string).toLocaleDateString()}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

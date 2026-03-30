@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { LocationInput } from "@/components/location-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +19,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { formatCityRegion, parseCityRegion } from "@/lib/locations";
 import { Palette, Sparkles } from "lucide-react";
 
 const CREATOR_TYPES = [
@@ -199,12 +201,16 @@ export default function Onboarding() {
             <CardContent className="space-y-5">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>City</Label>
-                  <Input value={profileForm.city} onChange={(e) => setProfileForm((current) => ({ ...current, city: e.target.value }))} placeholder="Los Angeles" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Location</Label>
-                  <Input value={profileForm.location} onChange={(e) => setProfileForm((current) => ({ ...current, location: e.target.value }))} placeholder="Los Angeles, CA" />
+                  <Label>City / state</Label>
+                  <LocationInput
+                    value={formatCityRegion(profileForm.city, profileForm.location)}
+                    placeholder="Los Angeles, California"
+                    onValueChange={(value) => {
+                      const parsed = parseCityRegion(value);
+                      setProfileForm((current) => ({ ...current, city: parsed.city, location: parsed.region }));
+                    }}
+                    onOptionSelect={(option) => setProfileForm((current) => ({ ...current, city: option.city, location: option.region }))}
+                  />
                 </div>
               </div>
               <div className="space-y-2">
@@ -265,7 +271,12 @@ export default function Onboarding() {
                 </div>
                 <div className="space-y-2">
                   <Label>Base location</Label>
-                  <Input value={artistForm.location} onChange={(e) => setArtistForm((current) => ({ ...current, location: e.target.value }))} placeholder="Los Angeles, CA" />
+                  <LocationInput
+                    value={artistForm.location}
+                    onValueChange={(value) => setArtistForm((current) => ({ ...current, location: value }))}
+                    onOptionSelect={(option) => setArtistForm((current) => ({ ...current, location: option.label }))}
+                    placeholder="Los Angeles, California"
+                  />
                 </div>
               </div>
               <div className="space-y-2">

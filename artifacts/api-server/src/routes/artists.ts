@@ -1,8 +1,9 @@
 import { Router } from "express";
-import { artistProfilesTable, creatorProfileSettingsTable, db, followsTable, galleryItemsTable, usersTable } from "@workspace/db";
+import { artistProfilesTable, creatorProfileSettingsTable, db, followsTable, galleryItemsTable, userProfileDetailsTable, usersTable } from "@workspace/db";
 import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth.js";
 import { formatArtistProfile, getBlockState, getBlockedUserIds } from "./helpers.js";
+import { expandLocationTerms } from "../lib/locations.js";
 
 const router = Router();
 
@@ -10,6 +11,7 @@ router.get("/artists", async (req, res) => {
   const { location, category, tags, q } = req.query as Record<string, string>;
   const blockedUserIds = await getBlockedUserIds(req.session.userId);
   const conditions = [];
+  const locationTerms = expandLocationTerms(location);
 
   if (q) {
     conditions.push(or(
@@ -17,9 +19,19 @@ router.get("/artists", async (req, res) => {
       ilike(artistProfilesTable.displayName, `%${q}%`),
       ilike(artistProfilesTable.category, `%${q}%`),
       ilike(artistProfilesTable.location, `%${q}%`),
+      ilike(userProfileDetailsTable.city, `%${q}%`),
+      ilike(userProfileDetailsTable.location, `%${q}%`),
     ));
   }
-  if (location) conditions.push(ilike(artistProfilesTable.location, `%${location}%`));
+  if (locationTerms.length > 0) {
+    conditions.push(or(
+      ...locationTerms.flatMap((term) => [
+        ilike(artistProfilesTable.location, `%${term}%`),
+        ilike(userProfileDetailsTable.city, `%${term}%`),
+        ilike(userProfileDetailsTable.location, `%${term}%`),
+      ]),
+    ));
+  }
   if (category) conditions.push(ilike(artistProfilesTable.category, `%${category}%`));
   if (tags) {
     const tagList = tags.split(",").map((tag) => tag.trim()).filter(Boolean);
@@ -30,6 +42,7 @@ router.get("/artists", async (req, res) => {
 
   const results = await db.select().from(artistProfilesTable)
     .innerJoin(usersTable, eq(artistProfilesTable.userId, usersTable.id))
+    .leftJoin(userProfileDetailsTable, eq(userProfileDetailsTable.userId, usersTable.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(desc(artistProfilesTable.updatedAt));
 

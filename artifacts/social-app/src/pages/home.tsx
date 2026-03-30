@@ -18,6 +18,8 @@ import {
   useCreatePost,
   useGetCustomFeeds,
   getFeed,
+  useFollowUser,
+  useUnfollowUser,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -43,6 +45,7 @@ import { getEmbedDescriptor } from "@/lib/embeds";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LoadMoreSentinel } from "@/components/load-more-sentinel";
 import { useActiveIdentity } from "@/hooks/useActiveIdentity";
+import { LocationInput } from "@/components/location-input";
 
 const POST_DRAFT_KEY = "socialhub:post-draft";
 
@@ -113,7 +116,7 @@ export default function Home() {
       if (!response.ok) {
         throw new Error("Could not load suggested creators");
       }
-      return response.json() as Promise<{ artists: Array<{ userId: number; displayName?: string | null; avatarUrl?: string | null; category: string; location?: string | null; tagline?: string | null; tags?: string[]; user: { username: string; avatarUrl?: string | null } }> }>;
+      return response.json() as Promise<{ artists: Array<{ userId: number; displayName?: string | null; avatarUrl?: string | null; category: string; location?: string | null; tagline?: string | null; tags?: string[]; isFollowing?: boolean; user: { username: string; avatarUrl?: string | null } }> }>;
     },
   });
   const { data: followingPreview, isLoading: isLoadingFollowingPreview } = useQuery({
@@ -171,6 +174,32 @@ export default function Home() {
       },
       onError: () => {
         toast({ title: "Could not save custom feed", variant: "destructive" });
+      },
+    },
+  });
+
+  const followCreator = useFollowUser({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["suggested-creators", user?.id] });
+        queryClient.invalidateQueries({ queryKey: ["/api/users", user?.id, "following"] });
+        queryClient.invalidateQueries({ queryKey: ["feed"] });
+      },
+      onError: () => {
+        toast({ title: "Could not follow creator", variant: "destructive" });
+      },
+    },
+  });
+
+  const unfollowCreator = useUnfollowUser({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["suggested-creators", user?.id] });
+        queryClient.invalidateQueries({ queryKey: ["/api/users", user?.id, "following"] });
+        queryClient.invalidateQueries({ queryKey: ["feed"] });
+      },
+      onError: () => {
+        toast({ title: "Could not update follow", variant: "destructive" });
       },
     },
   });
@@ -324,7 +353,7 @@ export default function Home() {
 
                     <div className="space-y-2">
                       <div className="text-sm font-medium">Local city filter</div>
-                      <Input placeholder="Los Angeles" value={city} onChange={(e) => setCity(e.target.value)} />
+                      <LocationInput placeholder="Los Angeles, California" value={city} onValueChange={setCity} />
                       {city && (
                         <div className="flex flex-wrap gap-2">
                           <Badge variant="secondary">{city}</Badge>
@@ -592,6 +621,68 @@ export default function Home() {
         </CardContent>
       </Card>
 
+      {!!suggestedCreators?.artists?.length && (
+        <Card className="overflow-hidden border-border/50 bg-card/60 md:hidden">
+          <CardContent className="space-y-4 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold">Suggested Creators</h2>
+                <div className="mt-1 text-xs text-muted-foreground">Discover people to follow without leaving the feed.</div>
+              </div>
+              <Link href="/discover">
+                <Button variant="ghost" size="sm" className="shrink-0">See all</Button>
+              </Link>
+            </div>
+            <div className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-1">
+              {suggestedCreators.artists.map((artist) => {
+                const artistName = artist.displayName || artist.user.username;
+                const artistDescriptor = artist.tagline || artist.tags?.[0] || "";
+
+                return (
+                  <Link
+                    key={artist.userId}
+                    href={`/artists/${artist.userId}`}
+                    className="min-w-[250px] snap-start rounded-2xl border border-border/50 bg-background/45 p-3 shadow-sm transition-colors hover:border-primary/30"
+                  >
+                    <div className="flex items-start gap-3">
+                      <Avatar className="h-12 w-12 shrink-0">
+                        <AvatarImage src={artist.avatarUrl || artist.user.avatarUrl || ""} />
+                        <AvatarFallback>{artistName.slice(0, 2).toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-semibold">{artistName}</div>
+                        <div className="mt-1 text-xs text-muted-foreground">{artist.category}</div>
+                        {artist.location ? <div className="mt-1 text-xs text-muted-foreground">{artist.location}</div> : null}
+                        {artistDescriptor ? <div className="mt-2 line-clamp-2 text-xs text-muted-foreground">{artistDescriptor}</div> : null}
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <Button
+                        size="sm"
+                        variant={artist.isFollowing ? "outline" : "default"}
+                        className="w-full"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          if (artist.isFollowing) {
+                            unfollowCreator.mutate({ userId: artist.userId });
+                          } else {
+                            followCreator.mutate({ userId: artist.userId });
+                          }
+                        }}
+                        disabled={followCreator.isPending || unfollowCreator.isPending}
+                      >
+                        {artist.isFollowing ? "Following" : "Follow"}
+                      </Button>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="hidden overflow-hidden border-border/50 bg-card/60 md:block">
         <CardContent className="p-0">
           <div className="relative px-6 py-8 md:px-8 md:py-10">
@@ -675,7 +766,7 @@ export default function Home() {
 
               <div className="space-y-2">
                 <div className="text-sm font-medium">Local city filter</div>
-                <Input placeholder="Los Angeles" value={city} onChange={(e) => setCity(e.target.value)} />
+                <LocationInput placeholder="Los Angeles, California" value={city} onValueChange={setCity} />
                 {city && (
                   <div className="flex flex-wrap gap-2">
                     <Badge variant="secondary">{city}</Badge>

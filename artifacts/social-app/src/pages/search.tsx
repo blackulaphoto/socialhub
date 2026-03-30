@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Spinner } from "@/components/ui/spinner";
 import { QueryErrorState } from "@/components/query-error-state";
 import { FriendActionButton } from "@/components/friend-action-button";
+import { LocationInput } from "@/components/location-input";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 
@@ -162,7 +163,7 @@ export default function Search() {
               <SelectItem value="events">Events</SelectItem>
             </SelectContent>
           </Select>
-          <Input placeholder="City / location" value={location} onChange={(e) => setLocation(e.target.value)} />
+          <LocationInput placeholder="City / state" value={location} onValueChange={setLocation} />
           <Input placeholder="Category" value={category} onChange={(e) => setCategory(e.target.value)} />
           <Input placeholder="Tags, comma separated" value={tags} onChange={(e) => setTags(e.target.value)} />
         </CardContent>

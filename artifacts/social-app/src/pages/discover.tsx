@@ -14,6 +14,7 @@ import { QueryErrorState } from "@/components/query-error-state";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { FriendActionButton } from "@/components/friend-action-button";
+import { LocationInput } from "@/components/location-input";
 
 type FriendshipState = {
   id?: number | null;
@@ -188,13 +189,12 @@ export default function Discover() {
               </SelectContent>
             </Select>
           </div>
-          <div className="w-full md:w-64 relative">
-            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Location"
-              className="pl-9 bg-background/50 border-border/50"
+          <div className="w-full md:w-64">
+            <LocationInput
+              placeholder="City / state"
+              className="bg-background/50 border-border/50"
               value={location}
-              onChange={(e) => setLocation(e.target.value)}
+              onValueChange={setLocation}
             />
           </div>
         </CardContent>

@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
 import { Badge } from "@/components/ui/badge";
 import { QueryErrorState } from "@/components/query-error-state";
+import { LocationInput } from "@/components/location-input";
 import { useToast } from "@/hooks/use-toast";
 import { uploadImage } from "@/lib/upload-image";
 
@@ -143,7 +144,11 @@ export default function Events() {
               <Textarea placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
               <Input type="datetime-local" value={form.startsAt} onChange={(e) => setForm({ ...form, startsAt: e.target.value })} />
               <Input placeholder="Venue / address" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
-              <Input placeholder="City" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+              <LocationInput
+                placeholder="City / state"
+                value={form.city}
+                onValueChange={(value) => setForm({ ...form, city: value })}
+              />
               <div className="space-y-2">
                 <Input placeholder="Event image URL" value={form.imageUrl} onChange={(e) => setForm({ ...form, imageUrl: e.target.value })} />
                 <Input type="file" accept="image/*" onChange={(e) => handleEventImageUpload(e.target.files?.[0] || null)} disabled={isUploadingImage} />
@@ -237,7 +242,12 @@ export default function Events() {
       <Card className="border-border/50 bg-card/50">
         <CardContent className="grid grid-cols-1 gap-3 p-4 md:grid-cols-2">
           <Input placeholder="Search title or description..." value={query} onChange={(e) => setQuery(e.target.value)} className="bg-card/50" />
-          <Input placeholder="Filter by city..." value={city} onChange={(e) => setCity(e.target.value)} className="bg-card/50" />
+          <LocationInput
+            placeholder="Filter by city / state..."
+            value={city}
+            onValueChange={setCity}
+            className="bg-card/50"
+          />
         </CardContent>
       </Card>
 
