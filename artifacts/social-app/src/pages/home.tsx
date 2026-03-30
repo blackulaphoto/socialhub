@@ -270,6 +270,12 @@ export default function Home() {
     window.localStorage.setItem(`${POST_DRAFT_KEY}:${user.id}`, JSON.stringify(postForm));
   }, [draftLoaded, postForm, user?.id]);
 
+  useEffect(() => {
+    if (canUseArtistIdentity && activeIdentity === "artist") {
+      setActiveIdentity("personal");
+    }
+  }, [activeIdentity, canUseArtistIdentity, setActiveIdentity]);
+
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 p-4 md:py-8">
       <Card className="border-border/50 bg-card/60 md:hidden">
@@ -541,24 +547,21 @@ export default function Home() {
 
       <Card className="cursor-pointer border-border/70 bg-card/90 shadow-[0_10px_30px_rgba(15,23,42,0.08)] transition-colors hover:border-primary/35" onClick={openPostDialog}>
         <CardContent className="p-4 md:p-5">
-          <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-background/70 p-3 md:p-4">
+          <div className="flex items-center gap-3">
             <Avatar className="h-10 w-10 md:h-11 md:w-11">
               <AvatarImage src={user?.avatarUrl || ""} />
               <AvatarFallback>{user?.username?.slice(0, 2).toUpperCase()}</AvatarFallback>
             </Avatar>
-              <button
-                type="button"
-                data-testid="open-post-composer"
-                className="flex-1 rounded-2xl border border-border bg-background px-4 py-3 text-left shadow-sm transition-colors hover:border-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-              >
-                <span className="mr-2 inline-flex rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-primary">
-                  {activeIdentity === "artist" ? "Artist Page" : "Personal"}
-                </span>
-                <div className="mt-2 text-sm font-medium text-foreground/85">Create a post</div>
-                <div className="mt-1 text-sm text-muted-foreground">
-                  Share a release, appearance, drop, call-for-collab, or update...
-                </div>
-              </button>
+            <button
+              type="button"
+              data-testid="open-post-composer"
+              className="flex-1 rounded-2xl border border-slate-300/85 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.95))] px-4 py-4 text-left shadow-[0_12px_26px_rgba(15,23,42,0.10)] transition-colors hover:border-primary/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 dark:border-slate-700/80 dark:bg-[linear-gradient(180deg,rgba(17,24,39,0.96),rgba(15,23,42,0.94))] dark:shadow-[0_14px_30px_rgba(2,6,23,0.42)]"
+            >
+              <div className="text-sm font-medium text-foreground">Create a post</div>
+              <div className="mt-1 text-sm text-muted-foreground">
+                What&apos;s happening? Share a release, drop, collab, or update...
+              </div>
+            </button>
             <div className="hidden items-center gap-1 sm:flex">
               <Button
                 type="button"
@@ -791,30 +794,29 @@ export default function Home() {
                   {isLoadingFollowingPreview ? (
                     <div className="mt-4 flex justify-center py-4"><Spinner /></div>
                   ) : followingCount ? (
-                    <div className="mt-4 flex flex-wrap gap-3">
-                      {followingPreview!.slice(0, 8).map((followedUser) => (
-                        <Link
-                          key={followedUser.id}
-                          href={followedUser.hasArtistPage ? `/artists/${followedUser.id}` : `/profile/${followedUser.id}`}
-                          className="flex items-center gap-3 rounded-2xl border border-border/50 bg-card/50 px-3 py-2 transition-colors hover:border-primary/30"
-                        >
-                          <Avatar className="h-10 w-10">
-                            <AvatarImage src={followedUser.avatarUrl || ""} />
-                            <AvatarFallback>{followedUser.username.slice(0, 2).toUpperCase()}</AvatarFallback>
-                          </Avatar>
-                          <div className="min-w-0">
-                            <div className="truncate text-sm font-medium">{followedUser.username}</div>
-                            <div className="truncate text-xs text-muted-foreground">
-                              {followedUser.hasArtistPage ? "Artist page available" : "Personal profile"}
-                              {(followedUser.city || followedUser.location) ? ` / ${followedUser.city || followedUser.location}` : ""}
-                            </div>
-                          </div>
-                        </Link>
-                      ))}
+                    <div className="mt-4 flex items-center gap-3">
+                      <div className="flex items-center -space-x-3">
+                        {followingPreview!.slice(0, 6).map((followedUser) => (
+                          <Link
+                            key={followedUser.id}
+                            href={followedUser.hasArtistPage ? `/artists/${followedUser.id}` : `/profile/${followedUser.id}`}
+                            className="rounded-full ring-2 ring-background transition-transform hover:z-10 hover:scale-105"
+                            title={followedUser.username}
+                          >
+                            <Avatar className="h-12 w-12 border border-border/60 bg-card shadow-sm">
+                              <AvatarImage src={followedUser.avatarUrl || ""} />
+                              <AvatarFallback>{followedUser.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                            </Avatar>
+                          </Link>
+                        ))}
+                      </div>
+                      {followingCount > 6 ? (
+                        <div className="text-xs font-medium text-muted-foreground">+{followingCount - 6} more</div>
+                      ) : null}
                     </div>
                   ) : (
                     <div className="mt-4 rounded-2xl border border-dashed border-border/50 bg-card/30 p-4 text-sm text-muted-foreground">
-                      Follow a creator or person and they will appear here.
+                      Follow a creator or person and the latest six will appear here.
                     </div>
                   )}
                 </div>

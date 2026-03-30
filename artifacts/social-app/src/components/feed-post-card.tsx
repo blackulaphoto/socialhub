@@ -365,6 +365,13 @@ export function FeedPostCard({
   const visibilityLabel = post.visibility === "friends" ? "Friends" : post.visibility === "private" ? "Private" : "Public";
   const VisibilityIcon = post.visibility === "friends" ? UsersRound : post.visibility === "private" ? Lock : Globe2;
   const surfaceLabel = post.actorSurface === "artist" ? "Artist Page" : "Personal";
+  const postTimestamp = new Date(post.createdAt).toLocaleString([], {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 
   return (
     <Card id={`post-${post.id}`} data-testid={`post-card-${post.id}`} className="overflow-hidden border-border/50 bg-card/60">
@@ -383,7 +390,7 @@ export function FeedPostCard({
                   {authorDisplayName}
                 </Link>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <span>{new Date(post.createdAt).toLocaleString()}</span>
+                  <span>{postTimestamp}</span>
                   {post.updatedAt && new Date(post.updatedAt).getTime() - new Date(post.createdAt).getTime() > 60_000 ? (
                     <span>edited</span>
                   ) : null}
@@ -393,9 +400,11 @@ export function FeedPostCard({
                       {authorLocation}
                     </span>
                   )}
-                  <span className="inline-flex items-center rounded-full border border-border/60 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-foreground/70">
-                    {surfaceLabel}
-                  </span>
+                  {post.actorSurface === "artist" ? (
+                    <span className="inline-flex items-center rounded-full border border-border/60 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-foreground/70">
+                      {surfaceLabel}
+                    </span>
+                  ) : null}
                   <span className="inline-flex items-center">
                     <VisibilityIcon className="mr-1 h-3 w-3" />
                     {visibilityLabel}
@@ -424,9 +433,11 @@ export function FeedPostCard({
       {!showAuthor && canDelete ? (
         <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 pb-3">
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <span className="inline-flex items-center rounded-full border border-border/60 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-foreground/70">
-              {surfaceLabel}
-            </span>
+            {post.actorSurface === "artist" ? (
+              <span className="inline-flex items-center rounded-full border border-border/60 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-foreground/70">
+                {surfaceLabel}
+              </span>
+            ) : null}
             <span className="inline-flex items-center">
               <VisibilityIcon className="mr-1 h-3 w-3" />
               {visibilityLabel}
@@ -496,15 +507,20 @@ export function FeedPostCard({
         ) : null}
         {cleanedContent ? <p className="whitespace-pre-wrap text-sm leading-6">{cleanedContent}</p> : null}
         {post.media?.length ? (
-          <div className="space-y-4 rounded-[1.75rem] border border-border/50 bg-background/30 p-3 md:p-4">
+          <div className="-mx-4 space-y-4 md:-mx-6">
             {post.media.map((item) => (
-              <div key={item.id} className="overflow-hidden rounded-[1.5rem] border border-border/60 bg-background shadow-sm">
-                <MediaEmbed type={item.type} url={item.url} title={item.title || undefined} />
+              <div key={item.id} className="overflow-hidden border-y border-border/50 bg-background shadow-sm sm:rounded-[1.5rem] sm:border sm:border-border/60 md:mx-4">
+                <MediaEmbed
+                  type={item.type}
+                  url={item.url}
+                  title={item.title || undefined}
+                  className={item.type === "image" ? "w-full max-h-[44rem] object-cover" : undefined}
+                />
               </div>
             ))}
           </div>
         ) : fallbackLink ? (
-          <div className="overflow-hidden rounded-[1.75rem] border border-border/60 bg-background/35 p-3 md:p-4">
+          <div className="-mx-4 overflow-hidden border-y border-border/50 bg-background/35 sm:rounded-[1.5rem] sm:border sm:border-border/60 md:mx-4">
             <MediaEmbed type="link" url={fallbackLink} />
           </div>
         ) : null}
@@ -675,7 +691,13 @@ export function FeedPostCard({
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <div className="text-sm font-medium">{comment.author?.username || "Unknown"}</div>
-                          <div className="text-xs text-muted-foreground">{new Date(comment.createdAt).toLocaleString()}</div>
+                          <div className="text-xs text-muted-foreground">{new Date(comment.createdAt).toLocaleString([], {
+                            year: "numeric",
+                            month: "numeric",
+                            day: "numeric",
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })}</div>
                         </div>
                         {canDeleteComment ? (
                           <Button variant="ghost" size="sm" onClick={() => handleDeleteComment(comment.id)}>

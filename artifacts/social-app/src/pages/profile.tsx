@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import {
   Camera,
   Compass,
@@ -79,6 +79,12 @@ export default function Profile({ id }: { id: string }) {
   } = useGetUser(userId, {
     query: { enabled: !!userId, queryKey: ["/api/users", userId] },
   });
+
+  useEffect(() => {
+    if (isOwnProfile) {
+      setActiveIdentity("personal");
+    }
+  }, [isOwnProfile, setActiveIdentity]);
 
   const {
     data: postsData,

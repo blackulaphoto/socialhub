@@ -305,7 +305,14 @@ export default function ArtistProfile({ id }: { id: string }) {
   const artistPageAvatar = artist.avatarUrl || null;
   const artistPageBanner = artist.bannerUrl || null;
   const artistBaseLocation = formatPlace([artist.location, profile.user.city, profile.user.location]);
+  const primaryTag = artist.tags?.[0] || null;
   const isOwnArtistPage = currentUser?.id === userId;
+
+  useEffect(() => {
+    if (isOwnArtistPage) {
+      setActiveIdentity("artist");
+    }
+  }, [isOwnArtistPage, setActiveIdentity]);
   const heroGridClass = layoutTemplate === "editorial"
     ? "lg:grid-cols-[1.2fr_0.8fr]"
     : layoutTemplate === "music"
@@ -393,45 +400,43 @@ export default function ArtistProfile({ id }: { id: string }) {
     : null;
 
   const renderFeatured = () => (
-    <Card className="overflow-hidden border-border/50 bg-card/60">
-      <CardHeader className="pb-3">
+    <section className="space-y-4">
+      <div className="space-y-2">
         <div className="flex items-center gap-2 text-sm uppercase tracking-[0.22em] text-muted-foreground">
           <Pin className="h-4 w-4 text-primary" /> Featured
         </div>
-        <CardTitle className="text-2xl">{creator?.featuredTitle || "Lead with what matters most"}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-          {creator?.featuredDescription && <p className="max-w-3xl text-sm text-muted-foreground">{creator.featuredDescription}</p>}
-        {creator?.pinnedPost ? (
-          <FeedPostCard post={creator.pinnedPost} showAuthor={false} />
-        ) : creator?.featuredUrl ? (
-          <a href={creator.featuredUrl} target="_blank" rel="noreferrer" className="block rounded-2xl border border-border/50 bg-background/40 p-5 transition-colors hover:border-primary/40">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <div className="text-sm text-muted-foreground">Featured destination</div>
-                <div className="mt-1 font-medium">{creator.featuredUrl}</div>
-              </div>
-              <ExternalLink className="h-5 w-5 text-primary" />
+        <h2 className="text-2xl font-bold tracking-tight md:text-[2rem]">{creator?.featuredTitle || "Lead with what matters most"}</h2>
+        {creator?.featuredDescription ? <p className="max-w-3xl text-sm text-muted-foreground">{creator.featuredDescription}</p> : null}
+      </div>
+      {creator?.pinnedPost ? (
+        <FeedPostCard post={creator.pinnedPost} showAuthor={false} />
+      ) : creator?.featuredUrl ? (
+        <a href={creator.featuredUrl} target="_blank" rel="noreferrer" className="block rounded-2xl border border-border/50 bg-background/40 p-5 transition-colors hover:border-primary/40">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="text-sm text-muted-foreground">Featured destination</div>
+              <div className="mt-1 font-medium">{creator.featuredUrl}</div>
             </div>
-          </a>
-        ) : profile.user.featuredContent ? (
-          <div className="rounded-2xl border border-border/50 bg-background/40 p-5 text-sm text-muted-foreground">
-            {profile.user.featuredContent}
+            <ExternalLink className="h-5 w-5 text-primary" />
           </div>
-        ) : null}
-      </CardContent>
-    </Card>
+        </a>
+      ) : profile.user.featuredContent ? (
+        <div className="rounded-2xl border border-border/50 bg-background/40 p-5 text-sm text-muted-foreground">
+          {profile.user.featuredContent}
+        </div>
+      ) : null}
+    </section>
   );
 
   const aboutContent = (
-    <div className="space-y-5">
-        <p className="whitespace-pre-wrap text-sm leading-7 text-muted-foreground">
+    <div className="space-y-6">
+        <p className="whitespace-pre-wrap text-[15px] leading-8 text-muted-foreground">
           {artist.bio || "No bio added yet."}
         </p>
 
         {artist.influences && (
-          <div>
-            <div className="mb-2 text-xs uppercase tracking-[0.22em] text-muted-foreground">Influences</div>
+          <div className="space-y-3">
+            <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Influences</div>
             <div className="rounded-2xl border border-border/50 bg-background/40 p-4 text-sm text-muted-foreground">
               {artist.influences}
             </div>
@@ -540,40 +545,54 @@ export default function ArtistProfile({ id }: { id: string }) {
         </DialogContent>
       </Dialog>
 
-      <Card className="hidden border-border/50 bg-card/60 md:block">
-        <CardHeader><CardTitle>About</CardTitle></CardHeader>
-        <CardContent>{aboutContent}</CardContent>
-      </Card>
+      <section className="hidden space-y-4 md:block">
+        <div className="space-y-2">
+          <h2 className="text-2xl font-bold tracking-tight md:text-[2rem]">About</h2>
+          <p className="text-sm text-muted-foreground">Background, influences, links, and working details.</p>
+        </div>
+        {aboutContent}
+      </section>
     </>
   );
 
   const renderMedia = () => (
     <div className="space-y-5">
-      <div className="flex items-center gap-2">
-        <Palette className="h-5 w-5 text-primary" />
-        <h2 className="text-2xl font-bold">Media Modules</h2>
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <Palette className="h-5 w-5 text-primary" />
+          <h2 className="text-2xl font-bold tracking-tight md:text-[2rem]">Media</h2>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Gallery, video, audio, and links collected in one cleaner showcase.
+        </p>
       </div>
 
       {imageGallery.length > 0 && (
-        <Card className="border-border/50 bg-card/60">
-          <CardHeader><CardTitle>Image Gallery</CardTitle></CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-2">
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">Image Gallery</h3>
+            <span className="text-xs text-muted-foreground">{imageGallery.length} items</span>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
             {imageGallery.map((item) => (
-              <Card key={item.id} className="overflow-hidden border-border/50 bg-background/40">
+              <div key={item.id} className="overflow-hidden rounded-[1.75rem] border border-border/50 bg-background/40 shadow-sm">
                 <MediaEmbed type={item.type} url={item.url} title={item.caption} className="aspect-square w-full object-cover" />
                 {item.caption && <div className="p-4 text-sm text-muted-foreground">{item.caption}</div>}
-              </Card>
+              </div>
             ))}
-          </CardContent>
-        </Card>
+          </div>
+        </section>
       )}
 
       {videoGallery.length > 0 && (
-        <Card className="border-border/50 bg-card/60">
-          <CardHeader><CardTitle>Video</CardTitle></CardHeader>
-          <CardContent className="grid gap-4">
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">Video</h3>
+            <span className="text-xs text-muted-foreground">{videoGallery.length} items</span>
+          </div>
+          <div className="grid gap-4">
             {videoGallery.map((item) => (
-              <div key={item.id} className="overflow-hidden rounded-2xl border border-border/50 bg-background/40">
+              <div key={item.id} className="overflow-hidden rounded-[1.75rem] border border-border/50 bg-background/40 shadow-sm">
                 <div className="flex items-center gap-2 border-b border-border/50 px-4 py-3 text-sm font-medium">
                   <Video className="h-4 w-4 text-primary" />
                   {item.caption || "Featured video"}
@@ -581,16 +600,19 @@ export default function ArtistProfile({ id }: { id: string }) {
                 <MediaEmbed type={item.type} url={item.url} title={item.caption} className="aspect-video w-full border-0" />
               </div>
             ))}
-          </CardContent>
-        </Card>
+          </div>
+        </section>
       )}
 
       {audioGallery.length > 0 && (
-        <Card className="border-border/50 bg-card/60">
-          <CardHeader><CardTitle>Audio</CardTitle></CardHeader>
-          <CardContent className="grid gap-4">
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">Audio</h3>
+            <span className="text-xs text-muted-foreground">{audioGallery.length} items</span>
+          </div>
+          <div className="grid gap-4">
             {audioGallery.map((item) => (
-              <div key={item.id} className="overflow-hidden rounded-2xl border border-border/50 bg-background/40">
+              <div key={item.id} className="overflow-hidden rounded-[1.75rem] border border-border/50 bg-background/40 shadow-sm">
                 <div className="flex items-center gap-2 border-b border-border/50 px-4 py-3 text-sm font-medium">
                   <Mic2 className="h-4 w-4 text-primary" />
                   {item.caption || "Featured audio"}
@@ -598,14 +620,16 @@ export default function ArtistProfile({ id }: { id: string }) {
                 <MediaEmbed type={item.type} url={item.url} title={item.caption} className="h-40 w-full border-0" />
               </div>
             ))}
-          </CardContent>
-        </Card>
+          </div>
+        </section>
       )}
 
       {(storeLinks.length > 0 || creator?.primaryActionUrl) && (
-        <Card className="border-border/50 bg-card/60">
-          <CardHeader><CardTitle>Store and Product Links</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">Store and Links</h3>
+          </div>
+          <div className="space-y-3">
             {creator?.primaryActionUrl && (actionType === "shop" || actionType === "store") && (
               <a href={creator.primaryActionUrl} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-2xl border border-border/50 bg-background/40 px-4 py-3 text-sm transition-colors hover:border-primary/40">
                 <span>{actionLabel}</span>
@@ -618,8 +642,8 @@ export default function ArtistProfile({ id }: { id: string }) {
                 <ExternalLink className="h-4 w-4 text-primary" />
               </a>
             ))}
-          </CardContent>
-        </Card>
+          </div>
+        </section>
       )}
 
       {!imageGallery.length && !videoGallery.length && !audioGallery.length && !storeLinks.length && !creator?.primaryActionUrl && (
@@ -635,38 +659,39 @@ export default function ArtistProfile({ id }: { id: string }) {
 
   const renderPosts = () => (
     <div className="space-y-5">
-      <div className="flex items-center gap-2">
-        <Radio className="h-5 w-5 text-primary" />
-        <h2 className="text-2xl font-bold">Posts and Updates</h2>
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <Radio className="h-5 w-5 text-primary" />
+          <h2 className="text-2xl font-bold tracking-tight md:text-[2rem]">Posts and Updates</h2>
+        </div>
+        <p className="text-sm text-muted-foreground">Artist-page announcements, drops, and public updates.</p>
       </div>
 
       {isOwnArtistPage && (
-        <Card className="border-border/50 bg-card/60">
-          <CardHeader className="pb-3">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <CardTitle>Post as your artist page</CardTitle>
-                <div className="mt-1 text-sm text-muted-foreground">
-                  These posts stay on the creator page and publish with your artist-page identity.
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant={activeIdentity === "artist" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setActiveIdentity("artist")}
-                >
-                  Use Artist Page
-                </Button>
-                <Link href={`/profile/${userId}`}>
-                  <Button variant="ghost" size="sm" onClick={() => setActiveIdentity("personal")}>
-                    Personal Profile
-                  </Button>
-                </Link>
+        <section className="space-y-4 rounded-[1.75rem] border border-border/50 bg-background/35 p-5">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h3 className="text-lg font-semibold">Post as your artist page</h3>
+              <div className="mt-1 text-sm text-muted-foreground">
+                These posts stay on the creator page and publish with your artist-page identity.
               </div>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant={activeIdentity === "artist" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setActiveIdentity("artist")}
+              >
+                Use Artist Page
+              </Button>
+              <Link href={`/profile/${userId}`}>
+                <Button variant="ghost" size="sm" onClick={() => setActiveIdentity("personal")}>
+                  Personal Profile
+                </Button>
+              </Link>
+            </div>
+          </div>
+          <div className="space-y-4">
             <Textarea
               placeholder="Share a release, set update, gallery drop, booking note, or artist-page announcement..."
               value={artistPostForm.content}
@@ -718,8 +743,8 @@ export default function ArtistProfile({ id }: { id: string }) {
                 Post As Artist Page
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
       )}
 
       {isLoadingArtistPosts ? (
@@ -753,15 +778,20 @@ export default function ArtistProfile({ id }: { id: string }) {
 
   const renderEvents = () => (
     <div className="space-y-5">
-      <div className="flex items-center gap-2">
-        <CalendarRange className="h-5 w-5 text-primary" />
-        <h2 className="text-2xl font-bold">Events and Appearances</h2>
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <CalendarRange className="h-5 w-5 text-primary" />
+          <h2 className="text-2xl font-bold tracking-tight md:text-[2rem]">Events and Appearances</h2>
+        </div>
+        <p className="text-sm text-muted-foreground">Upcoming shows, past appearances, and linked lineups.</p>
       </div>
 
       <div className="grid gap-5 xl:grid-cols-2">
-        <Card className="border-border/50 bg-card/60">
-          <CardHeader><CardTitle>Upcoming</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">Upcoming</h3>
+          </div>
+          <div className="space-y-3">
             {upcomingEvents.length ? upcomingEvents.map((event) => (
               <Link key={event.id} href={`/events/${event.id}`}>
                 <div className="rounded-2xl border border-border/50 bg-background/40 p-4 transition-colors hover:border-primary/40">
@@ -781,12 +811,14 @@ export default function ArtistProfile({ id }: { id: string }) {
                 No upcoming appearances linked yet.
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </section>
 
-        <Card className="border-border/50 bg-card/60">
-          <CardHeader><CardTitle>Past Appearances</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">Past Appearances</h3>
+          </div>
+          <div className="space-y-3">
             {pastEvents.length ? pastEvents.map((event) => (
               <Link key={event.id} href={`/events/${event.id}`}>
                 <div className="rounded-2xl border border-border/50 bg-background/40 p-4 transition-colors hover:border-primary/40">
@@ -801,16 +833,19 @@ export default function ArtistProfile({ id }: { id: string }) {
                 No past events linked yet.
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </section>
       </div>
     </div>
   );
 
   const renderContact = () => (
-    <Card className="border-border/50 bg-card/60">
-      <CardHeader><CardTitle>Contact and Action</CardTitle></CardHeader>
-      <CardContent className="space-y-4">
+    <section className="space-y-4">
+      <div className="space-y-2">
+        <h2 className="text-2xl font-bold tracking-tight md:text-[2rem]">Contact and Action</h2>
+        <p className="text-sm text-muted-foreground">The main way people can reach this page or take the next step.</p>
+      </div>
+      <div className="space-y-4">
         <div className="rounded-2xl border border-border/50 bg-background/40 p-5">
           <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Primary call to action</div>
           <div className="mt-2 text-2xl font-semibold">{actionLabel}</div>
@@ -834,8 +869,8 @@ export default function ArtistProfile({ id }: { id: string }) {
             <Share2 className="mr-2 h-4 w-4" /> Share Page
           </Button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 
   const sections: Record<string, ReactNode> = {
@@ -877,26 +912,29 @@ export default function ArtistProfile({ id }: { id: string }) {
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/78 to-background/18" />
         <div className="absolute inset-0 bg-black/12 dark:bg-black/22" />
 
-        <div className="relative z-10 mx-auto max-w-7xl px-4 py-12 md:py-16">
-          <div className={cn("grid gap-8", heroGridClass)}>
+        <div className="relative z-10 mx-auto max-w-7xl px-4 py-14 md:py-20">
+          <div className={cn("grid gap-10 md:gap-12", heroGridClass)}>
             <Avatar className="h-32 w-32 border-4 border-background/80 shadow-2xl md:h-40 md:w-40">
               <AvatarImage src={artistPageAvatar || ""} />
               <AvatarFallback>{artistPageName.slice(0, 2).toUpperCase()}</AvatarFallback>
             </Avatar>
 
-            <div className="space-y-6">
-              <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+            <div className="space-y-8">
+              <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
                 <div className="max-w-4xl">
-                  <div className="mb-4 flex flex-wrap gap-2">
-                    <Badge variant="secondary">{artist.category}</Badge>
-                    {artistBaseLocation && <Badge variant="outline">{artistBaseLocation}</Badge>}
-                    <Badge variant="outline">{MODULE_LABELS[visibleSections[0] || "featured"] || "Creator Page"}</Badge>
-                    <Badge variant="outline">{layoutTemplate}</Badge>
-                    <Badge variant="outline">{fontPreset}</Badge>
+                  <div className="mb-5 flex flex-wrap gap-2">
+                    <Badge variant="secondary" className="px-3 py-1 text-[11px] font-medium tracking-[0.18em] uppercase">
+                      {artist.category}
+                    </Badge>
+                    {primaryTag ? (
+                      <Badge variant="outline" className="px-3 py-1 text-[11px] font-medium tracking-[0.18em] uppercase">
+                        {primaryTag}
+                      </Badge>
+                    ) : null}
                   </div>
-                  <h1 className={cn("text-4xl font-bold md:text-6xl", headingClass)}>{artistPageName}</h1>
-                  <p className={cn("mt-4 max-w-3xl text-lg font-medium text-foreground/95", layoutTemplate === "editorial" && "max-w-2xl text-xl", layoutTemplate === "music" && "text-xl")}>{heroTagline}</p>
-                  <div className="mt-4 flex flex-wrap items-center gap-4 text-sm font-medium text-foreground/80">
+                  <h1 className={cn("text-4xl font-bold leading-none tracking-tight md:text-6xl", headingClass)}>{artistPageName}</h1>
+                  <p className={cn("mt-5 max-w-3xl text-lg font-medium leading-8 text-foreground/95 md:text-[1.35rem]", layoutTemplate === "editorial" && "max-w-2xl text-xl", layoutTemplate === "music" && "text-xl")}>{heroTagline}</p>
+                  <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm font-medium text-foreground/78">
                     {artistBaseLocation && (
                       <span className="inline-flex items-center"><MapPin className="mr-1.5 h-4 w-4" /> {artistBaseLocation}</span>
                     )}
@@ -904,9 +942,17 @@ export default function ArtistProfile({ id }: { id: string }) {
                     <span>{profile.user.followingCount} following</span>
                     <span>{upcomingEvents.length} upcoming events</span>
                   </div>
+                  <div className="mt-5 flex flex-wrap gap-2 text-xs uppercase tracking-[0.18em] text-foreground/65">
+                    <span className="rounded-full border border-border/50 bg-background/25 px-3 py-1">
+                      {layoutTemplate}
+                    </span>
+                    <span className="rounded-full border border-border/50 bg-background/25 px-3 py-1">
+                      {fontPreset}
+                    </span>
+                  </div>
                 </div>
 
-                <div className={cn("flex flex-wrap items-center gap-2 md:gap-3", heroActionsClass)}>
+                <div className={cn("flex flex-wrap items-center gap-2.5 md:gap-3", heroActionsClass)}>
                   {!currentUser?.hasArtistPage && (
                     <Link href="/settings?tab=creator">
                       <Button variant="outline" className="border-border/60 bg-background/30">
@@ -1028,24 +1074,26 @@ export default function ArtistProfile({ id }: { id: string }) {
                     <DropdownMenuContent align="end" className="w-64">
                       {isOwnArtistPage ? (
                         <>
-                          <DropdownMenuItem asChild>
-                            <Link href="/settings">
-                              <Palette className="mr-2 h-4 w-4" /> Edit Profile
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem asChild>
-                            <Link href="/settings?tab=creator">
-                              <Sparkles className="mr-2 h-4 w-4" /> Edit Artist Page
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => setActiveIdentity("artist")}>
-                            <Sparkles className="mr-2 h-4 w-4" /> {activeIdentity === "artist" ? "Using Artist Page" : "Switch To Artist Page"}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem asChild>
-                            <Link href={`/profile/${profile.user.id}`} onClick={() => setActiveIdentity("personal")}>
-                              <MessageSquare className="mr-2 h-4 w-4" /> View Personal Profile
-                            </Link>
-                          </DropdownMenuItem>
+                          {activeIdentity === "artist" ? (
+                            <>
+                              <DropdownMenuItem asChild>
+                                <Link href="/settings?tab=creator">
+                                  <Sparkles className="mr-2 h-4 w-4" /> Edit Artist Page
+                                </Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem asChild>
+                                <Link href={`/profile/${profile.user.id}`} onClick={() => setActiveIdentity("personal")}>
+                                  <MessageSquare className="mr-2 h-4 w-4" /> Switch To Personal Profile
+                                </Link>
+                              </DropdownMenuItem>
+                            </>
+                          ) : (
+                            <DropdownMenuItem asChild>
+                              <Link href={`/profile/${profile.user.id}`} onClick={() => setActiveIdentity("personal")}>
+                                <MessageSquare className="mr-2 h-4 w-4" /> View Personal Profile
+                              </Link>
+                            </DropdownMenuItem>
+                          )}
                         </>
                       ) : (
                         <>
@@ -1077,11 +1125,15 @@ export default function ArtistProfile({ id }: { id: string }) {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                {artist.tags?.map((tag: string) => <Badge key={tag} variant="secondary">{tag}</Badge>)}
+                {artist.tags?.slice(1, 4).map((tag: string) => (
+                  <Badge key={tag} variant="secondary" className="bg-background/25 px-3 py-1 text-[11px] tracking-[0.16em] text-foreground/75">
+                    {tag}
+                  </Badge>
+                ))}
               </div>
               {currentUser?.id !== userId ? (
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className="inline-flex items-center rounded-2xl border border-border/50 bg-background/40 px-4 py-3 text-sm text-foreground/80">
+                <div className="flex flex-wrap items-center gap-3 pt-1">
+                  <div className="inline-flex items-center rounded-full border border-border/40 bg-background/20 px-4 py-2 text-sm text-foreground/75">
                     <HeartHandshake className="mr-2 h-4 w-4 text-primary" />
                     {profile.user.friendCount} friends
                   </div>
@@ -1100,11 +1152,11 @@ export default function ArtistProfile({ id }: { id: string }) {
         </div>
       </section>
 
-      <div className={cn("mx-auto mt-8 grid max-w-7xl gap-6 px-4", pageGridClass)}>
-        <div className="space-y-6">
+      <div className={cn("mx-auto mt-10 grid max-w-7xl gap-8 px-4 md:mt-12 md:gap-10", pageGridClass)}>
+        <div className="space-y-8">
           {primaryKeys.map((key) => <div key={key}>{sections[key]}</div>)}
         </div>
-        <div className="space-y-6">
+        <div className="space-y-8">
           {secondaryKeys.map((key) => <div key={key}>{sections[key]}</div>)}
         </div>
       </div>

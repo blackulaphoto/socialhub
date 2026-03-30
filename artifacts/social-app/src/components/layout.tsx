@@ -224,22 +224,25 @@ function HeaderActions() {
           <DropdownMenuSeparator />
           {canUseArtistIdentity ? (
             <>
-              <DropdownMenuItem
-                onClick={() => {
-                  setActiveIdentity("personal");
-                  setLocation(`/profile/${user?.id}`);
-                }}
-              >
-                Use Personal Profile
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  setActiveIdentity("artist");
-                  setLocation(`/artists/${user?.id}`);
-                }}
-              >
-                Use Artist Page
-              </DropdownMenuItem>
+              {activeIdentity === "artist" ? (
+                <DropdownMenuItem
+                  onClick={() => {
+                    setActiveIdentity("personal");
+                    setLocation(`/profile/${user?.id}`);
+                  }}
+                >
+                  Switch To Personal Profile
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem
+                  onClick={() => {
+                    setActiveIdentity("artist");
+                    setLocation(`/artists/${user?.id}`);
+                  }}
+                >
+                  Switch To Artist Page
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
             </>
           ) : null}
@@ -391,24 +394,25 @@ function HeaderActions() {
             <Link href={`/profile/${user?.id}`}>Profile</Link>
           </DropdownMenuItem>
           {canUseArtistIdentity ? (
-            <>
+            activeIdentity === "artist" ? (
               <DropdownMenuItem
                 onClick={() => {
                   setActiveIdentity("personal");
                   setLocation(`/profile/${user?.id}`);
                 }}
               >
-                Use Personal Profile
+                Switch To Personal Profile
               </DropdownMenuItem>
+            ) : (
               <DropdownMenuItem
                 onClick={() => {
                   setActiveIdentity("artist");
                   setLocation(`/artists/${user?.id}`);
                 }}
               >
-                Use Artist Page
+                Switch To Artist Page
               </DropdownMenuItem>
-            </>
+            )
           ) : null}
           <DropdownMenuItem asChild>
             <Link href="/settings">Settings</Link>
