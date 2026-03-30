@@ -3,6 +3,7 @@ import {
   Bell,
   CalendarRange,
   Compass,
+  Menu,
   Palette,
   Home,
   LogOut,
@@ -11,7 +12,6 @@ import {
   Search,
   Settings,
   ShieldAlert,
-  Sidebar as SidebarIcon,
   Sun,
   User as UserIcon,
   Users,
@@ -201,6 +201,53 @@ function HeaderActions() {
 
   return (
     <div className="flex items-center gap-2">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="rounded-full md:hidden" aria-label="Open header menu">
+            <Menu className="h-5 w-5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-64 md:hidden">
+          <DropdownMenuLabel>Quick actions</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {canUseArtistIdentity ? (
+            <>
+              <DropdownMenuItem
+                onClick={() => {
+                  setActiveIdentity("personal");
+                  setLocation(`/profile/${user?.id}`);
+                }}
+              >
+                Use Personal Profile
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  setActiveIdentity("artist");
+                  setLocation(`/artists/${user?.id}`);
+                }}
+              >
+                Use Artist Page
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          ) : null}
+          {!user?.hasArtistPage ? (
+            <>
+              <DropdownMenuItem asChild>
+                <Link href="/settings?tab=creator">Create Artist Page</Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          ) : null}
+          <DropdownMenuItem onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
+            {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            {theme === "dark" ? "Light mode" : "Dark mode"}
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href="/settings">Settings</Link>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
       {canUseArtistIdentity && (
         <div className="hidden items-center rounded-full border border-border/60 bg-background/60 p-1 md:flex">
           <Button
@@ -382,7 +429,7 @@ function AppHeader() {
       <div className="px-4 md:px-6 h-16 flex items-center gap-3">
         <div className="md:hidden">
           <SidebarTrigger>
-            <SidebarIcon className="w-4 h-4" />
+            <Menu className="w-5 h-5" />
           </SidebarTrigger>
         </div>
         <div className="min-w-0 flex-1">

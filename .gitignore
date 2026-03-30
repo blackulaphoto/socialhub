@@ -47,8 +47,17 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+.claude/
+artifacts/api-server/coverage/
+test-results/
 
 # Local environment files
 .env
 .env.local
 .env.*.local
+
+# Local tooling and test artifacts
+.claude/
+.vercel/
+artifacts/api-server/coverage/
+test-results/
