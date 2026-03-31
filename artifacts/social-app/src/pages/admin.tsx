@@ -37,6 +37,22 @@ export default function Admin() {
   const [siteForm, setSiteForm] = useState({ siteName: "", logoUrl: "", faviconUrl: "" });
   const [savingSiteSettings, setSavingSiteSettings] = useState(false);
   const [uploadingAsset, setUploadingAsset] = useState<"logo" | "favicon" | null>(null);
+  const [storageStatus, setStorageStatus] = useState<null | {
+    storage: {
+      provider: string;
+      root: string | null;
+      publicBaseUrl: string | null;
+      persistentLikely: boolean;
+      mode: string;
+    };
+    environment: {
+      nodeEnv: string;
+      railwayService: string | null;
+      railwayPublicDomain: string | null;
+    };
+  }>(null);
+  const [storageStatusError, setStorageStatusError] = useState<string | null>(null);
+  const [loadingStorageStatus, setLoadingStorageStatus] = useState(false);
   const siteSettingsQuery = useSiteSettings();
 
   const usersQuery = useAdminGetUsers({ page: 1, limit: 100 }, { query: { enabled: !!user?.isAdmin, queryKey: ["/api/admin/users"] } });
@@ -61,6 +77,44 @@ export default function Admin() {
       faviconUrl: siteSettingsQuery.data.faviconUrl || "",
     });
   }, [siteSettingsQuery.data]);
+
+  useEffect(() => {
+    if (!user?.isAdmin) return;
+
+    let cancelled = false;
+    setLoadingStorageStatus(true);
+    setStorageStatusError(null);
+
+    fetch(`${import.meta.env.VITE_API_BASE_URL || ""}/api/admin/storage-status`, {
+      credentials: "include",
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          const error = await response.json().catch(() => null);
+          throw new Error(error?.message || error?.error || `Request failed with ${response.status}`);
+        }
+        return response.json();
+      })
+      .then((data) => {
+        if (!cancelled) {
+          setStorageStatus(data);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setStorageStatusError(error instanceof Error ? error.message : "Could not load storage status");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingStorageStatus(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.isAdmin]);
 
   if (!user?.isAdmin) {
     return <div className="flex h-full items-center justify-center p-8 text-muted-foreground">Admin access required.</div>;
@@ -236,6 +290,45 @@ export default function Admin() {
                       </div>
                     </div>
                   </div>
+
+                  <Card className="border-border/50 bg-background/40">
+                    <CardHeader>
+                      <CardTitle className="text-lg">Storage Status</CardTitle>
+                      <p className="text-sm text-muted-foreground">Shows whether uploaded media is likely on persistent storage or ephemeral disk.</p>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {loadingStorageStatus ? (
+                        <div className="flex justify-center py-4"><Spinner /></div>
+                      ) : storageStatusError ? (
+                        <QueryErrorState title="Could not load storage status" description={storageStatusError} />
+                      ) : storageStatus ? (
+                        <>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant={storageStatus.storage.persistentLikely ? "secondary" : "destructive"}>
+                              {storageStatus.storage.persistentLikely ? "Persistent" : "Ephemeral"}
+                            </Badge>
+                            <Badge variant="outline">{storageStatus.storage.provider}</Badge>
+                            <Badge variant="outline">{storageStatus.storage.mode}</Badge>
+                          </div>
+                          <div className="grid gap-3 md:grid-cols-2">
+                            <div className="rounded-2xl border border-border/50 bg-background/50 p-4">
+                              <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Upload Root</div>
+                              <div className="mt-2 break-all text-sm">{storageStatus.storage.root || "Unknown"}</div>
+                            </div>
+                            <div className="rounded-2xl border border-border/50 bg-background/50 p-4">
+                              <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Public Media URL</div>
+                              <div className="mt-2 break-all text-sm">{storageStatus.storage.publicBaseUrl || "Unknown"}</div>
+                            </div>
+                          </div>
+                          <div className="rounded-2xl border border-border/50 bg-background/50 p-4 text-sm text-muted-foreground">
+                            {storageStatus.storage.persistentLikely
+                              ? "New uploads should survive deploys because the backend is pointing at a persistent local volume."
+                              : "Uploads are currently likely on ephemeral local disk and may disappear after redeploys or restarts."}
+                          </div>
+                        </>
+                      ) : null}
+                    </CardContent>
+                  </Card>
                 </>
               )}
             </CardContent>

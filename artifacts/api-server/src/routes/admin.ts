@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db, eventsTable, groupsTable, pageViewsTable, postsTable, reportsTable, usersTable } from "@workspace/db";
 import { desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { enrichPost, formatEvent, formatGroup, formatUser } from "./helpers.js";
+import { describeMediaStorage } from "../lib/media-storage.js";
 
 const router = Router();
 
@@ -126,6 +127,32 @@ router.get("/admin/analytics", requireAdminMiddleware, async (_req, res) => {
       pageViews24h: Number(pageViews24h?.count ?? 0),
       activeUsers7d: Number(activeUsers7d?.count ?? 0),
       topPaths: Array.isArray(topPaths.rows) ? topPaths.rows : [],
+    },
+  });
+});
+
+router.get("/admin/storage-status", requireAdminMiddleware, async (req, res) => {
+  const storage = describeMediaStorage(req);
+  const root = storage.root || "";
+  const persistentLikely =
+    storage.provider === "local" &&
+    (root.startsWith("/data") || root.startsWith("/uploads") || root.includes("\\.local\\uploads"));
+
+  res.json({
+    storage: {
+      ...storage,
+      persistentLikely,
+      mode:
+        storage.provider === "local"
+          ? persistentLikely
+            ? "persistent-local-volume"
+            : "ephemeral-local-disk"
+          : storage.provider,
+    },
+    environment: {
+      nodeEnv: process.env.NODE_ENV || "development",
+      railwayService: process.env.RAILWAY_SERVICE_NAME || null,
+      railwayPublicDomain: process.env.RAILWAY_PUBLIC_DOMAIN || null,
     },
   });
 });
