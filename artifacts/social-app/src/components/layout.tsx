@@ -385,17 +385,17 @@ function AppHeader() {
   return (
     <header className="sticky top-0 z-30 border-b border-border/60 bg-background/80 backdrop-blur-xl">
       <div className="px-4 md:px-6 h-16 flex items-center gap-3 md:gap-6">
-        <div className="flex min-w-0 items-center gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-3 md:flex-none">
           <SidebarTrigger>
             <Menu className="w-5 h-5" />
           </SidebarTrigger>
-          <Link href="/" className="min-w-0">
-            <div className="text-lg font-semibold leading-none">{siteSettings?.siteName || "ArtistHub"}</div>
+          <Link href="/" className="min-w-0 max-w-[10rem] md:max-w-none">
+            <div className="truncate text-lg font-semibold leading-none">{siteSettings?.siteName || "ArtistHub"}</div>
             <div className="hidden text-xs text-muted-foreground md:block">{location === "/" ? meta.subtitle : meta.title}</div>
           </Link>
         </div>
 
-        <div className="flex flex-1 justify-center">
+        <div className="hidden flex-1 justify-center md:flex">
           {canUseArtistIdentity ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -430,7 +430,9 @@ function AppHeader() {
           )}
         </div>
 
-        <HeaderActions />
+        <div className="shrink-0">
+          <HeaderActions />
+        </div>
       </div>
     </header>
   );
