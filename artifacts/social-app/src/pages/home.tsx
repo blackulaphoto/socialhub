@@ -621,7 +621,7 @@ export default function Home() {
         </CardContent>
       </Card>
 
-      {!!suggestedCreators?.artists?.length && (
+      {!isLoading && (
         <Card className="overflow-hidden border-border/50 bg-card/60 md:hidden">
           <CardContent className="space-y-4 p-4">
             <div className="flex items-center justify-between gap-3">
@@ -633,52 +633,58 @@ export default function Home() {
                 <Button variant="ghost" size="sm" className="shrink-0">See all</Button>
               </Link>
             </div>
-            <div className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-1">
-              {suggestedCreators.artists.map((artist) => {
-                const artistName = artist.displayName || artist.user.username;
-                const artistDescriptor = artist.tagline || artist.tags?.[0] || "";
+            {suggestedCreators?.artists?.length ? (
+              <div className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-1">
+                {suggestedCreators.artists.map((artist) => {
+                  const artistName = artist.displayName || artist.user.username;
+                  const artistDescriptor = artist.tagline || artist.tags?.[0] || "";
 
-                return (
-                  <Link
-                    key={artist.userId}
-                    href={`/artists/${artist.userId}`}
-                    className="min-w-[250px] snap-start rounded-2xl border border-border/50 bg-background/45 p-3 shadow-sm transition-colors hover:border-primary/30"
-                  >
-                    <div className="flex items-start gap-3">
-                      <Avatar className="h-12 w-12 shrink-0">
-                        <AvatarImage src={artist.avatarUrl || artist.user.avatarUrl || ""} />
-                        <AvatarFallback>{artistName.slice(0, 2).toUpperCase()}</AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-semibold">{artistName}</div>
-                        <div className="mt-1 text-xs text-muted-foreground">{artist.category}</div>
-                        {artist.location ? <div className="mt-1 text-xs text-muted-foreground">{artist.location}</div> : null}
-                        {artistDescriptor ? <div className="mt-2 line-clamp-2 text-xs text-muted-foreground">{artistDescriptor}</div> : null}
+                  return (
+                    <Link
+                      key={artist.userId}
+                      href={`/artists/${artist.userId}`}
+                      className="min-w-[250px] snap-start rounded-2xl border border-border/50 bg-background/45 p-3 shadow-sm transition-colors hover:border-primary/30"
+                    >
+                      <div className="flex items-start gap-3">
+                        <Avatar className="h-12 w-12 shrink-0">
+                          <AvatarImage src={artist.avatarUrl || artist.user.avatarUrl || ""} />
+                          <AvatarFallback>{artistName.slice(0, 2).toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-semibold">{artistName}</div>
+                          <div className="mt-1 text-xs text-muted-foreground">{artist.category}</div>
+                          {artist.location ? <div className="mt-1 text-xs text-muted-foreground">{artist.location}</div> : null}
+                          {artistDescriptor ? <div className="mt-2 line-clamp-2 text-xs text-muted-foreground">{artistDescriptor}</div> : null}
+                        </div>
                       </div>
-                    </div>
-                    <div className="mt-3">
-                      <Button
-                        size="sm"
-                        variant={artist.isFollowing ? "outline" : "default"}
-                        className="w-full"
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          if (artist.isFollowing) {
-                            unfollowCreator.mutate({ userId: artist.userId });
-                          } else {
-                            followCreator.mutate({ userId: artist.userId });
-                          }
-                        }}
-                        disabled={followCreator.isPending || unfollowCreator.isPending}
-                      >
-                        {artist.isFollowing ? "Following" : "Follow"}
-                      </Button>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
+                      <div className="mt-3">
+                        <Button
+                          size="sm"
+                          variant={artist.isFollowing ? "outline" : "default"}
+                          className="w-full"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            if (artist.isFollowing) {
+                              unfollowCreator.mutate({ userId: artist.userId });
+                            } else {
+                              followCreator.mutate({ userId: artist.userId });
+                            }
+                          }}
+                          disabled={followCreator.isPending || unfollowCreator.isPending}
+                        >
+                          {artist.isFollowing ? "Following" : "Follow"}
+                        </Button>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-border/50 bg-background/35 p-4 text-sm text-muted-foreground">
+                Creator suggestions will appear here as more public pages join the network.
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -714,15 +720,16 @@ export default function Home() {
 
       <div className="flex flex-col gap-6 lg:flex-row">
         <div className="hidden space-y-4 md:block lg:w-80">
-          {!!suggestedCreators?.artists?.length && (
+          {!isLoading && (
             <Card className="border-border/50 bg-card/50">
               <CardContent className="space-y-4 p-4">
                 <div>
                   <h2 className="font-semibold">Suggested Creators</h2>
                   <div className="mt-1 text-xs text-muted-foreground">Based on your interests and location.</div>
                 </div>
-                <div className="space-y-3">
-                  {suggestedCreators.artists.map((artist) => (
+                {suggestedCreators?.artists?.length ? (
+                  <div className="space-y-3">
+                    {suggestedCreators.artists.map((artist) => (
                     <Link
                       key={artist.userId}
                       href={`/artists/${artist.userId}`}
@@ -739,7 +746,15 @@ export default function Home() {
                       </div>
                     </Link>
                   ))}
-                </div>
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-border/50 bg-background/30 p-4 text-sm text-muted-foreground">
+                    No creator suggestions yet. Open Discover to browse public pages as more creators join.
+                  </div>
+                )}
+                <Link href="/discover">
+                  <Button variant="ghost" size="sm" className="w-full justify-center">See all</Button>
+                </Link>
               </CardContent>
             </Card>
           )}
