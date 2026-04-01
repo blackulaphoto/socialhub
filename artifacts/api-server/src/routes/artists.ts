@@ -7,6 +7,47 @@ import { expandLocationTerms } from "../lib/locations.js";
 
 const router = Router();
 
+function getYouTubeThumbnailUrl(rawUrl?: string | null) {
+  if (!rawUrl) return null;
+  try {
+    const parsed = new URL(rawUrl);
+    const host = parsed.hostname.replace(/^www\./, "");
+    let videoId: string | null = null;
+
+    if (host.includes("youtu.be")) {
+      videoId = parsed.pathname.split("/").filter(Boolean)[0] ?? null;
+    } else if (host.includes("youtube.com") || host.includes("youtube-nocookie.com") || host.includes("music.youtube.com")) {
+      videoId = parsed.searchParams.get("v");
+      if (!videoId) {
+        const parts = parsed.pathname.split("/").filter(Boolean);
+        if (parts.length >= 2 && ["embed", "shorts", "live", "v"].includes(parts[0])) {
+          videoId = parts[1];
+        }
+      }
+    }
+
+    return videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : null;
+  } catch {
+    return null;
+  }
+}
+
+async function getVimeoThumbnailUrl(rawUrl?: string | null) {
+  if (!rawUrl) return null;
+  try {
+    const response = await fetch(`https://vimeo.com/api/oembed.json?url=${encodeURIComponent(rawUrl)}`);
+    if (!response.ok) return null;
+    const data = await response.json() as { thumbnail_url?: string };
+    return data.thumbnail_url || null;
+  } catch {
+    return null;
+  }
+}
+
+async function resolveVideoThumbnailUrl(rawUrl?: string | null) {
+  return getYouTubeThumbnailUrl(rawUrl) || await getVimeoThumbnailUrl(rawUrl);
+}
+
 router.get("/artists", async (req, res) => {
   const { location, category, tags, q } = req.query as Record<string, string>;
   const blockedUserIds = await getBlockedUserIds(req.session.userId);
@@ -263,18 +304,25 @@ router.post("/artists/:userId/gallery", requireAuth, async (req, res) => {
     return;
   }
 
-  const { type, url, caption } = req.body;
+  const { type, url, caption, thumbnailUrl } = req.body;
   if (!type || !url) {
     res.status(400).json({ error: "type and url are required" });
     return;
   }
 
+  const resolvedThumbnailUrl = type === "video"
+    ? (typeof thumbnailUrl === "string" && thumbnailUrl.trim()
+      ? thumbnailUrl.trim()
+      : await resolveVideoThumbnailUrl(url))
+    : (typeof thumbnailUrl === "string" && thumbnailUrl.trim() ? thumbnailUrl.trim() : null);
+
   const [item] = await db.insert(galleryItemsTable).values({
     artistId: profile.id,
     type,
     url,
+    thumbnailUrl: resolvedThumbnailUrl,
     caption: caption || null,
-  }).returning();
+  } as any).returning();
 
   res.status(201).json(item);
 });

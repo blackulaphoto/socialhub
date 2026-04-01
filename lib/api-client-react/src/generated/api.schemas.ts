@@ -273,6 +273,7 @@ export interface GalleryItem {
   artistId: number;
   type: GalleryItemType;
   url: string;
+  thumbnailUrl?: string | null;
   caption?: string | null;
   createdAt: string;
 }
@@ -686,6 +687,7 @@ export const GalleryItemRequestType = {
 export interface GalleryItemRequest {
   type: GalleryItemRequestType;
   url: string;
+  thumbnailUrl?: string | null;
   caption?: string | null;
 }
 

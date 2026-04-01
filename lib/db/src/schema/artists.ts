@@ -35,6 +35,7 @@ export const galleryItemsTable = pgTable("gallery_items", {
   artistId: integer("artist_id").notNull().references(() => artistProfilesTable.id, { onDelete: "cascade" }),
   type: galleryItemTypeEnum("type").notNull(),
   url: text("url").notNull(),
+  thumbnailUrl: text("thumbnail_url"),
   caption: text("caption"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

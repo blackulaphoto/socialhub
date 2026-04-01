@@ -1,10 +1,13 @@
 import fs from "node:fs";
 import fsPromises from "node:fs/promises";
 import path from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import type { Request } from "express";
 import sharp from "sharp";
 
 const workspaceRoot = path.resolve(import.meta.dirname, "..", "..", "..");
+const execFileAsync = promisify(execFile);
 
 export type UploadScope =
   | "avatar"
@@ -52,6 +55,13 @@ const IMAGE_EXTENSIONS = new Map<string, string>([
   ["image/png", ".png"],
   ["image/webp", ".webp"],
   ["image/gif", ".gif"],
+]);
+
+const VIDEO_EXTENSIONS = new Map<string, string>([
+  ["video/mp4", ".mp4"],
+  ["video/webm", ".webm"],
+  ["video/quicktime", ".mov"],
+  ["video/x-m4v", ".m4v"],
 ]);
 
 function getConfiguredProvider(): MediaStorageProviderName {
@@ -114,6 +124,18 @@ export function getImageExtension(mimeType: string, originalName: string) {
   const originalExt = path.extname(originalName).toLowerCase();
   if ([".jpg", ".jpeg", ".png", ".webp", ".gif"].includes(originalExt)) {
     return originalExt === ".jpeg" ? ".jpg" : originalExt;
+  }
+
+  return null;
+}
+
+export function getVideoExtension(mimeType: string, originalName: string) {
+  const direct = VIDEO_EXTENSIONS.get(mimeType);
+  if (direct) return direct;
+
+  const originalExt = path.extname(originalName).toLowerCase();
+  if ([".mp4", ".webm", ".mov", ".m4v"].includes(originalExt)) {
+    return originalExt;
   }
 
   return null;
@@ -200,6 +222,60 @@ export async function processImageUpload(input: {
     mimeType: metadata.format === "gif" ? input.mimeType : "image/webp",
     width: finalMetadata.width ?? metadata.width ?? null,
     height: finalMetadata.height ?? metadata.height ?? null,
+    bytes: (await fsPromises.stat(targetPath)).size,
+  };
+}
+
+export async function processVideoUpload(input: {
+  buffer: Buffer;
+  scope: UploadScope;
+  userId: number;
+  originalName: string;
+  mimeType: string;
+}) {
+  const provider = getConfiguredProvider();
+  if (provider !== "local") {
+    throw new Error(`Unsupported media storage provider: ${provider}`);
+  }
+
+  const extension = getVideoExtension(input.mimeType, input.originalName);
+  if (!extension) {
+    throw new Error("Unsupported video type");
+  }
+
+  const scopeDir = ensureLocalUploadDirectory(input.scope);
+  const baseName = `${input.userId}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const fileName = `${baseName}${extension}`;
+  const thumbFileName = `${baseName}-thumb.webp`;
+  const targetPath = path.join(scopeDir, fileName);
+  const thumbnailPath = path.join(scopeDir, "thumbs", thumbFileName);
+
+  await fsPromises.writeFile(targetPath, input.buffer);
+
+  try {
+    await execFileAsync("ffmpeg", [
+      "-y",
+      "-i", targetPath,
+      "-ss", "00:00:01",
+      "-frames:v", "1",
+      "-vf", "scale=640:-1",
+      thumbnailPath,
+    ]);
+  } catch (error) {
+    await fsPromises.rm(targetPath, { force: true });
+    throw new Error(`Could not generate video thumbnail: ${error instanceof Error ? error.message : "ffmpeg failed"}`);
+  }
+
+  const thumbnailMetadata = await sharp(thumbnailPath).metadata();
+  return {
+    provider,
+    fileName,
+    thumbnailFileName: thumbFileName,
+    path: targetPath,
+    thumbnailPath,
+    mimeType: input.mimeType,
+    width: thumbnailMetadata.width ?? null,
+    height: thumbnailMetadata.height ?? null,
     bytes: (await fsPromises.stat(targetPath)).size,
   };
 }

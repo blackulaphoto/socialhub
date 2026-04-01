@@ -10,5 +10,6 @@ import type { GalleryItemRequestType } from "./galleryItemRequestType";
 export interface GalleryItemRequest {
   type: GalleryItemRequestType;
   url: string;
+  thumbnailUrl?: string | null;
   caption?: string | null;
 }

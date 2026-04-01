@@ -41,7 +41,7 @@ import { deriveLegacyModuleState, readCreatorBuilderMeta, writeCreatorBuilderMet
 import { getEmbedDescriptor } from "@/lib/embeds";
 import { formatCityRegion, parseCityRegion } from "@/lib/locations";
 import { groupItemsByFolder, readMediaFolderState, writeMediaFolderState } from "@/lib/media-folders";
-import { uploadImage } from "@/lib/upload-image";
+import { uploadImage, uploadMedia } from "@/lib/upload-image";
 import { cn } from "@/lib/utils";
 import { ArrowDown, ArrowUp, Check, Eye, EyeOff, Image as ImageIcon, Loader2, Mic2, Plus, Trash2, UploadCloud, Video } from "lucide-react";
 
@@ -553,10 +553,10 @@ export default function Settings() {
 
   const creatorPickerTarget = useMemo(() => {
     const value = new URLSearchParams(currentSearch).get("picker");
-    return value === "hero" || value === "gallery" || value === "video" ? value : null;
+    return value === "hero-slider" || value === "hero" || value === "gallery" || value === "video" ? value : null;
   }, [currentSearch]);
 
-  const openCreatorShowcase = (target: "hero" | "gallery" | "video") => {
+  const openCreatorShowcase = (target: "hero-slider" | "hero" | "gallery" | "video") => {
     setActiveTab("gallery");
     setLocation(`/settings?tab=gallery&returnTo=creator&picker=${target}`);
     if (typeof window !== "undefined") {
@@ -747,36 +747,43 @@ export default function Settings() {
     try {
       const addedIds: number[] = [];
       for (const file of showcaseFiles) {
-        const uploaded = await uploadImage(file, "gallery");
+        const uploaded = await uploadMedia(file, "gallery");
         const created = await addGalleryItem.mutateAsync({
           userId: user.id,
           data: {
-            type: GalleryItemRequestType.image,
+            type: gallery.type,
             url: uploaded.url,
+            thumbnailUrl: uploaded.thumbnailUrl || undefined,
             caption: gallery.caption || undefined,
-          },
+          } as never,
         });
         if (typeof created?.id === "number") {
           addedIds.push(created.id);
         }
       }
 
-      if (creatorPickerTarget && showcasePickerType === "image" && addedIds.length) {
-        if (creatorPickerTarget === "gallery") {
+      if (creatorPickerTarget && addedIds.length) {
+        if (creatorPickerTarget === "hero-slider" && gallery.type === GalleryItemRequestType.image) {
+          updateBuilderMeta({ heroSliderItemIds: Array.from(new Set([...(currentBuilderMeta.heroSliderItemIds || []), ...addedIds])) });
+        } else if (creatorPickerTarget === "gallery" && gallery.type === GalleryItemRequestType.image) {
           updateBuilderMeta({ galleryItemIds: Array.from(new Set([...(currentBuilderMeta.galleryItemIds || []), ...addedIds])) });
-        } else if (creatorPickerTarget === "hero") {
+        } else if (creatorPickerTarget === "hero" && gallery.type === GalleryItemRequestType.image) {
           updateBuilderMeta({
             heroMediaType: "image",
             heroItemIds: Array.from(new Set([...(currentBuilderMeta.heroItemIds || []), ...addedIds])),
           });
+        } else if (creatorPickerTarget === "video" && gallery.type === GalleryItemRequestType.video) {
+          updateBuilderMeta({ videoItemIds: Array.from(new Set([...(currentBuilderMeta.videoItemIds || []), ...addedIds])) });
+        } else if (creatorPickerTarget === "hero" && gallery.type === GalleryItemRequestType.video) {
+          updateBuilderMeta({ heroMediaType: "video", heroItemIds: Array.from(new Set([...(currentBuilderMeta.heroItemIds || []), ...addedIds])) });
         }
       }
 
       setShowcaseFiles([]);
-      setGallery({ type: GalleryItemRequestType.image, url: "", caption: "" });
+      setGallery((current) => ({ ...current, url: "", caption: "" }));
       toast({
         title: "Showcase updated",
-        description: `${showcaseFiles.length} image${showcaseFiles.length === 1 ? "" : "s"} added to your creator showcase.`,
+        description: `${showcaseFiles.length} ${gallery.type === GalleryItemRequestType.video ? "video" : "image"}${showcaseFiles.length === 1 ? "" : "s"} added to your creator showcase.`,
       });
     } catch (error) {
       toast({
@@ -793,6 +800,9 @@ export default function Settings() {
     if (!user || !gallery.url.trim()) return;
     const created = await addGalleryItem.mutateAsync({ userId: user.id, data: gallery });
     if (creatorPickerTarget && typeof created?.id === "number") {
+      if (creatorPickerTarget === "hero-slider" && gallery.type === GalleryItemRequestType.image) {
+        updateBuilderMeta({ heroSliderItemIds: Array.from(new Set([...(currentBuilderMeta.heroSliderItemIds || []), created.id])) });
+      }
       if (creatorPickerTarget === "video" && gallery.type === GalleryItemRequestType.video) {
         updateBuilderMeta({ videoItemIds: Array.from(new Set([...(currentBuilderMeta.videoItemIds || []), created.id])) });
       }
@@ -1365,7 +1375,9 @@ export default function Settings() {
       ? "video"
       : "image";
 
-  const pickerSelectedIds = creatorPickerTarget === "gallery"
+  const pickerSelectedIds = creatorPickerTarget === "hero-slider"
+    ? currentBuilderMeta.heroSliderItemIds || []
+    : creatorPickerTarget === "gallery"
     ? currentBuilderMeta.galleryItemIds || []
     : creatorPickerTarget === "video"
       ? currentBuilderMeta.videoItemIds || []
@@ -1380,7 +1392,9 @@ export default function Settings() {
         ? [itemId]
         : [...pickerSelectedIds, itemId];
 
-    if (creatorPickerTarget === "gallery") {
+    if (creatorPickerTarget === "hero-slider") {
+      updateBuilderMeta({ heroSliderItemIds: nextIds });
+    } else if (creatorPickerTarget === "gallery") {
       updateBuilderMeta({ galleryItemIds: nextIds });
     } else if (creatorPickerTarget === "video") {
       updateBuilderMeta({ videoItemIds: nextIds });
@@ -1569,7 +1583,7 @@ export default function Settings() {
       id: String(item.id || `video-${index}`),
       title: item.caption || `Video ${index + 1}`,
       url: item.url,
-      thumbnail: item.url,
+      thumbnail: (item as { thumbnailUrl?: string | null }).thumbnailUrl || undefined,
     }));
   const showcaseAudioTracks = (profile.artistProfile?.gallery || [])
     .filter((item) => item.type === "audio")
@@ -1590,7 +1604,11 @@ export default function Settings() {
     title: event.title,
     startsAt: event.startsAt,
     location: event.location || undefined,
+    city: event.city || undefined,
     description: event.description || undefined,
+    imageUrl: event.imageUrl || undefined,
+    tags: event.lineupTags || undefined,
+    linkedArtistsCount: event.artists?.length || 0,
   }));
   const videoPreviewItems = creator.featuredType === "video" && creator.featuredUrl?.trim()
     ? [
@@ -1598,7 +1616,7 @@ export default function Settings() {
           id: "featured-video",
           title: creator.featuredTitle?.trim() || "Featured video",
           url: creator.featuredUrl.trim(),
-          thumbnail: creator.featuredUrl.trim(),
+          thumbnail: undefined,
         },
         ...showcaseVideoItems,
       ]
@@ -1950,13 +1968,18 @@ export default function Settings() {
                 title: event.title,
                 startsAt: event.startsAt,
                 location: event.location,
+                city: event.city || null,
                 description: event.description || null,
+                imageUrl: event.imageUrl || null,
+                lineupTags: event.lineupTags || [],
+                linkedArtistsCount: event.artists?.length || 0,
               }))}
               artistPostsCount={artistPosts.length}
               saveStatus={saveState.artistPage}
               onSave={() => { void saveBuilderProgress("Page"); }}
               onOpenPublicPage={() => setLocation(`/artists/${user.id}`)}
               onOpenShowcase={openCreatorShowcase}
+              onOpenEventsManager={() => setLocation("/events?returnTo=creator&compose=1")}
               onUploadImage={handleImageUpload}
               uploading={uploading}
             />
@@ -3541,7 +3564,7 @@ export default function Settings() {
             {creatorPickerTarget && (() => {
               const pickerType = creatorPickerTarget === "video" ? "video" : "image";
               const pickerLabel = pickerType === "video" ? "Videos" : "Images";
-              const destinationLabel = creatorPickerTarget === "hero" ? "Hero Section" : creatorPickerTarget === "gallery" ? "Media Gallery" : "Video Playlist";
+              const destinationLabel = creatorPickerTarget === "hero-slider" ? "Hero Slider" : creatorPickerTarget === "hero" ? "Hero Section" : creatorPickerTarget === "gallery" ? "Media Gallery" : "Video Playlist";
 
               return (
                 <div className="sticky top-0 z-10 mb-6 rounded-2xl border border-primary/30 bg-primary/10 p-4 shadow-lg backdrop-blur-sm">
@@ -3587,16 +3610,20 @@ export default function Settings() {
                   </Select>
                   <div className="space-y-2">
                     <Input placeholder="Media URL" value={gallery.url} onChange={(e) => setGallery({ ...gallery, url: e.target.value })} />
-                    {gallery.type === GalleryItemRequestType.image && (
+                    {(gallery.type === GalleryItemRequestType.image || gallery.type === GalleryItemRequestType.video) && (
                       <>
                         <Input
                           type="file"
-                          accept="image/*"
+                          accept={gallery.type === GalleryItemRequestType.video ? "video/*" : "image/*"}
                           multiple
                           onChange={(e) => setShowcaseFiles(Array.from(e.target.files || []))}
                           disabled={isUploadingShowcaseBatch}
                         />
-                        <div className="text-xs text-muted-foreground">Choose one or many images. They will upload directly into your creator showcase.</div>
+                        <div className="text-xs text-muted-foreground">
+                          {gallery.type === GalleryItemRequestType.video
+                            ? "Choose one or many video files. They will upload into your creator showcase with saved thumbnails."
+                            : "Choose one or many images. They will upload directly into your creator showcase."}
+                        </div>
                       </>
                     )}
                   </div>
@@ -3608,14 +3635,14 @@ export default function Settings() {
                       <Button type="button" variant="outline" onClick={() => addFolder("showcase")}>Add</Button>
                     </div>
                   </div>
-                  {gallery.type === GalleryItemRequestType.image && showcaseFiles.length > 0 ? (
+                  {(gallery.type === GalleryItemRequestType.image || gallery.type === GalleryItemRequestType.video) && showcaseFiles.length > 0 ? (
                     <div className="rounded-2xl border border-border/50 bg-background/40 px-4 py-3 text-sm text-muted-foreground">
-                      {showcaseFiles.length} image file{showcaseFiles.length === 1 ? "" : "s"} ready for upload
+                      {showcaseFiles.length} {gallery.type === GalleryItemRequestType.video ? "video" : "image"} file{showcaseFiles.length === 1 ? "" : "s"} ready for upload
                     </div>
                   ) : null}
-                  {gallery.type === GalleryItemRequestType.image ? (
+                  {(gallery.type === GalleryItemRequestType.image || gallery.type === GalleryItemRequestType.video) && showcaseFiles.length > 0 ? (
                     <Button className="w-full" onClick={uploadShowcaseImages} disabled={addGalleryItem.isPending || isUploadingShowcaseBatch || showcaseFiles.length === 0}>
-                      Upload Images
+                      {gallery.type === GalleryItemRequestType.video ? "Upload Videos" : "Upload Images"}
                     </Button>
                   ) : (
                     <Button className="w-full" onClick={() => { void addSingleShowcaseItem(); }} disabled={addGalleryItem.isPending || uploading.gallery || !gallery.url.trim()}>
@@ -3678,7 +3705,9 @@ export default function Settings() {
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            if (creatorPickerTarget === "gallery") {
+                            if (creatorPickerTarget === "hero-slider") {
+                              updateBuilderMeta({ heroSliderItemIds: allMatchingIds });
+                            } else if (creatorPickerTarget === "gallery") {
                               updateBuilderMeta({ galleryItemIds: allMatchingIds });
                             } else if (creatorPickerTarget === "video") {
                               updateBuilderMeta({ videoItemIds: allMatchingIds });
@@ -3694,7 +3723,9 @@ export default function Settings() {
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            if (creatorPickerTarget === "gallery") {
+                            if (creatorPickerTarget === "hero-slider") {
+                              updateBuilderMeta({ heroSliderItemIds: [] });
+                            } else if (creatorPickerTarget === "gallery") {
                               updateBuilderMeta({ galleryItemIds: [] });
                             } else if (creatorPickerTarget === "video") {
                               updateBuilderMeta({ videoItemIds: [] });
@@ -3804,9 +3835,9 @@ export default function Settings() {
                                 onCheckedChange={() => togglePickerSelection(item.id)}
                                 onClick={(event) => event.stopPropagation()}
                               />
-                              <span>Use in {creatorPickerTarget === "hero" ? "hero" : creatorPickerTarget === "gallery" ? "gallery" : "playlist"}</span>
-                            </div>
-                          </div>
+                                  <span>Use in {creatorPickerTarget === "hero-slider" ? "hero slider" : creatorPickerTarget === "hero" ? "hero" : creatorPickerTarget === "gallery" ? "gallery" : "playlist"}</span>
+                                </div>
+                              </div>
                         ) : (
                           <div className="text-sm text-muted-foreground">This item is not the right media type for the current picker.</div>
                         )

@@ -1,4 +1,4 @@
-import { MapPin, Clock, CheckCircle } from "lucide-react";
+import { Link as LinkIcon, Mail, MapPin, Phone, Clock, CheckCircle, DollarSign } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,12 @@ export type CreatorInfoDetails = {
   title?: string;
   location?: string;
   availability?: AvailabilityState;
+  availabilityText?: string;
   turnaround?: string;
+  price?: string;
+  phone?: string;
+  email?: string;
+  links?: Array<{ label: string; url: string }>;
   services?: string[];
   image?: string | null;
   bio?: string;
@@ -69,16 +74,10 @@ export function CreatorInfoCard({
           ) : null}
 
           <div className="grid gap-2 text-sm text-muted-foreground">
-            {creator.availability ? (
+            {creator.availability || creator.availabilityText ? (
               <div className="inline-flex items-center gap-2">
-                <span className={cn("h-2.5 w-2.5 rounded-full", availabilityTone[creator.availability])} />
-                <span className="font-medium text-foreground/80">{availabilityLabel[creator.availability]}</span>
-              </div>
-            ) : null}
-            {creator.location ? (
-              <div className="inline-flex items-center gap-2">
-                <MapPin className="h-4 w-4" />
-                <span>{creator.location}</span>
+                {creator.availability ? <span className={cn("h-2.5 w-2.5 rounded-full", availabilityTone[creator.availability])} /> : null}
+                <span className="font-medium text-foreground/80">{creator.availabilityText || (creator.availability ? availabilityLabel[creator.availability] : "")}</span>
               </div>
             ) : null}
             {creator.turnaround ? (
@@ -87,7 +86,59 @@ export function CreatorInfoCard({
                 <span>{creator.turnaround}</span>
               </div>
             ) : null}
+            {creator.location ? (
+              <div className="inline-flex items-center gap-2">
+                <MapPin className="h-4 w-4" />
+                <span>{creator.location}</span>
+              </div>
+            ) : null}
+            {creator.price ? (
+              <div className="inline-flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                <span>{creator.price}</span>
+              </div>
+            ) : null}
           </div>
+
+          {creator.links?.length ? (
+            <div className="space-y-2">
+              <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Links</div>
+              <div className="space-y-2">
+                {creator.links.slice(0, compact ? 2 : 4).map((link) => (
+                  <a
+                    key={`${link.label}-${link.url}`}
+                    href={link.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 text-sm text-foreground/85 transition-colors hover:text-primary"
+                  >
+                    <LinkIcon className="h-4 w-4" />
+                    <span>{link.label || link.url}</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {(creator.phone || creator.email) ? (
+            <div className="space-y-2">
+              <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Contact info</div>
+              <div className="space-y-2 text-sm text-foreground/85">
+                {creator.phone ? (
+                  <div className="inline-flex items-center gap-2">
+                    <Phone className="h-4 w-4" />
+                    <span>{creator.phone}</span>
+                  </div>
+                ) : null}
+                {creator.email ? (
+                  <div className="inline-flex items-center gap-2">
+                    <Mail className="h-4 w-4" />
+                    <span>{creator.email}</span>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
 
           {creator.services?.length ? (
             <div className="space-y-2">

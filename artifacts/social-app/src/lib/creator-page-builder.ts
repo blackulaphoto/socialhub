@@ -19,13 +19,23 @@ export type CreatorBuilderSection = {
   visible: boolean;
 };
 
+export type CreatorBuilderLinkItem = {
+  label: string;
+  url: string;
+};
+
 export type CreatorBuilderMeta = {
-  version: 2;
+  version: 4;
   heroVideoUrl?: string;
   heroMediaType?: "image" | "video";
   heroItemIds?: number[];
+  heroSliderItemIds?: number[];
   galleryItemIds?: number[];
   videoItemIds?: number[];
+  heroInfoTitle?: string;
+  heroInfoDescription?: string;
+  heroInfoPhone?: string;
+  heroInfoLinks?: CreatorBuilderLinkItem[];
   sections: CreatorBuilderSection[];
 };
 
@@ -106,12 +116,26 @@ export function readCreatorBuilderMeta(
           });
 
         return {
-          version: 2,
+          version: 4,
           heroVideoUrl: typeof meta.heroVideoUrl === "string" ? meta.heroVideoUrl : "",
           heroMediaType: meta.heroMediaType === "video" ? "video" : "image",
           heroItemIds: Array.isArray(meta.heroItemIds) ? meta.heroItemIds.map(Number).filter(Number.isFinite) : [],
+          heroSliderItemIds: Array.isArray(meta.heroSliderItemIds) ? meta.heroSliderItemIds.map(Number).filter(Number.isFinite) : [],
           galleryItemIds: Array.isArray(meta.galleryItemIds) ? meta.galleryItemIds.map(Number).filter(Number.isFinite) : [],
           videoItemIds: Array.isArray(meta.videoItemIds) ? meta.videoItemIds.map(Number).filter(Number.isFinite) : [],
+          heroInfoTitle: typeof meta.heroInfoTitle === "string" ? meta.heroInfoTitle : "",
+          heroInfoDescription: typeof meta.heroInfoDescription === "string" ? meta.heroInfoDescription : "",
+          heroInfoPhone: typeof meta.heroInfoPhone === "string" ? meta.heroInfoPhone : "",
+          heroInfoLinks: Array.isArray(meta.heroInfoLinks)
+            ? meta.heroInfoLinks
+              .filter((item): item is CreatorBuilderLinkItem =>
+                Boolean(item)
+                && typeof item === "object"
+                && typeof item.label === "string"
+                && typeof item.url === "string",
+              )
+              .map((item) => ({ label: item.label, url: item.url }))
+            : [],
           sections,
         };
       }
@@ -119,12 +143,17 @@ export function readCreatorBuilderMeta(
   }
 
   return {
-    version: 2,
+    version: 4,
     heroVideoUrl: "",
     heroMediaType: "image",
     heroItemIds: [],
+    heroSliderItemIds: [],
     galleryItemIds: [],
     videoItemIds: [],
+    heroInfoTitle: "",
+    heroInfoDescription: "",
+    heroInfoPhone: "",
+    heroInfoLinks: [],
     sections: createDefaultSections(input),
   };
 }

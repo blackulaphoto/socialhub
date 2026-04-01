@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "wouter";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCreateEvent, useGetArtists, useGetEvents, useSearch } from "@workspace/api-client-react";
 import { CalendarRange, MapPin, Plus, Search, Sparkles, Users, X } from "lucide-react";
@@ -18,6 +18,7 @@ import { uploadImage } from "@/lib/upload-image";
 export default function Events() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
   const [city, setCity] = useState("");
   const [query, setQuery] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -38,6 +39,15 @@ export default function Events() {
     lineupTags: "",
   });
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const currentSearch = typeof window !== "undefined" ? window.location.search : "";
+  const returnTo = useMemo(() => new URLSearchParams(currentSearch).get("returnTo"), [currentSearch]);
+  const shouldOpenComposer = useMemo(() => new URLSearchParams(currentSearch).get("compose") === "1", [currentSearch]);
+
+  useEffect(() => {
+    if (shouldOpenComposer) {
+      setIsCreateOpen(true);
+    }
+  }, [shouldOpenComposer]);
 
   const { data, isLoading, isError, refetch } = useGetEvents(
     { city: city || undefined, q: query || undefined },
@@ -133,11 +143,17 @@ export default function Events() {
           <h1 className="text-3xl font-bold">Events</h1>
           <p className="text-muted-foreground">Track lineups, appearances, and local creative happenings.</p>
         </div>
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button><Plus className="mr-2 h-4 w-4" /> Add Event</Button>
-          </DialogTrigger>
-          <DialogContent>
+        <div className="flex flex-wrap gap-2">
+          {returnTo === "creator" ? (
+            <Button type="button" variant="outline" onClick={() => setLocation("/settings?tab=creator")}>
+              Back to Editing
+            </Button>
+          ) : null}
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <DialogTrigger asChild>
+              <Button><Plus className="mr-2 h-4 w-4" /> Add Event</Button>
+            </DialogTrigger>
+          <DialogContent className="max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>Create Event</DialogTitle></DialogHeader>
             <div className="space-y-3">
               <Input placeholder="Title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
@@ -236,7 +252,8 @@ export default function Events() {
               </Button>
             </div>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </div>
 
       <Card className="border-border/50 bg-card/50">

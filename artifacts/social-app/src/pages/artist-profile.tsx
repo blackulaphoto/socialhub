@@ -366,13 +366,21 @@ export default function ArtistProfile({ id }: { id: string }) {
     : layoutTemplate === "editorial"
       ? "xl:max-w-sm"
       : "xl:max-w-md xl:justify-end";
+  const assignedHeroSliderImages = imageGallery.filter((item) => builderMeta.heroSliderItemIds?.includes(Number(item.id)));
   const heroSlides = [
-    {
-      id: "hero-banner",
-      image: artistPageBanner || "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=1600&q=80",
-      title: artistPageName,
-      subtitle: heroTagline,
-    },
+    ...(assignedHeroSliderImages.length
+      ? assignedHeroSliderImages.map((item, index) => ({
+          id: String(item.id || `hero-slide-${index}`),
+          image: item.url,
+          title: item.caption || artistPageName,
+          subtitle: heroTagline,
+        }))
+      : [{
+          id: "hero-banner",
+          image: artistPageBanner || "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=1600&q=80",
+          title: artistPageName,
+          subtitle: heroTagline,
+        }]),
   ];
   const assignedHeroImages = imageGallery.filter((item) => builderMeta.heroItemIds?.includes(Number(item.id)));
   const assignedHeroVideos = videoGallery.filter((item) => builderMeta.heroItemIds?.includes(Number(item.id)));
@@ -403,14 +411,20 @@ export default function ArtistProfile({ id }: { id: string }) {
     id: String(item.id),
     title: item.caption || "Video release",
     url: item.url,
-    thumbnail: item.url,
+    thumbnail: (item as { thumbnailUrl?: string | null }).thumbnailUrl || undefined,
   }));
   const heroVideoItems = assignedHeroVideos.map((item) => ({
     id: String(item.id),
     title: item.caption || "Hero video",
     url: item.url,
-    thumbnail: item.url,
+    thumbnail: (item as { thumbnailUrl?: string | null }).thumbnailUrl || undefined,
   }));
+  const heroInfoTitle = builderMeta.heroInfoTitle?.trim() || "Creation description";
+  const heroInfoDescription = builderMeta.heroInfoDescription?.trim() || artist.category || artist.tagline || "Describe what this creator makes, offers, or focuses on.";
+  const heroInfoPhone = builderMeta.heroInfoPhone?.trim() || "";
+  const heroInfoLinks = (builderMeta.heroInfoLinks || []).filter((item) => item.label.trim() || item.url.trim()).slice(0, 3);
+  const heroTags = String(artist.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean);
+  const heroInfoServices = capabilityFlags.length ? capabilityFlags : heroTags;
   const heroMediaGalleryItems = assignedHeroImages.map((item) => ({
     id: String(item.id),
     title: item.caption || artistPageName,
@@ -428,7 +442,11 @@ export default function ArtistProfile({ id }: { id: string }) {
     title: event.title,
     startsAt: event.startsAt,
     location: event.location,
+    city: event.city || undefined,
     description: event.description || null,
+    imageUrl: event.imageUrl || undefined,
+    tags: event.lineupTags || undefined,
+    linkedArtistsCount: event.artists?.length || 0,
   }));
   const featuredType = creator?.featuredContent?.type || null;
   const featuredTitle = creator?.featuredContent?.title || creator?.featuredTitle || null;
@@ -728,50 +746,50 @@ export default function ArtistProfile({ id }: { id: string }) {
 
   const renderHeroRow = () => (
     <section className="grid gap-5 lg:grid-cols-[minmax(260px,1fr)_minmax(0,1.5fr)] lg:items-stretch">
-      <div className="rounded-[2rem] border border-border/45 bg-background/28 p-5 md:p-6">
-        <div className="space-y-5">
-          <div>
-            <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">About</div>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight">What this creator does</h2>
-          </div>
-          <div className="space-y-4">
-            {aboutSidebarItems.map((item) => (
-              <div key={item.label} className="rounded-2xl border border-border/50 bg-background/40 p-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{item.label}</div>
-                <div className="mt-2 text-sm leading-6">{item.value}</div>
-              </div>
-            ))}
-            {capabilityFlags.length > 0 ? (
-              <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Working Style</div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {capabilityFlags.map((flag) => <Badge key={flag} variant="secondary">{flag}</Badge>)}
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </div>
+      <div className="rounded-[2rem] border border-border/45 bg-background/28">
+        <CreatorInfoCard
+          creator={{
+            name: heroInfoTitle,
+            title: artist.category || artist.tagline || "Creator",
+            bio: heroInfoDescription,
+            availabilityText: artist.availabilityStatus || undefined,
+            turnaround: turnaroundInfo || undefined,
+            location: artist.location || undefined,
+            price: pricingSummary || undefined,
+            phone: heroInfoPhone || undefined,
+            email: artist.bookingEmail || undefined,
+            links: heroInfoLinks,
+            services: heroInfoServices,
+          }}
+          className="min-h-[28rem] rounded-[2rem] border-0 bg-transparent shadow-none"
+          showImage={false}
+        />
       </div>
 
-      <div className="rounded-[2rem] border border-border/45 bg-background/28 p-5 md:p-6">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div>
-            <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Hero</div>
-            <div className="mt-1 text-sm text-muted-foreground">Primary media section below the banner.</div>
-          </div>
-        </div>
+      <div className="overflow-hidden rounded-[2rem] border border-border/45 bg-background/28">
         {builderMeta.heroMediaType === "video" ? (
           heroVideoItems.length ? (
             <BuilderVideoPlaylist items={heroVideoItems} />
           ) : (
-            <div className="rounded-2xl border border-dashed border-border/50 bg-background/30 p-6 text-sm text-muted-foreground">
+            <div className="p-6 text-sm text-muted-foreground">
               No hero videos selected yet.
             </div>
           )
         ) : heroMediaGalleryItems.length ? (
-          <BuilderMediaGallery items={heroMediaGalleryItems} />
+          <div className="relative min-h-[28rem] w-full overflow-hidden bg-muted">
+            <img
+              src={heroMediaGalleryItems[0]?.imageUrl || heroMediaGalleryItems[0]?.mediaUrl || ""}
+              alt={heroMediaGalleryItems[0]?.title || "Hero image"}
+              className="h-full w-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+            <div className="absolute inset-x-0 bottom-0 p-6 text-white">
+              <div className="text-sm uppercase tracking-[0.22em] text-white/80">Hero media</div>
+              <div className="mt-2 text-3xl font-semibold">{heroMediaGalleryItems[0]?.title || "Hero image"}</div>
+            </div>
+          </div>
         ) : (
-          <div className="rounded-2xl border border-dashed border-border/50 bg-background/30 p-6 text-sm text-muted-foreground">
+          <div className="p-6 text-sm text-muted-foreground">
             No hero images selected yet.
           </div>
         )}

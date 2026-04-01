@@ -12,6 +12,7 @@ export interface GalleryItem {
   artistId: number;
   type: GalleryItemType;
   url: string;
+  thumbnailUrl?: string | null;
   caption?: string | null;
   createdAt: Date;
 }

@@ -26,11 +26,15 @@ function getApiBaseUrl() {
 }
 
 export async function uploadImage(file: File, scope: UploadScope): Promise<UploadImageResponse> {
+  return uploadMedia(file, scope, "images");
+}
+
+export async function uploadMedia(file: File, scope: UploadScope, kind: "images" | "media" = "media"): Promise<UploadImageResponse> {
   const form = new FormData();
   form.append("file", file);
   form.append("scope", scope);
 
-  const response = await fetch(`${getApiBaseUrl()}/api/uploads/images`, {
+  const response = await fetch(`${getApiBaseUrl()}/api/uploads/${kind}`, {
     method: "POST",
     body: form,
     credentials: "include",

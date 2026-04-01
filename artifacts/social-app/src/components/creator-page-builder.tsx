@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import { ArrowDown, ArrowUp, Check, ChevronDown, Eye, EyeOff, ExternalLink, Loader2, Save, Video } from "lucide-react";
 import { CreatorHeroSlider } from "@/components/creator-page/creator-hero-slider";
+import { CreatorInfoCard } from "@/components/creator-page/creator-info-card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ import { BuilderVideoPlaylist } from "@/components/page-builder-blocks/builder-v
 import { cn } from "@/lib/utils";
 import {
   CreatorBuilderMeta,
+  CreatorBuilderLinkItem,
   CreatorSectionKey,
   deriveLegacyModuleState,
   readCreatorBuilderMeta,
@@ -47,13 +49,14 @@ type BuilderProps = {
   setArtist: Dispatch<SetStateAction<Record<string, string>>>;
   creator: Record<string, string>;
   setCreator: Dispatch<SetStateAction<Record<string, string>>>;
-  galleryItems: Array<{ id?: number; type: string; url: string; caption?: string | null }>;
-  linkedEvents: Array<{ id: number; title: string; startsAt: string; location?: string | null; description?: string | null }>;
+  galleryItems: Array<{ id?: number; type: string; url: string; thumbnailUrl?: string | null; caption?: string | null }>;
+  linkedEvents: Array<{ id: number; title: string; startsAt: string; location?: string | null; city?: string | null; description?: string | null; imageUrl?: string | null; lineupTags?: string[] | null; linkedArtistsCount?: number | null }>;
   artistPostsCount: number;
   saveStatus: "idle" | "saving" | "saved";
   onSave: () => void;
   onOpenPublicPage: () => void;
-  onOpenShowcase: (target: "hero" | "gallery" | "video") => void;
+  onOpenShowcase: (target: "hero-slider" | "hero" | "gallery" | "video") => void;
+  onOpenEventsManager: () => void;
   onUploadImage: (file: File | null, scope: "avatar" | "banner", onComplete: (url: string) => void) => void;
   uploading: { avatar: boolean; banner: boolean };
 };
@@ -83,6 +86,19 @@ function parseLinkItems(raw: string | undefined) {
       };
     })
     .filter((item) => item.url);
+}
+
+function serializeLinkItems(items: Array<{ label: string; url: string; kind?: string | null }>) {
+  return items
+    .map((item) => {
+      const label = item.label.trim();
+      const url = item.url.trim();
+      const kind = item.kind?.trim() || "";
+      if (!url) return "";
+      return kind ? `${label}|${url}|${kind}` : `${label}|${url}`;
+    })
+    .filter(Boolean)
+    .join("\n");
 }
 
 function parseCustomFields(raw: string | undefined) {
@@ -123,10 +139,11 @@ export function CreatorPageBuilder({
   onSave,
   onOpenPublicPage,
   onOpenShowcase,
+  onOpenEventsManager,
   onUploadImage,
   uploading,
 }: BuilderProps) {
-  const [selectedBlock, setSelectedBlock] = useState<"hero" | CreatorSectionKey>("hero");
+  const [selectedBlock, setSelectedBlock] = useState<"hero" | "hero-details" | CreatorSectionKey>("hero");
   const [showMobileBlockMenu, setShowMobileBlockMenu] = useState(false);
   const sectionConfigs = useMemo(() => parseSectionConfigs(creator.sectionConfigs), [creator.sectionConfigs]);
   const builderMeta = useMemo(
@@ -145,6 +162,7 @@ export function CreatorPageBuilder({
   const imageGallery = galleryItems.filter((item) => item.type === "image");
   const videoGallery = galleryItems.filter((item) => item.type === "video");
   const audioGallery = galleryItems.filter((item) => item.type === "audio");
+  const assignedHeroSliderImages = imageGallery.filter((item) => builderMeta.heroSliderItemIds?.includes(Number(item.id)));
   const assignedHeroImages = imageGallery.filter((item) => builderMeta.heroItemIds?.includes(Number(item.id)));
   const assignedHeroVideos = videoGallery.filter((item) => builderMeta.heroItemIds?.includes(Number(item.id)));
   const assignedGalleryImages = imageGallery.filter((item) => builderMeta.galleryItemIds?.includes(Number(item.id)));
@@ -160,14 +178,26 @@ export function CreatorPageBuilder({
   const heroTags = String(artist.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean);
   const featuredMode = creator.featuredType || "highlight";
   const heroName = artist.displayName || username;
-  const heroSlides = [
-    {
-      id: "hero-banner",
-      image: artist.bannerUrl || imageGallery[0]?.url || artist.avatarUrl || "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=1600&q=80",
-      title: heroName,
-      subtitle: artist.tagline || "Add a one-line first impression in the inspector.",
-    },
-  ];
+  const heroInfoTitle = builderMeta.heroInfoTitle?.trim() || "Creation description";
+  const heroInfoDescription = builderMeta.heroInfoDescription?.trim() || artist.category || artist.tagline || "Describe what this creator makes, offers, or focuses on.";
+  const heroInfoPhone = builderMeta.heroInfoPhone?.trim() || "";
+  const heroInfoLinks = (builderMeta.heroInfoLinks || []).slice(0, 3);
+  const heroInfoServices = heroTags;
+  const heroSlides = assignedHeroSliderImages.length
+    ? assignedHeroSliderImages.map((item, index) => ({
+        id: String(item.id || `hero-slide-${index}`),
+        image: item.url,
+        title: item.caption || heroName,
+        subtitle: artist.tagline || "Add a one-line first impression in the inspector.",
+      }))
+    : [
+        {
+          id: "hero-banner",
+          image: artist.bannerUrl || imageGallery[0]?.url || artist.avatarUrl || "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=1600&q=80",
+          title: heroName,
+          subtitle: artist.tagline || "Add a one-line first impression in the inspector.",
+        },
+      ];
 
   const updateBuilderMeta = (nextMeta: CreatorBuilderMeta) => {
     const nextConfigs = writeCreatorBuilderMeta(sectionConfigs, nextMeta);
@@ -177,6 +207,33 @@ export function CreatorPageBuilder({
       enabledModules: legacyState.enabledModules.join(","),
       moduleOrder: legacyState.moduleOrder.join(","),
       sectionConfigs: JSON.stringify(nextConfigs, null, 2),
+    }));
+  };
+
+  const updateHeroInfoLink = (index: number, field: keyof CreatorBuilderLinkItem, value: string) => {
+    const nextLinks = Array.from({ length: 3 }, (_, itemIndex) => builderMeta.heroInfoLinks?.[itemIndex] || { label: "", url: "" });
+    nextLinks[index] = {
+      ...nextLinks[index],
+      [field]: value,
+    };
+    updateBuilderMeta({
+      ...builderMeta,
+      heroInfoLinks: nextLinks.filter((item) => item.label.trim() || item.url.trim()),
+    });
+  };
+
+  const updateCreatorLinkItem = (index: number, field: "label" | "url", value: string) => {
+    const nextLinks = Array.from(
+      { length: Math.max(linkItems.length, 4) },
+      (_, itemIndex) => linkItems[itemIndex] || { id: `link-${itemIndex}`, label: "", url: "", kind: null },
+    );
+    nextLinks[index] = {
+      ...nextLinks[index],
+      [field]: value,
+    };
+    setCreator((current) => ({
+      ...current,
+      linkItems: serializeLinkItems(nextLinks.map((item) => ({ label: item.label, url: item.url, kind: item.kind }))),
     }));
   };
 
@@ -230,76 +287,159 @@ export function CreatorPageBuilder({
     </Button>
   );
 
+  const renderIdentityTools = () => (
+    <div className="space-y-5">
+      <div className="space-y-4 rounded-2xl border border-border/50 bg-background/20 p-4">
+        <div className="space-y-1">
+          <div className="text-sm font-semibold">Profile image</div>
+          <div className="text-sm text-muted-foreground">Upload or paste the portrait that anchors the creator identity.</div>
+        </div>
+        <div className="flex items-center gap-4">
+          <Avatar className="h-20 w-20">
+            <AvatarImage src={artist.avatarUrl || ""} />
+            <AvatarFallback>{heroName.slice(0, 2).toUpperCase()}</AvatarFallback>
+          </Avatar>
+          <div className="flex-1 space-y-2">
+            <Input value={artist.avatarUrl || ""} placeholder="https://..." onChange={(event) => setArtist((current) => ({ ...current, avatarUrl: event.target.value }))} />
+            <Input type="file" accept="image/*" disabled={uploading.avatar} onChange={(event) => onUploadImage(event.target.files?.[0] || null, "avatar", (url) => setArtist((current) => ({ ...current, avatarUrl: url })))} />
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-4 rounded-2xl border border-border/50 bg-background/20 p-4">
+        <div className="space-y-1">
+          <div className="text-sm font-semibold">Top banner</div>
+          <div className="text-sm text-muted-foreground">This is the full-width banner above the hero block.</div>
+        </div>
+        <Input value={artist.bannerUrl || ""} placeholder="https://..." onChange={(event) => setArtist((current) => ({ ...current, bannerUrl: event.target.value }))} />
+        <Input type="file" accept="image/*" disabled={uploading.banner} onChange={(event) => onUploadImage(event.target.files?.[0] || null, "banner", (url) => setArtist((current) => ({ ...current, bannerUrl: url })))} />
+      </div>
+
+      <div className="space-y-4 rounded-2xl border border-border/50 bg-background/20 p-4">
+        <div className="space-y-1">
+          <div className="text-sm font-semibold">Hero slider</div>
+          <div className="text-sm text-muted-foreground">Choose Showcase images for the rotating top slider. If none are selected, the top banner is used as the fallback.</div>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <Button type="button" variant="outline" onClick={() => onOpenShowcase("hero-slider")}>
+            Choose Slider Images
+          </Button>
+        </div>
+        <div className="text-sm text-muted-foreground">
+          {assignedHeroSliderImages.length} selected slide{assignedHeroSliderImages.length === 1 ? "" : "s"}
+        </div>
+      </div>
+
+      <div className="space-y-4 rounded-2xl border border-border/50 bg-background/20 p-4">
+        <div className="space-y-1">
+          <div className="text-sm font-semibold">Page details</div>
+          <div className="text-sm text-muted-foreground">These fields define the page name and core identity shown across the creator page.</div>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-2">
+            <Label>Page name</Label>
+            <Input value={artist.displayName || ""} placeholder="Your creator name" onChange={(event) => setArtist((current) => ({ ...current, displayName: event.target.value }))} />
+          </div>
+          <div className="space-y-2">
+            <Label>Category</Label>
+            <Input value={artist.category || ""} placeholder="Photographer, musician, designer..." onChange={(event) => setArtist((current) => ({ ...current, category: event.target.value }))} />
+          </div>
+          <div className="space-y-2">
+            <Label>Tagline</Label>
+            <Input value={artist.tagline || ""} placeholder="One-line first impression" onChange={(event) => setArtist((current) => ({ ...current, tagline: event.target.value }))} />
+          </div>
+          <div className="space-y-2">
+            <Label>Location</Label>
+            <Input value={artist.location || ""} placeholder="Los Angeles, CA" onChange={(event) => setArtist((current) => ({ ...current, location: event.target.value }))} />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Label>Tags</Label>
+          <Input value={artist.tags || ""} placeholder="portrait, club, editorial" onChange={(event) => setArtist((current) => ({ ...current, tags: event.target.value }))} />
+        </div>
+      </div>
+    </div>
+  );
+
   const renderInspector = () => {
     if (selectedBlock === "hero") {
       return (
         <div className="space-y-5">
+          <div className="rounded-2xl border border-border/50 bg-background/10 p-4">
+            <div className="text-sm font-semibold">Hero media block</div>
+            <div className="mt-1 text-sm text-muted-foreground">This sits below the top banner. Pick showcase images or videos for the hero media area.</div>
+            <div className="mt-3 flex flex-wrap gap-3">
+              <Select value={builderMeta.heroMediaType || "image"} onValueChange={(value) => updateBuilderMeta({ ...builderMeta, heroMediaType: value as "image" | "video" })}>
+                <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="image">Hero image</SelectItem>
+                  <SelectItem value="video">Hero video</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button type="button" variant="outline" onClick={() => onOpenShowcase("hero")}>
+                Choose Hero Media
+              </Button>
+            </div>
+            <div className="mt-3 text-sm text-muted-foreground">
+              {builderMeta.heroMediaType === "video"
+                ? `${assignedHeroVideos.length} selected video${assignedHeroVideos.length === 1 ? "" : "s"}`
+                : `${assignedHeroImages.length} selected image${assignedHeroImages.length === 1 ? "" : "s"}`}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (selectedBlock === "hero-details") {
+      const editableLinks = Array.from({ length: 3 }, (_, index) => builderMeta.heroInfoLinks?.[index] || { label: "", url: "" });
+      return (
+        <div className="space-y-5">
           <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
-            <div className="text-sm font-semibold">Global page identity</div>
+            <div className="text-sm font-semibold">Creation description block</div>
             <div className="mt-1 text-sm text-muted-foreground">
-              These are the top-level controls: name, tagline, category, location, profile image, top banner, and hero media selection.
-            </div>
-          </div>
-          <div className="space-y-4 rounded-2xl border border-border/50 bg-background/30 p-4">
-            <Label>Profile image</Label>
-            <div className="flex items-center gap-4">
-              <Avatar className="h-20 w-20">
-                <AvatarImage src={artist.avatarUrl || ""} />
-                <AvatarFallback>{heroName.slice(0, 2).toUpperCase()}</AvatarFallback>
-              </Avatar>
-              <div className="flex-1 space-y-2">
-                <Input value={artist.avatarUrl || ""} placeholder="https://..." onChange={(event) => setArtist((current) => ({ ...current, avatarUrl: event.target.value }))} />
-                <Input type="file" accept="image/*" disabled={uploading.avatar} onChange={(event) => onUploadImage(event.target.files?.[0] || null, "avatar", (url) => setArtist((current) => ({ ...current, avatarUrl: url })))} />
-              </div>
-            </div>
-          </div>
-          <div className="space-y-4 rounded-2xl border border-border/50 bg-background/30 p-4">
-            <Label>Hero banner</Label>
-            <Input value={artist.bannerUrl || ""} placeholder="https://..." onChange={(event) => setArtist((current) => ({ ...current, bannerUrl: event.target.value }))} />
-            <Input type="file" accept="image/*" disabled={uploading.banner} onChange={(event) => onUploadImage(event.target.files?.[0] || null, "banner", (url) => setArtist((current) => ({ ...current, bannerUrl: url })))} />
-            <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
-              <div className="text-sm font-semibold">Hero media block</div>
-              <div className="mt-1 text-sm text-muted-foreground">This sits below the banner. Pick showcase images or videos for the hero media area.</div>
-              <div className="mt-3 flex flex-wrap gap-3">
-                <Select value={builderMeta.heroMediaType || "image"} onValueChange={(value) => updateBuilderMeta({ ...builderMeta, heroMediaType: value as "image" | "video" })}>
-                  <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="image">Hero image</SelectItem>
-                    <SelectItem value="video">Hero video</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button type="button" variant="outline" onClick={() => onOpenShowcase("hero")}>
-                  Choose Hero Media
-                </Button>
-              </div>
-              <div className="mt-3 text-sm text-muted-foreground">
-                {builderMeta.heroMediaType === "video"
-                  ? `${assignedHeroVideos.length} selected video${assignedHeroVideos.length === 1 ? "" : "s"}`
-                  : `${assignedHeroImages.length} selected image${assignedHeroImages.length === 1 ? "" : "s"}`}
-              </div>
-            </div>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Page name</Label>
-              <Input value={artist.displayName || ""} placeholder="Your creator name" onChange={(event) => setArtist((current) => ({ ...current, displayName: event.target.value }))} />
-            </div>
-            <div className="space-y-2">
-              <Label>Category</Label>
-              <Input value={artist.category || ""} placeholder="Photographer, musician, designer..." onChange={(event) => setArtist((current) => ({ ...current, category: event.target.value }))} />
-            </div>
-            <div className="space-y-2">
-              <Label>Tagline</Label>
-              <Input value={artist.tagline || ""} placeholder="One-line first impression" onChange={(event) => setArtist((current) => ({ ...current, tagline: event.target.value }))} />
-            </div>
-            <div className="space-y-2">
-              <Label>Location</Label>
-              <Input value={artist.location || ""} placeholder="Los Angeles, CA" onChange={(event) => setArtist((current) => ({ ...current, location: event.target.value }))} />
+              This block sits beside the hero media. Use it for what the creator makes, short business context, and direct contact paths.
             </div>
           </div>
           <div className="space-y-2">
-            <Label>Tags</Label>
-            <Input value={artist.tags || ""} placeholder="portrait, club, editorial" onChange={(event) => setArtist((current) => ({ ...current, tags: event.target.value }))} />
+            <Label>Block title</Label>
+            <Input
+              value={builderMeta.heroInfoTitle || ""}
+              placeholder="Creation description"
+              onChange={(event) => updateBuilderMeta({ ...builderMeta, heroInfoTitle: event.target.value })}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Description</Label>
+            <Textarea
+              value={builderMeta.heroInfoDescription || ""}
+              placeholder="Describe what they make, do, or offer."
+              onChange={(event) => updateBuilderMeta({ ...builderMeta, heroInfoDescription: event.target.value })}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Contact number</Label>
+            <Input
+              value={builderMeta.heroInfoPhone || ""}
+              placeholder="+1 (555) 555-5555"
+              onChange={(event) => updateBuilderMeta({ ...builderMeta, heroInfoPhone: event.target.value })}
+            />
+          </div>
+          <div className="space-y-3">
+            <Label>Links</Label>
+            {editableLinks.map((item, index) => (
+              <div key={`hero-info-link-${index}`} className="grid gap-3 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+                <Input
+                  value={item.label}
+                  placeholder={`Link ${index + 1} label`}
+                  onChange={(event) => updateHeroInfoLink(index, "label", event.target.value)}
+                />
+                <Input
+                  value={item.url}
+                  placeholder="https://..."
+                  onChange={(event) => updateHeroInfoLink(index, "url", event.target.value)}
+                />
+              </div>
+            ))}
           </div>
         </div>
       );
@@ -367,15 +507,29 @@ export function CreatorPageBuilder({
     }
 
     if (selectedBlock === "links") {
+      const editableLinks = Array.from(
+        { length: Math.max(linkItems.length + 1, 4) },
+        (_, index) => linkItems[index] || { id: `editable-link-${index}`, label: "", url: "", kind: null },
+      );
       return (
         <div className="space-y-4">
-          <div className="text-sm text-muted-foreground">One item per line using `Label|https://url|kind`.</div>
-          <Textarea
-            className="min-h-48"
-            value={creator.linkItems || ""}
-            placeholder={"Store|https://your-store.com|shop\nInstagram|https://instagram.com/you|social"}
-            onChange={(event) => setCreator((current) => ({ ...current, linkItems: event.target.value }))}
-          />
+          <div className="text-sm text-muted-foreground">Add a title people will see and the URL each link should open.</div>
+          <div className="space-y-3">
+            {editableLinks.map((item, index) => (
+              <div key={item.id || `creator-link-${index}`} className="grid gap-3 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+                <Input
+                  value={item.label}
+                  placeholder={`Link ${index + 1} title`}
+                  onChange={(event) => updateCreatorLinkItem(index, "label", event.target.value)}
+                />
+                <Input
+                  value={item.url}
+                  placeholder="https://..."
+                  onChange={(event) => updateCreatorLinkItem(index, "url", event.target.value)}
+                />
+              </div>
+            ))}
+          </div>
         </div>
       );
     }
@@ -432,17 +586,25 @@ export function CreatorPageBuilder({
             : selectedBlock === "events"
               ? `${linkedEvents.length} linked event${linkedEvents.length === 1 ? "" : "s"}`
               : `${artistPostsCount} published artist post${artistPostsCount === 1 ? "" : "s"}`;
+      const summaryCopy = selectedBlock === "events"
+        ? `${summary}. Create events from the Events page, then return here to preview them on the creator page.`
+        : `${summary}. This block now pulls from explicit showcase selections rather than every showcase item of that type.`;
 
       return (
         <div className="space-y-4">
           <div className="rounded-2xl border border-border/50 bg-background/30 p-4 text-sm text-muted-foreground">
-            {summary}. This block now pulls from explicit showcase selections rather than every showcase item of that type.
+            {summaryCopy}
           </div>
           {(selectedBlock === "gallery" || selectedBlock === "video" || selectedBlock === "audio") ? (
             <div className="flex flex-wrap gap-3">
               {selectedBlock === "gallery" ? <Button type="button" variant="outline" onClick={() => onOpenShowcase("gallery")}>Select Gallery Images</Button> : null}
               {selectedBlock === "video" ? <Button type="button" variant="outline" onClick={() => onOpenShowcase("video")}>Select Playlist Videos</Button> : null}
               {selectedBlock === "audio" ? <Button type="button" variant="outline" onClick={() => onOpenShowcase("gallery")}>Open Showcase</Button> : null}
+            </div>
+          ) : null}
+          {selectedBlock === "events" ? (
+            <div className="flex flex-wrap gap-3">
+              <Button type="button" variant="outline" onClick={onOpenEventsManager}>Open Events</Button>
             </div>
           ) : null}
           {selectedBlock === "posts" ? (
@@ -465,12 +627,29 @@ export function CreatorPageBuilder({
           setSelectedBlock("hero");
           setShowMobileBlockMenu(false);
         }}
-        className={cn("w-full rounded-2xl border p-4 text-left transition-all", selectedBlock === "hero" ? "border-primary bg-primary/8 ring-1 ring-primary/20" : "border-border/50 bg-background/35")}
+        className={cn("w-full rounded-2xl border p-4 text-left transition-all", selectedBlock === "hero" ? "border-primary bg-primary/8 ring-1 ring-primary/20" : "border-primary/30 bg-background/35")}
       >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-sm font-semibold">Hero</div>
+            <div className="text-sm font-semibold text-primary">Hero</div>
             <div className="mt-1 text-sm text-muted-foreground">Global banner and identity plane.</div>
+          </div>
+          <Badge variant="secondary">Top</Badge>
+        </div>
+      </button>
+
+      <button
+        type="button"
+        onClick={() => {
+          setSelectedBlock("hero-details");
+          setShowMobileBlockMenu(false);
+        }}
+        className={cn("w-full rounded-2xl border p-4 text-left transition-all", selectedBlock === "hero-details" ? "border-primary bg-primary/8 ring-1 ring-primary/20" : "border-primary/30 bg-background/35")}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold text-primary">Creation description</div>
+            <div className="mt-1 text-sm text-muted-foreground">The business summary block beside the hero media.</div>
           </div>
           <Badge variant="secondary">Top</Badge>
         </div>
@@ -488,13 +667,13 @@ export function CreatorPageBuilder({
               }}
               className={cn(
                 "w-full rounded-2xl border p-4 text-left transition-all",
-                selectedBlock === section.key ? "border-primary bg-primary/8 ring-1 ring-primary/20" : "border-border/50 bg-background/35",
+                selectedBlock === section.key ? "border-primary bg-primary/8 ring-1 ring-primary/20" : "border-primary/30 bg-background/35",
                 !section.visible && "border-dashed opacity-70",
               )}
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-sm font-semibold">{meta.label}</div>
+                  <div className="text-sm font-semibold text-primary">{meta.label}</div>
                   <div className="mt-1 text-sm text-muted-foreground">{meta.description}</div>
                   <div className="mt-3 text-xs font-medium text-foreground/80">
                     {section.visible ? (previewCards[section.key] ? "Configured" : "Needs content") : "Hidden"}
@@ -528,13 +707,30 @@ export function CreatorPageBuilder({
             onClick={() => setSelectedBlock("hero")}
             className={cn(
               "min-w-56 rounded-2xl border p-4 text-left transition-all",
-              selectedBlock === "hero" ? "border-primary bg-primary/8 ring-1 ring-primary/20" : "border-border/50 bg-background/35",
+              selectedBlock === "hero" ? "border-primary bg-primary/8 ring-1 ring-primary/20" : "border-primary/30 bg-background/35",
             )}
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-sm font-semibold">Hero</div>
+                <div className="text-sm font-semibold text-primary">Hero</div>
                 <div className="mt-1 text-sm text-muted-foreground">Global banner and identity plane.</div>
+              </div>
+              <Badge variant="secondary">Top</Badge>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedBlock("hero-details")}
+            className={cn(
+              "min-w-64 rounded-2xl border p-4 text-left transition-all",
+              selectedBlock === "hero-details" ? "border-primary bg-primary/8 ring-1 ring-primary/20" : "border-primary/30 bg-background/35",
+            )}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-primary">Creation description</div>
+                <div className="mt-1 text-sm text-muted-foreground">The business summary block beside the hero media.</div>
               </div>
               <Badge variant="secondary">Top</Badge>
             </div>
@@ -548,13 +744,13 @@ export function CreatorPageBuilder({
                 onClick={() => setSelectedBlock(section.key)}
                 className={cn(
                   "min-w-64 rounded-2xl border p-4 text-left transition-all",
-                  selectedBlock === section.key ? "border-primary bg-primary/8 ring-1 ring-primary/20" : "border-border/50 bg-background/35",
+                  selectedBlock === section.key ? "border-primary bg-primary/8 ring-1 ring-primary/20" : "border-primary/30 bg-background/35",
                   !section.visible && "border-dashed opacity-70",
                 )}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="text-sm font-semibold">{meta.label}</div>
+                    <div className="text-sm font-semibold text-primary">{meta.label}</div>
                     <div className="mt-1 text-sm text-muted-foreground">{meta.description}</div>
                     <div className="mt-3 text-xs font-medium text-foreground/80">
                       {section.visible ? (previewCards[section.key] ? "Configured" : "Needs content") : "Hidden"}
@@ -589,7 +785,7 @@ export function CreatorPageBuilder({
           {creator.featuredDescription ? <div className="text-sm text-muted-foreground">{creator.featuredDescription}</div> : null}
           {featuredMode === "video" && creator.featuredUrl ? (
             <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
-              <BuilderVideoPlaylist items={[{ id: "featured-video", title: creator.featuredTitle || "Featured video", url: creator.featuredUrl, thumbnail: creator.featuredUrl }]} />
+              <BuilderVideoPlaylist items={[{ id: "featured-video", title: creator.featuredTitle || "Featured video", url: creator.featuredUrl, thumbnail: undefined }]} />
             </div>
           ) : featuredMode === "track" && creator.featuredUrl ? (
             <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
@@ -612,7 +808,7 @@ export function CreatorPageBuilder({
 
     if (key === "video") {
       return assignedPlaylistVideos.length ? (
-        <BuilderVideoPlaylist items={assignedPlaylistVideos.map((item, index) => ({ id: String(item.id || index), title: item.caption || `Video ${index + 1}`, url: item.url, thumbnail: item.url }))} />
+        <BuilderVideoPlaylist items={assignedPlaylistVideos.map((item, index) => ({ id: String(item.id || index), title: item.caption || `Video ${index + 1}`, url: item.url, thumbnail: item.thumbnailUrl || undefined }))} />
       ) : <div className="text-sm text-muted-foreground">No video items yet.</div>;
     }
 
@@ -630,7 +826,7 @@ export function CreatorPageBuilder({
 
     if (key === "events") {
       return linkedEvents.length ? (
-        <BuilderEventCarousel items={linkedEvents.map((event) => ({ id: String(event.id), title: event.title, startsAt: event.startsAt, location: event.location || undefined, description: event.description || undefined }))} />
+        <BuilderEventCarousel items={linkedEvents.map((event) => ({ id: String(event.id), title: event.title, startsAt: event.startsAt, location: event.location || undefined, city: event.city || undefined, description: event.description || undefined, imageUrl: event.imageUrl || undefined, tags: event.lineupTags || undefined, linkedArtistsCount: event.linkedArtistsCount ?? undefined }))} />
       ) : <div className="text-sm text-muted-foreground">No linked events yet.</div>;
     }
 
@@ -723,32 +919,14 @@ export function CreatorPageBuilder({
         </CardContent>
       </Card>
 
-      <div className="hidden md:block">
+      <div className="hidden md:block rounded-[1.75rem] border border-primary/35 p-3">
+        <div className="mb-3 px-2">
+          <div className="text-sm font-semibold">Page identity tools</div>
+          <div className="mt-1 text-sm text-muted-foreground">Manage the fixed page identity here. This top module should stay focused on the basic page information.</div>
+        </div>
         <Card className="border-border/50 bg-card/50">
-          <CardHeader>
-            <CardTitle>{selectedBlock === "hero" ? "Hero" : selectedSection?.label}</CardTitle>
-            <CardDescription>{selectedBlock === "hero" ? "Edit the global identity and top banner." : selectedSection?.description}</CardDescription>
-          </CardHeader>
           <CardContent className="space-y-4">
-            {renderInspector()}
-            <div className="flex flex-wrap gap-3 border-t border-border/50 pt-4">
-              {renderSaveButton()}
-              {!hasArtistPage ? (
-                <div className="text-sm text-muted-foreground">Save once to publish the page and unlock the public route.</div>
-              ) : null}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="hidden md:block">
-        <Card className="border-border/50 bg-card/50">
-          <CardHeader>
-            <CardTitle>Page blocks</CardTitle>
-            <CardDescription>Desktop uses a horizontal block picker instead of a full left column.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {renderHorizontalBlockMenu()}
+            {renderIdentityTools()}
           </CardContent>
         </Card>
       </div>
@@ -771,21 +949,63 @@ export function CreatorPageBuilder({
           ) : null}
         </Card>
 
-        <Card className={cn("border-border/50 bg-card/50 md:hidden xl:sticky xl:top-24 xl:h-fit", creatorBuilderView === "preview" && "hidden md:block")}>
-          <CardHeader>
-            <CardTitle>{selectedBlock === "hero" ? "Hero" : selectedSection?.label}</CardTitle>
-            <CardDescription>{selectedBlock === "hero" ? "Edit the global identity and top banner." : selectedSection?.description}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {renderInspector()}
-            <div className="flex flex-wrap gap-3 border-t border-border/50 pt-4">
-              {renderSaveButton()}
-              {!hasArtistPage ? (
-                <div className="text-sm text-muted-foreground">Save once to publish the page and unlock the public route.</div>
-              ) : null}
+        <div className={cn("space-y-4 md:hidden xl:sticky xl:top-24 xl:h-fit", creatorBuilderView === "preview" && "hidden md:block")}>
+          <div className="rounded-[1.75rem] border border-sky-400/35 p-3">
+            <div className="mb-3 px-2">
+              <div className="text-sm font-semibold">Page creation tools</div>
+              <div className="mt-1 text-sm text-muted-foreground">Use the block picker and section settings here to build the page structure.</div>
             </div>
-          </CardContent>
-        </Card>
+            <Card className="border-border/50 bg-card/50">
+              <CardHeader>
+                <CardTitle>{selectedBlock === "hero" ? "Hero block settings" : selectedBlock === "hero-details" ? "Creation description settings" : `${selectedSection?.label} settings`}</CardTitle>
+                <CardDescription>{selectedBlock === "hero" ? "Edit the hero media block only. Basic page identity stays in the fixed module above." : selectedBlock === "hero-details" ? "Edit the block that sits beside the hero media." : selectedSection?.description}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {renderInspector()}
+                <div className="flex flex-wrap gap-3 border-t border-border/50 pt-4">
+                  {renderSaveButton()}
+                  {!hasArtistPage ? (
+                    <div className="text-sm text-muted-foreground">Save once to publish the page and unlock the public route.</div>
+                  ) : null}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        <div className="hidden md:block xl:sticky xl:top-24 xl:h-fit">
+          <div className="mb-6 rounded-[1.75rem] border border-sky-400/35 p-3">
+            <div className="mb-3 px-2">
+              <div className="text-sm font-semibold">Page creation tools</div>
+              <div className="mt-1 text-sm text-muted-foreground">Use the block picker and section settings here to build the page structure.</div>
+            </div>
+            <Card className="border-border/50 bg-card/50">
+              <CardHeader>
+                <CardTitle>Block picker</CardTitle>
+                <CardDescription>Choose which module you are editing, then reorder or hide sections from here.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {renderHorizontalBlockMenu()}
+              </CardContent>
+            </Card>
+
+            <Card className="mt-4 border-border/50 bg-card/50">
+              <CardHeader>
+                <CardTitle>{selectedBlock === "hero" ? "Hero block settings" : selectedBlock === "hero-details" ? "Creation description settings" : `${selectedSection?.label} settings`}</CardTitle>
+                <CardDescription>{selectedBlock === "hero" ? "Edit the hero media block only. Basic page identity stays in the fixed module above." : selectedBlock === "hero-details" ? "Edit the block that sits beside the hero media." : selectedSection?.description}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {renderInspector()}
+                <div className="flex flex-wrap gap-3 border-t border-border/50 pt-4">
+                  {renderSaveButton()}
+                  {!hasArtistPage ? (
+                    <div className="text-sm text-muted-foreground">Save once to publish the page and unlock the public route.</div>
+                  ) : null}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
 
         <Card className={cn("border-border/50 bg-card/50 xl:sticky xl:top-24", creatorBuilderView === "edit" && "hidden md:block")}>
           <CardHeader>
@@ -828,30 +1048,57 @@ export function CreatorPageBuilder({
               </button>
 
               <div className="space-y-4 p-4 md:p-5">
-                <button
-                  type="button"
-                  onClick={() => setSelectedBlock("about")}
-                  className={cn("block w-full rounded-[1.5rem] border border-border/50 bg-background/35 p-4 text-left transition-all hover:border-primary/30", (selectedBlock === "hero" || selectedBlock === "about") && "border-primary/50 ring-1 ring-primary/20")}
-                >
-                  <div className="mb-4 grid gap-4 lg:grid-cols-[minmax(220px,1fr)_minmax(0,1.5fr)]">
-                    <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
-                      <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">What they do</div>
-                      <div className="mt-2 text-sm leading-6">{artist.category || artist.tagline || "Define the business offering."}</div>
-                    </div>
-                    <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
-                      <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Hero media</div>
-                      <div className="mt-3">
-                        {builderMeta.heroMediaType === "video" ? (
-                          assignedHeroVideos.length ? (
-                            <BuilderVideoPlaylist items={assignedHeroVideos.map((item, index) => ({ id: String(item.id || index), title: item.caption || `Video ${index + 1}`, url: item.url, thumbnail: item.url }))} />
-                          ) : <div className="text-sm text-muted-foreground">No hero videos selected.</div>
-                        ) : assignedHeroImages.length ? (
-                          <BuilderMediaGallery items={assignedHeroImages.map((item, index) => ({ id: String(item.id || index), title: item.caption || `Image ${index + 1}`, imageUrl: item.url, mediaUrl: item.url }))} />
-                        ) : <div className="text-sm text-muted-foreground">No hero images selected.</div>}
+                <div className="mb-4 grid gap-4 lg:grid-cols-[minmax(220px,1fr)_minmax(0,1.5fr)]">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedBlock("hero-details")}
+                    className={cn("rounded-2xl border border-border/50 bg-background/40 text-left transition-all hover:border-primary/30", selectedBlock === "hero-details" && "border-primary/50 ring-1 ring-primary/20")}
+                  >
+                    <CreatorInfoCard
+                      creator={{
+                        name: heroInfoTitle,
+                        title: artist.category || artist.tagline || "Creator",
+                        bio: heroInfoDescription,
+                        availabilityText: artist.availabilityStatus || undefined,
+                        turnaround: creator.turnaroundInfo || undefined,
+                        location: artist.location || undefined,
+                        price: creator.pricingSummary || undefined,
+                        phone: heroInfoPhone || undefined,
+                        email: artist.bookingEmail || undefined,
+                        links: heroInfoLinks,
+                        services: heroInfoServices,
+                      }}
+                      className="min-h-[22rem] rounded-2xl border-0 bg-transparent shadow-none"
+                      showImage={false}
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedBlock("hero")}
+                    className={cn("overflow-hidden rounded-2xl border border-border/50 bg-background/40 text-left transition-all hover:border-primary/30", selectedBlock === "hero" && "border-primary/50 ring-1 ring-primary/20")}
+                  >
+                    {builderMeta.heroMediaType === "video" ? (
+                      assignedHeroVideos.length ? (
+                        <div className="p-0">
+                          <BuilderVideoPlaylist items={assignedHeroVideos.map((item, index) => ({ id: String(item.id || index), title: item.caption || `Video ${index + 1}`, url: item.url, thumbnail: item.thumbnailUrl || undefined }))} />
+                        </div>
+                      ) : <div className="p-6 text-sm text-muted-foreground">No hero videos selected.</div>
+                    ) : assignedHeroImages.length ? (
+                      <div className="relative min-h-[22rem] w-full overflow-hidden bg-muted">
+                        <img
+                          src={assignedHeroImages[0]?.url || ""}
+                          alt={assignedHeroImages[0]?.caption || "Hero image"}
+                          className="h-full w-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+                        <div className="absolute left-4 top-4 text-xs uppercase tracking-[0.18em] text-white/80">Hero media</div>
+                        <div className="absolute inset-x-0 bottom-0 p-4 text-white">
+                          <div className="text-3xl font-semibold">{assignedHeroImages[0]?.caption || "Hero image"}</div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                </button>
+                    ) : <div className="p-6 text-sm text-muted-foreground">No hero images selected.</div>}
+                  </button>
+                </div>
                 {visibleSections.map((section) => {
                   const meta = SECTION_LIBRARY.find((item) => item.key === section.key)!;
                   return (
