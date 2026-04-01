@@ -3454,13 +3454,15 @@ export default function Settings() {
                                 <img src={item.imageUrl} alt={item.caption || "Profile gallery photo"} className="aspect-square w-full object-cover" />
                                 <div className="absolute inset-0 bg-black/60 opacity-0 transition-opacity group-hover:opacity-100">
                                   <div className="flex h-full flex-col justify-end p-3">
-                                    <Select value={profileFolderState.assignments[String(item.id || item.imageUrl)] || "__unsorted__"} onValueChange={(value) => assignFolder("profile", String(item.id || item.imageUrl), value)} onClick={(e) => e.stopPropagation()}>
-                                      <SelectTrigger className="mb-2 h-8 text-xs"><SelectValue /></SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="__unsorted__">Unsorted</SelectItem>
-                                        {profileFolderState.folders.map((folder) => <SelectItem key={folder} value={folder}>{folder}</SelectItem>)}
-                                      </SelectContent>
-                                    </Select>
+                                    <div onClick={(e) => e.stopPropagation()}>
+                                      <Select value={profileFolderState.assignments[String(item.id || item.imageUrl)] || "__unsorted__"} onValueChange={(value) => assignFolder("profile", String(item.id || item.imageUrl), value)}>
+                                        <SelectTrigger className="mb-2 h-8 text-xs"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="__unsorted__">Unsorted</SelectItem>
+                                          {profileFolderState.folders.map((folder) => <SelectItem key={folder} value={folder}>{folder}</SelectItem>)}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
                                     <Button
                                       variant="destructive"
                                       size="sm"
@@ -3494,13 +3496,15 @@ export default function Settings() {
                             <img src={item.imageUrl} alt={item.caption || "Profile gallery photo"} className="aspect-square w-full object-cover" />
                             <div className="absolute inset-0 bg-black/60 opacity-0 transition-opacity group-hover:opacity-100">
                               <div className="flex h-full flex-col justify-end p-2">
-                                <Select value={profileFolderState.assignments[String(item.id || item.imageUrl)] || "__unsorted__"} onValueChange={(value) => assignFolder("profile", String(item.id || item.imageUrl), value)} onClick={(e) => e.stopPropagation()}>
-                                  <SelectTrigger className="mb-2 h-8 text-xs"><SelectValue /></SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="__unsorted__">Unsorted</SelectItem>
-                                    {profileFolderState.folders.map((folder) => <SelectItem key={folder} value={folder}>{folder}</SelectItem>)}
-                                  </SelectContent>
-                                </Select>
+                                <div onClick={(e) => e.stopPropagation()}>
+                                  <Select value={profileFolderState.assignments[String(item.id || item.imageUrl)] || "__unsorted__"} onValueChange={(value) => assignFolder("profile", String(item.id || item.imageUrl), value)}>
+                                    <SelectTrigger className="mb-2 h-8 text-xs"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="__unsorted__">Unsorted</SelectItem>
+                                      {profileFolderState.folders.map((folder) => <SelectItem key={folder} value={folder}>{folder}</SelectItem>)}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
                                 <Button
                                   variant="destructive"
                                   size="sm"
