@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useQueryClient } from "@tanstack/react-query";
 import { Compass } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { consumeReturnTo, navigateAfterAuth } from "@/lib/auth-redirect";
+import { navigateAfterAuth } from "@/lib/auth-redirect";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -28,7 +28,7 @@ export default function Login() {
           queryClient.setQueryData(["/api/auth/me"], data.user);
           queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
           toast({ title: "Welcome back!", description: "Successfully logged in." });
-          navigateAfterAuth(consumeReturnTo());
+          navigateAfterAuth("/");
         },
         onError: (err: any) => {
           toast({ 

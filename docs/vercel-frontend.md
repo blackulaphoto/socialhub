@@ -16,10 +16,10 @@ The root [vercel.json](/c:/Users/brandon/Downloads/Social-Hub/Social-Hub/vercel.
 Set this in the Vercel project:
 
 ```env
-VITE_API_BASE_URL=https://your-api.up.railway.app
+VITE_API_BASE_URL=https://your-frontend.vercel.app
 ```
 
-This is required because parts of the frontend still call the API directly from the browser using the configured base URL.
+The frontend should use its own Vercel origin in production so browser calls stay same-origin and Vercel rewrites proxy `/api/*` and `/uploads/*` to Railway.
 
 ## Recommended Vercel project settings
 
@@ -29,8 +29,9 @@ This is required because parts of the frontend still call the API directly from 
 - Build command: leave default because [vercel.json](/c:/Users/brandon/Downloads/Social-Hub/Social-Hub/vercel.json) defines it
 - Output directory: leave default because [vercel.json](/c:/Users/brandon/Downloads/Social-Hub/Social-Hub/vercel.json) defines it
 
-## Important note
+## Important notes
 
-Do not point `VITE_API_BASE_URL` at `localhost`.
-
-For a public Vercel deploy to function, the backend must already be running on a public Railway URL.
+- Do not point `VITE_API_BASE_URL` at `localhost` for a public deploy.
+- The Vercel domain should be the configured frontend base URL.
+- [vercel.json](/c:/Users/brandon/Downloads/Social-Hub/Social-Hub/vercel.json) proxies `/api/*` and `/uploads/*` to Railway.
+- For local production-style testing, use [deployment-parity.md](/c:/Users/brandon/Downloads/Social-Hub/Social-Hub/docs/deployment-parity.md).

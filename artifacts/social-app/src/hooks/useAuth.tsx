@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useGetMe } from "@workspace/api-client-react";
 import { User } from "@workspace/api-client-react";
 import { Spinner } from "@/components/ui/spinner";
-import { consumeReturnTo, rememberReturnTo } from "@/lib/auth-redirect";
+import { rememberReturnTo } from "@/lib/auth-redirect";
 
 interface AuthContextType {
   user: User | null;
@@ -36,7 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else if (user && !user.onboardingCompleted && !isOnboardingRoute && !isAuthRoute) {
         setLocation("/onboarding");
       } else if (user && isAuthRoute) {
-        setLocation(consumeReturnTo());
+        setLocation("/");
       }
     }
   }, [isLoading, isError, user, location, isAuthRoute, isOnboardingRoute, setLocation]);

@@ -9,7 +9,6 @@ import {
   Image as ImageIcon,
   Link2,
   Mail,
-  MapPin,
   MessageSquare,
   Mic2,
   MoreHorizontal,
@@ -52,6 +51,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { FeedPostCard } from "@/components/feed-post-card";
+import { CreatorHeroSlider } from "@/components/creator-page/creator-hero-slider";
+import { CreatorInfoCard } from "@/components/creator-page/creator-info-card";
+import { BuilderAudioPlayer } from "@/components/page-builder-blocks/builder-audio-player";
+import { BuilderEventCarousel } from "@/components/page-builder-blocks/builder-event-carousel";
+import { BuilderLinksShowcase } from "@/components/page-builder-blocks/builder-links-showcase";
+import { BuilderMediaGallery } from "@/components/page-builder-blocks/builder-media-gallery";
+import { BuilderVideoPlaylist } from "@/components/page-builder-blocks/builder-video-playlist";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
@@ -66,9 +72,12 @@ import { ProfileReactionBar } from "@/components/profile-reaction-bar";
 import { BlockActionButton } from "@/components/block-action-button";
 import { useAuth } from "@/hooks/useAuth";
 import { useActiveIdentity } from "@/hooks/useActiveIdentity";
+import { readCreatorBuilderMeta } from "@/lib/creator-page-builder";
 import { uploadImage } from "@/lib/upload-image";
 import { getEmbedDescriptor } from "@/lib/embeds";
+import { groupItemsByFolder, readMediaFolderState } from "@/lib/media-folders";
 import { LoadMoreSentinel } from "@/components/load-more-sentinel";
+import { useTheme } from "next-themes";
 
 const ACTION_HELPERS: Record<string, { title: string; fields: string[]; hint: string }> = {
   book: { title: "Send booking inquiry", fields: ["eventType", "eventDate", "budget", "location"], hint: "Share date, budget, and event context." },
@@ -107,14 +116,23 @@ const FONT_PRESET_CLASSES: Record<string, string> = {
 };
 
 const DEFAULT_MODULE_ORDER = ["featured", "about", "media", "posts", "events", "contact"];
+const BACKGROUND_STYLE_CLASSES: Record<string, string> = {
+  "soft-glow": "",
+  spotlight: "before:absolute before:inset-0 before:bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.14),transparent_45%)] before:pointer-events-none after:absolute after:inset-0 after:bg-[radial-gradient(circle_at_70%_30%,rgba(255,255,255,0.08),transparent_35%)] after:pointer-events-none",
+  flat: "before:absolute before:inset-0 before:bg-black/5 before:pointer-events-none",
+};
 
-function formatPlace(parts: Array<string | null | undefined>) {
-  const normalized = parts
-    .map((part) => part?.trim())
-    .filter(Boolean) as string[];
+const LIGHT_THEME_VARIANT_CLASSES: Record<string, string> = {
+  studio: "",
+  paper: "light:[&_section]:border-slate-300/60 light:[&_section]:bg-white/85",
+  gallery: "light:[&_section]:border-slate-200/70 light:[&_section]:bg-white/72",
+};
 
-  return normalized.filter((part, index) => normalized.findIndex((item) => item.toLowerCase() === part.toLowerCase()) === index).join(", ");
-}
+type SectionConfig = {
+  visible?: boolean;
+  style?: string | null;
+  density?: string | null;
+};
 
 function useSavedCreatorPages() {
   const storageKey = "artist-page-favorites";
@@ -149,6 +167,7 @@ function useSavedCreatorPages() {
 export default function ArtistProfile({ id }: { id: string }) {
   const { user: currentUser } = useAuth();
   const { activeIdentity, setActiveIdentity } = useActiveIdentity();
+  const { theme } = useTheme();
   const userId = Number(id);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -209,6 +228,16 @@ export default function ArtistProfile({ id }: { id: string }) {
     }
   }, [isOwnArtistPage, setActiveIdentity]);
 
+  useEffect(() => {
+    const rawSearch = typeof window !== "undefined" ? window.location.search : "";
+    const view = new URLSearchParams(rawSearch).get("view");
+    if (view === "gallery" && typeof document !== "undefined") {
+      window.setTimeout(() => {
+        document.getElementById("creator-gallery")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 50);
+    }
+  }, []);
+
   const follow = useFollowUser();
   const unfollow = useUnfollowUser();
   const createPost = useCreatePost({
@@ -268,6 +297,7 @@ export default function ArtistProfile({ id }: { id: string }) {
     () => artistPostsData?.pages.flatMap((page) => page.posts) || [],
     [artistPostsData],
   );
+  const showcaseFolderState = useMemo(() => readMediaFolderState("showcase", userId), [userId]);
 
   if (isLoading) return <div className="flex justify-center py-20"><Spinner size="lg" /></div>;
   if (isError) return <div className="mx-auto max-w-6xl px-4 py-8"><QueryErrorState title="Could not load artist page" description="The artist profile request failed. Check the API and retry." onRetry={() => refetch()} /></div>;
@@ -278,29 +308,48 @@ export default function ArtistProfile({ id }: { id: string }) {
   const actionType = creator?.primaryActionType || "contact";
   const actionLabel = creator?.primaryActionLabel || "Contact Me";
   const actionMeta = ACTION_HELPERS[actionType] || ACTION_HELPERS.contact;
-  const accent = profile.user.accentColor || "#8b5cf6";
+  const accent = creator?.accentColor || profile.user.accentColor || "#8b5cf6";
   const moodPreset = creator?.moodPreset || "sleek";
   const layoutTemplate = creator?.layoutTemplate || "portfolio";
   const fontPreset = creator?.fontPreset || "modern";
+  const backgroundStyle = creator?.backgroundStyle || "soft-glow";
+  const lightThemeVariant = creator?.lightThemeVariant || "studio";
   const enabledModules = creator?.enabledModules?.length ? creator.enabledModules : DEFAULT_MODULE_ORDER;
   const moduleOrder = (creator?.moduleOrder?.length ? creator.moduleOrder : DEFAULT_MODULE_ORDER).filter((item) => enabledModules.includes(item));
+  const sectionConfigs = (creator?.sectionConfigs || {}) as Record<string, SectionConfig>;
+  const builderMeta = readCreatorBuilderMeta(sectionConfigs as Record<string, unknown>, {
+    enabledModules,
+    moduleOrder,
+    featuredType: creator?.featuredType,
+    featuredUrl: creator?.featuredUrl,
+    linkCount: (creator?.linkItems || []).length,
+    hasImages: (artist.gallery || []).some((item) => item.type === "image"),
+    hasVideos: (artist.gallery || []).some((item) => item.type === "video"),
+    hasAudio: (artist.gallery || []).some((item) => item.type === "audio"),
+  });
   const saved = savedIds.includes(userId);
   const gallery = artist.gallery || [];
   const imageGallery = gallery.filter((item) => item.type === "image");
   const videoGallery = gallery.filter((item) => item.type === "video");
   const audioGallery = gallery.filter((item) => item.type === "audio");
-  const aboutFacts = [
-    artist.availabilityStatus ? { label: "Availability", value: artist.availabilityStatus } : null,
-    artist.pronouns ? { label: "Pronouns", value: artist.pronouns } : null,
-    artist.yearsActive ? { label: "Years active", value: artist.yearsActive } : null,
-    artist.representedBy ? { label: "Representation", value: artist.representedBy } : null,
-  ].filter(Boolean) as Array<{ label: string; value: string }>;
   const capabilityFlags = [
     artist.openForCommissions ? "Open for commissions" : null,
     artist.touring ? "Touring" : null,
     artist.acceptsCollaborations ? "Accepts collaborations" : null,
   ].filter(Boolean) as string[];
-  const storeLinks = (profile.user.links || []).filter((link) => /shop|store/i.test(link.label) || /shop|store/i.test(link.url));
+  const linkItems = creator?.linkItems || [];
+  const serviceItems = creator?.serviceItems || [];
+  const pricingSummary = creator?.pricingSummary || null;
+  const turnaroundInfo = creator?.turnaroundInfo || null;
+  const storeLinks = linkItems.filter((link) => /shop|store/i.test(link.label) || /shop|store/i.test(link.url) || link.kind === "shop" || link.kind === "store");
+  const generalLinks = linkItems.filter((link) => !( /shop|store/i.test(link.label) || /shop|store/i.test(link.url) || link.kind === "shop" || link.kind === "store"));
+  const allShowcaseLinks = [
+    ...(creator?.primaryActionUrl && (actionType === "shop" || actionType === "store")
+      ? [{ id: "primary-action", label: actionLabel, url: creator.primaryActionUrl, kind: actionType }]
+      : []),
+    ...storeLinks,
+    ...generalLinks,
+  ];
   const mood = MOOD_STYLES[moodPreset] || MOOD_STYLES.sleek;
   const fontClass = FONT_PRESET_CLASSES[fontPreset] || "";
   const headingClass = fontPreset === "editorial"
@@ -312,20 +361,96 @@ export default function ArtistProfile({ id }: { id: string }) {
   const artistPageName = artist.displayName || profile.user.username;
   const artistPageAvatar = artist.avatarUrl || null;
   const artistPageBanner = artist.bannerUrl || null;
-  const artistBaseLocation = formatPlace([artist.location, profile.user.city, profile.user.location]);
-  const primaryTag = artist.tags?.[0] || null;
-  const heroGridClass = layoutTemplate === "editorial"
-    ? "lg:grid-cols-[1.2fr_0.8fr]"
-    : layoutTemplate === "music"
-      ? "lg:grid-cols-[0.9fr_1.1fr]"
-      : layoutTemplate === "performer"
-        ? "lg:grid-cols-[1fr_1fr]"
-        : "lg:grid-cols-[auto_1fr]";
   const heroActionsClass = layoutTemplate === "music"
     ? "xl:max-w-sm xl:flex-col xl:items-stretch"
     : layoutTemplate === "editorial"
       ? "xl:max-w-sm"
       : "xl:max-w-md xl:justify-end";
+  const heroSlides = [
+    {
+      id: "hero-banner",
+      image: artistPageBanner || "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=1600&q=80",
+      title: artistPageName,
+      subtitle: heroTagline,
+    },
+  ];
+  const assignedHeroImages = imageGallery.filter((item) => builderMeta.heroItemIds?.includes(Number(item.id)));
+  const assignedHeroVideos = videoGallery.filter((item) => builderMeta.heroItemIds?.includes(Number(item.id)));
+  const assignedGalleryImages = imageGallery.filter((item) => builderMeta.galleryItemIds?.includes(Number(item.id)));
+  const assignedVideoPlaylistItems = videoGallery.filter((item) => builderMeta.videoItemIds?.includes(Number(item.id)));
+  const creatorInfoServices = serviceItems.map((service) => service.title).filter(Boolean);
+  const creatorInfoBase = {
+    name: artistPageName,
+    title: artist.category || "Creator",
+    turnaround: turnaroundInfo || undefined,
+    services: creatorInfoServices.length ? creatorInfoServices : artist.tags,
+    image: artistPageAvatar,
+    bio: artist.bio || undefined,
+  } as const;
+  const aboutSidebarItems = [
+    { label: "What they do", value: artist.category || artist.tagline || "Define the business offering." },
+    creatorInfoServices.length ? { label: "Focus", value: creatorInfoServices.slice(0, 4).join(", ") } : null,
+    artist.tags?.length ? { label: "Tags", value: artist.tags.slice(0, 5).join(", ") } : null,
+  ].filter(Boolean) as Array<{ label: string; value: string }>;
+  const mediaShowcaseItems = assignedGalleryImages.map((item) => ({
+    id: String(item.id),
+    title: item.caption || artistPageName,
+    imageUrl: item.url,
+    mediaUrl: item.url,
+    description: item.caption || null,
+  }));
+  const videoPlaylistItems = assignedVideoPlaylistItems.map((item) => ({
+    id: String(item.id),
+    title: item.caption || "Video release",
+    url: item.url,
+    thumbnail: item.url,
+  }));
+  const heroVideoItems = assignedHeroVideos.map((item) => ({
+    id: String(item.id),
+    title: item.caption || "Hero video",
+    url: item.url,
+    thumbnail: item.url,
+  }));
+  const heroMediaGalleryItems = assignedHeroImages.map((item) => ({
+    id: String(item.id),
+    title: item.caption || artistPageName,
+    imageUrl: item.url,
+    mediaUrl: item.url,
+    description: item.caption || null,
+  }));
+  const audioShowcaseTracks = audioGallery.map((item) => ({
+    id: String(item.id),
+    title: item.caption || "Audio release",
+    url: item.url,
+  }));
+  const eventShowcaseItems = upcomingEvents.map((event) => ({
+    id: String(event.id),
+    title: event.title,
+    startsAt: event.startsAt,
+    location: event.location,
+    description: event.description || null,
+  }));
+  const featuredType = creator?.featuredContent?.type || null;
+  const featuredTitle = creator?.featuredContent?.title || creator?.featuredTitle || null;
+  const featuredDescription = creator?.featuredContent?.description || creator?.featuredDescription || null;
+  const featuredUrl = creator?.featuredContent?.url || creator?.featuredUrl || null;
+  const featuredEmbed = featuredUrl ? getEmbedDescriptor(featuredUrl) : null;
+  const effectiveFeaturedType =
+    featuredType && featuredType !== "highlight"
+      ? featuredType
+      : featuredEmbed?.kind === "video"
+        ? "video"
+        : featuredEmbed?.kind === "audio"
+          ? "track"
+          : featuredType;
+  const featuredLinkItems = featuredUrl
+    ? [{ id: "featured-link", label: featuredTitle || actionLabel || "Featured link", url: featuredUrl, kind: featuredType || "link" }]
+    : [];
+  const groupedAssignedGalleryImages = groupItemsByFolder(
+    assignedGalleryImages,
+    (item) => String(item.id),
+    showcaseFolderState.assignments,
+  );
 
   const handleArtistImageUpload = async (file: File | null) => {
     if (!file) return;
@@ -399,104 +524,153 @@ export default function ArtistProfile({ id }: { id: string }) {
   const primaryActionKind = !isOwnArtistPage && profile.canInteract
     ? (creator?.primaryActionLabel ? "contact" : "follow")
     : null;
-
-  const renderFeatured = () => (
-    <section className="space-y-4">
-      <div className="space-y-2">
-        <div className="flex items-center gap-2 text-sm uppercase tracking-[0.22em] text-muted-foreground">
-          <Pin className="h-4 w-4 text-primary" /> Featured
-        </div>
-        <h2 className="text-2xl font-bold tracking-tight md:text-[2rem]">{creator?.featuredTitle || "Lead with what matters most"}</h2>
-        {creator?.featuredDescription ? <p className="max-w-3xl text-sm text-muted-foreground">{creator.featuredDescription}</p> : null}
-      </div>
-      {creator?.pinnedPost ? (
-        <FeedPostCard post={creator.pinnedPost} showAuthor={false} />
-      ) : creator?.featuredUrl ? (
-        <a href={creator.featuredUrl} target="_blank" rel="noreferrer" className="block rounded-2xl border border-border/50 bg-background/40 p-5 transition-colors hover:border-primary/40">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <div className="text-sm text-muted-foreground">Featured destination</div>
-              <div className="mt-1 font-medium">{creator.featuredUrl}</div>
-            </div>
-            <ExternalLink className="h-5 w-5 text-primary" />
-          </div>
-        </a>
-      ) : profile.user.featuredContent ? (
-        <div className="rounded-2xl border border-border/50 bg-background/40 p-5 text-sm text-muted-foreground">
-          {profile.user.featuredContent}
-        </div>
-      ) : null}
-    </section>
+  const heroShellClass = cn(
+    BACKGROUND_STYLE_CLASSES[backgroundStyle],
+    theme === "light" && LIGHT_THEME_VARIANT_CLASSES[lightThemeVariant],
   );
 
-  const aboutContent = (
-    <div className="space-y-6">
-        <p className="whitespace-pre-wrap text-[15px] leading-8 text-muted-foreground">
-          {artist.bio || "No bio added yet."}
-        </p>
+  const getSectionPresentation = (sectionKey: string) => {
+    const config = sectionConfigs[sectionKey] || {};
+    const style = config.style || "default";
+    const density = config.density || "comfortable";
 
-        {artist.influences && (
-          <div className="space-y-3">
-            <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Influences</div>
-            <div className="rounded-2xl border border-border/50 bg-background/40 p-4 text-sm text-muted-foreground">
-              {artist.influences}
-            </div>
+    return {
+      wrapperClassName: cn(
+        "rounded-[2rem] transition-all",
+        style === "default" && "border border-border/45 bg-background/28 p-4 md:p-5",
+        style === "minimal" && "border border-border/30 bg-background/14 p-3 md:p-4",
+        style === "highlighted" && "border border-primary/20 bg-primary/[0.045] p-4 shadow-[0_18px_60px_-42px_rgba(139,92,246,0.65)] md:p-6",
+      ),
+      contentClassName: cn(
+        density === "compact" && "space-y-4 md:space-y-5",
+        density === "comfortable" && "space-y-6 md:space-y-7",
+        density === "expanded" && "space-y-8 md:space-y-10",
+      ),
+    };
+  };
+
+  const renderFeatured = () => {
+    const featuredNode = creator?.pinnedPost ? (
+      <FeedPostCard post={creator.pinnedPost} showAuthor={false} />
+    ) : effectiveFeaturedType === "video" && (featuredUrl || videoPlaylistItems.length) ? (
+      <BuilderVideoPlaylist
+        items={[
+          ...(featuredUrl
+            ? [{
+                id: "featured-video",
+                title: featuredTitle || "Featured video",
+                url: featuredUrl,
+                thumbnail: mediaShowcaseItems[0]?.imageUrl || artistPageBanner || artistPageAvatar || undefined,
+              }]
+            : []),
+          ...videoPlaylistItems,
+        ]}
+      />
+    ) : (effectiveFeaturedType === "track" || effectiveFeaturedType === "audio") && (featuredUrl || audioShowcaseTracks.length) ? (
+      <BuilderAudioPlayer
+        tracks={[
+          ...(featuredUrl
+            ? [{ id: "featured-track", title: featuredTitle || "Featured track", url: featuredUrl }]
+            : []),
+          ...audioShowcaseTracks,
+        ]}
+      />
+    ) : effectiveFeaturedType === "gallery" && mediaShowcaseItems.length ? (
+      <BuilderMediaGallery items={mediaShowcaseItems} />
+    ) : effectiveFeaturedType === "event" && eventShowcaseItems.length ? (
+      <BuilderEventCarousel items={eventShowcaseItems} />
+    ) : (effectiveFeaturedType === "product" || effectiveFeaturedType === "link" || effectiveFeaturedType === "store" || effectiveFeaturedType === "shop") && featuredLinkItems.length ? (
+      <BuilderLinksShowcase items={featuredLinkItems} />
+    ) : null;
+
+    if (!featuredNode) {
+      return null;
+    }
+
+    return (
+      <section className="space-y-4">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-sm uppercase tracking-[0.22em] text-muted-foreground">
+            <Pin className="h-4 w-4 text-primary" /> Featured
           </div>
-        )}
+          <h2 className="text-2xl font-bold tracking-tight md:text-[2rem]">
+            {featuredTitle || "Lead with what matters most"}
+          </h2>
+          {featuredDescription ? <p className="max-w-3xl text-sm text-muted-foreground">{featuredDescription}</p> : null}
+        </div>
+        {featuredNode}
+      </section>
+    );
+  };
 
-        <div className="grid gap-3 md:grid-cols-2">
-          {aboutFacts.map((fact) => (
-            <div key={fact.label} className="rounded-2xl border border-border/50 bg-background/40 p-4">
-              <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{fact.label}</div>
-              <div className="mt-1 text-sm font-medium">{fact.value}</div>
-            </div>
-          ))}
-          {artistBaseLocation && (
-            <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
-              <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Base</div>
-              <div className="mt-1 text-sm font-medium">{artistBaseLocation}</div>
+  const aboutContent = (
+    <div className="space-y-6 rounded-[1.75rem] border border-border/50 bg-background/35 p-5 md:p-6">
+          <p className="whitespace-pre-wrap text-[15px] leading-8 text-muted-foreground">
+            {artist.bio || "No bio added yet."}
+          </p>
+
+          {artist.influences && (
+            <div className="space-y-3">
+              <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Influences</div>
+              <div className="rounded-2xl border border-border/50 bg-background/40 p-4 text-sm text-muted-foreground">
+                {artist.influences}
+              </div>
             </div>
           )}
-        </div>
 
-        {capabilityFlags.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {capabilityFlags.map((flag) => <Badge key={flag} variant="secondary">{flag}</Badge>)}
-          </div>
-        )}
+          {artist.customFields?.length > 0 && (
+            <div className="grid gap-3 md:grid-cols-2">
+              {artist.customFields.map((field) => (
+                <div key={`${field.label}-${field.value}`} className="rounded-2xl border border-border/50 bg-background/40 p-4">
+                  <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{field.label}</div>
+                  <div className="mt-1 text-sm">{field.value}</div>
+                </div>
+              ))}
+            </div>
+          )}
 
-        {artist.customFields?.length > 0 && (
-          <div className="grid gap-3 md:grid-cols-2">
-            {artist.customFields.map((field) => (
-              <div key={`${field.label}-${field.value}`} className="rounded-2xl border border-border/50 bg-background/40 p-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{field.label}</div>
-                <div className="mt-1 text-sm">{field.value}</div>
+          {(serviceItems.length > 0 || pricingSummary || turnaroundInfo) && (
+            <div className="space-y-3">
+              <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Work Details</div>
+              <div className="grid gap-3 md:grid-cols-2">
+                {serviceItems.slice(0, 4).map((service) => (
+                  <div key={`${service.title}-${service.price ?? ""}`} className="rounded-2xl border border-border/50 bg-background/40 p-4">
+                    <div className="font-medium">{service.title}</div>
+                    {service.description ? <div className="mt-1 text-sm text-muted-foreground">{service.description}</div> : null}
+                    {(service.price || service.turnaround) ? <div className="mt-2 text-xs uppercase tracking-[0.16em] text-muted-foreground">{[service.price, service.turnaround].filter(Boolean).join(" / ")}</div> : null}
+                  </div>
+                ))}
+                {pricingSummary ? (
+                  <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
+                    <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Pricing</div>
+                    <div className="mt-1 text-sm font-medium">{pricingSummary}</div>
+                  </div>
+                ) : null}
+                {turnaroundInfo ? (
+                  <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
+                    <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Turnaround</div>
+                    <div className="mt-1 text-sm font-medium">{turnaroundInfo}</div>
+                  </div>
+                ) : null}
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          )}
 
-        {artist.tags?.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {artist.tags.map((tag: string) => <Badge key={tag} variant="secondary"><Tag className="mr-1 h-3 w-3" /> {tag}</Badge>)}
-          </div>
-        )}
-
-        {(profile.user.links?.length || artist.bookingEmail) && (
-          <div className="space-y-3">
-            {artist.bookingEmail && (
-              <div className="rounded-2xl border border-border/50 bg-background/40 px-4 py-3 text-sm">
-                Booking: <span className="text-muted-foreground">{artist.bookingEmail}</span>
-              </div>
-            )}
-            {profile.user.links?.map((link) => (
-              <a key={`${link.label}-${link.url}`} href={link.url} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-2xl border border-border/50 bg-background/40 px-4 py-3 text-sm transition-colors hover:border-primary/40">
-                <span className="inline-flex items-center"><Link2 className="mr-2 h-4 w-4 text-primary" /> {link.label}</span>
-                <ExternalLink className="h-4 w-4 text-muted-foreground" />
-              </a>
-            ))}
-          </div>
-        )}
+          {(generalLinks.length || artist.bookingEmail) && (
+            <div className="space-y-3">
+              {artist.bookingEmail && (
+                <div className="rounded-2xl border border-border/50 bg-background/40 px-4 py-3 text-sm">
+                  Booking: <span className="text-muted-foreground">{artist.bookingEmail}</span>
+                </div>
+              )}
+              {generalLinks.map((link) => (
+                <a key={`${link.label}-${link.url}`} href={link.url} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-2xl border border-border/50 bg-background/40 px-4 py-3 text-sm transition-colors hover:border-primary/40">
+                  <span className="inline-flex items-center"><Link2 className="mr-2 h-4 w-4 text-primary" /> {link.label}</span>
+                  <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                </a>
+              ))}
+            </div>
+          )}
     </div>
   );
 
@@ -510,19 +684,15 @@ export default function ArtistProfile({ id }: { id: string }) {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-3">
+          <div className="space-y-3">
             <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
               <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">What they do</div>
-              <div className="mt-1 text-sm font-medium">{artist.category}</div>
+              <div className="mt-2 text-sm leading-6">{artist.category || artist.tagline || "Define the business offering."}</div>
             </div>
-            <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
-              <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Base</div>
-              <div className="mt-1 text-sm font-medium">{artistBaseLocation || "Location not added yet"}</div>
-            </div>
-            {artist.availabilityStatus ? (
+            {creatorInfoServices.length ? (
               <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Availability</div>
-                <div className="mt-1 text-sm font-medium">{artist.availabilityStatus}</div>
+                <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Focus</div>
+                <div className="mt-2 text-sm leading-6">{creatorInfoServices.slice(0, 4).join(", ")}</div>
               </div>
             ) : null}
           </div>
@@ -556,8 +726,61 @@ export default function ArtistProfile({ id }: { id: string }) {
     </>
   );
 
+  const renderHeroRow = () => (
+    <section className="grid gap-5 lg:grid-cols-[minmax(260px,1fr)_minmax(0,1.5fr)] lg:items-stretch">
+      <div className="rounded-[2rem] border border-border/45 bg-background/28 p-5 md:p-6">
+        <div className="space-y-5">
+          <div>
+            <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">About</div>
+            <h2 className="mt-2 text-2xl font-bold tracking-tight">What this creator does</h2>
+          </div>
+          <div className="space-y-4">
+            {aboutSidebarItems.map((item) => (
+              <div key={item.label} className="rounded-2xl border border-border/50 bg-background/40 p-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{item.label}</div>
+                <div className="mt-2 text-sm leading-6">{item.value}</div>
+              </div>
+            ))}
+            {capabilityFlags.length > 0 ? (
+              <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Working Style</div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {capabilityFlags.map((flag) => <Badge key={flag} variant="secondary">{flag}</Badge>)}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-[2rem] border border-border/45 bg-background/28 p-5 md:p-6">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Hero</div>
+            <div className="mt-1 text-sm text-muted-foreground">Primary media section below the banner.</div>
+          </div>
+        </div>
+        {builderMeta.heroMediaType === "video" ? (
+          heroVideoItems.length ? (
+            <BuilderVideoPlaylist items={heroVideoItems} />
+          ) : (
+            <div className="rounded-2xl border border-dashed border-border/50 bg-background/30 p-6 text-sm text-muted-foreground">
+              No hero videos selected yet.
+            </div>
+          )
+        ) : heroMediaGalleryItems.length ? (
+          <BuilderMediaGallery items={heroMediaGalleryItems} />
+        ) : (
+          <div className="rounded-2xl border border-dashed border-border/50 bg-background/30 p-6 text-sm text-muted-foreground">
+            No hero images selected yet.
+          </div>
+        )}
+      </div>
+    </section>
+  );
+
   const renderMedia = () => (
-    <div className="space-y-5">
+    <div id="creator-gallery" className="space-y-5">
       <div className="space-y-2">
         <div className="flex items-center gap-2">
           <Palette className="h-5 w-5 text-primary" />
@@ -566,42 +789,33 @@ export default function ArtistProfile({ id }: { id: string }) {
         <p className="text-sm text-muted-foreground">
           Gallery, video, audio, and links collected in one cleaner showcase.
         </p>
+        <div>
+          <Link href={`/profile/${userId}?tab=photos`}>
+            <Button variant="outline" size="sm">
+              <ImageIcon className="mr-2 h-4 w-4" /> Open Profile Photos
+            </Button>
+          </Link>
+        </div>
       </div>
 
-      {imageGallery.length > 0 && (
-        <section className="space-y-3">
+      {assignedGalleryImages.length > 0 && (
+        <section className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">Image Gallery</h3>
-            <span className="text-xs text-muted-foreground">{imageGallery.length} items</span>
+            <span className="text-xs text-muted-foreground">{assignedGalleryImages.length} items</span>
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            {imageGallery.map((item) => (
-              <div key={item.id} className="overflow-hidden rounded-[1.75rem] border border-border/50 bg-background/40 shadow-sm">
-                <MediaEmbed type={item.type} url={item.url} title={item.caption} className="aspect-square w-full object-cover" />
-                {item.caption && <div className="p-4 text-sm text-muted-foreground">{item.caption}</div>}
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {videoGallery.length > 0 && (
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">Video</h3>
-            <span className="text-xs text-muted-foreground">{videoGallery.length} items</span>
-          </div>
-          <div className="grid gap-4">
-            {videoGallery.map((item) => (
-              <div key={item.id} className="overflow-hidden rounded-[1.75rem] border border-border/50 bg-background/40 shadow-sm">
-                <div className="flex items-center gap-2 border-b border-border/50 px-4 py-3 text-sm font-medium">
-                  <Video className="h-4 w-4 text-primary" />
-                  {item.caption || "Featured video"}
-                </div>
-                <MediaEmbed type={item.type} url={item.url} title={item.caption} className="aspect-video w-full border-0" />
-              </div>
-            ))}
-          </div>
+          {groupedAssignedGalleryImages.map((group) => (
+            <div key={group.folder} className="space-y-3">
+              <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{group.folder}</div>
+              <BuilderMediaGallery items={group.items.map((item) => ({
+                id: String(item.id),
+                title: item.caption || artistPageName,
+                imageUrl: item.url,
+                mediaUrl: item.url,
+                description: item.caption || null,
+              }))} />
+            </div>
+          ))}
         </section>
       )}
 
@@ -611,49 +825,41 @@ export default function ArtistProfile({ id }: { id: string }) {
             <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">Audio</h3>
             <span className="text-xs text-muted-foreground">{audioGallery.length} items</span>
           </div>
-          <div className="grid gap-4">
-            {audioGallery.map((item) => (
-              <div key={item.id} className="overflow-hidden rounded-[1.75rem] border border-border/50 bg-background/40 shadow-sm">
-                <div className="flex items-center gap-2 border-b border-border/50 px-4 py-3 text-sm font-medium">
-                  <Mic2 className="h-4 w-4 text-primary" />
-                  {item.caption || "Featured audio"}
-                </div>
-                <MediaEmbed type={item.type} url={item.url} title={item.caption} className="h-40 w-full border-0" />
-              </div>
-            ))}
-          </div>
+          <BuilderAudioPlayer tracks={audioShowcaseTracks} />
         </section>
       )}
 
-      {(storeLinks.length > 0 || creator?.primaryActionUrl) && (
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">Store and Links</h3>
-          </div>
-          <div className="space-y-3">
-            {creator?.primaryActionUrl && (actionType === "shop" || actionType === "store") && (
-              <a href={creator.primaryActionUrl} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-2xl border border-border/50 bg-background/40 px-4 py-3 text-sm transition-colors hover:border-primary/40">
-                <span>{actionLabel}</span>
-                <ExternalLink className="h-4 w-4 text-primary" />
-              </a>
-            )}
-            {storeLinks.map((link) => (
-              <a key={`${link.label}-${link.url}`} href={link.url} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-2xl border border-border/50 bg-background/40 px-4 py-3 text-sm transition-colors hover:border-primary/40">
-                <span>{link.label}</span>
-                <ExternalLink className="h-4 w-4 text-primary" />
-              </a>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {!imageGallery.length && !videoGallery.length && !audioGallery.length && !storeLinks.length && !creator?.primaryActionUrl && (
+      {!assignedGalleryImages.length && !audioGallery.length && (
         <Card className="border-dashed border-border/50 bg-card/40">
           <CardContent className="p-12 text-center text-muted-foreground">
             <ImageIcon className="mx-auto mb-3 h-10 w-10 opacity-25" />
             No media modules are turned on yet.
           </CardContent>
         </Card>
+      )}
+    </div>
+  );
+
+  const renderLinks = () => (
+    <div className="space-y-5">
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <ExternalLink className="h-5 w-5 text-primary" />
+          <h2 className="text-2xl font-bold tracking-tight md:text-[2rem]">Links and Shop</h2>
+        </div>
+        <p className="text-sm text-muted-foreground">External destinations, merch, shop links, and portfolio paths.</p>
+      </div>
+      {allShowcaseLinks.length ? (
+        <BuilderLinksShowcase items={allShowcaseLinks.map((link, index) => ({
+          id: `${link.label}-${index}`,
+          label: link.label,
+          url: link.url,
+          kind: link.kind || null,
+        }))} />
+      ) : (
+        <div className="rounded-2xl border border-dashed border-border/50 bg-background/30 p-6 text-sm text-muted-foreground">
+          No links or store destinations have been added yet.
+        </div>
       )}
     </div>
   );
@@ -787,40 +993,21 @@ export default function ArtistProfile({ id }: { id: string }) {
         <p className="text-sm text-muted-foreground">Upcoming shows, past appearances, and linked lineups.</p>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-2">
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">Upcoming</h3>
-          </div>
-          <div className="space-y-3">
-            {upcomingEvents.length ? upcomingEvents.map((event) => (
-              <Link key={event.id} href={`/events/${event.id}`}>
-                <div className="rounded-2xl border border-border/50 bg-background/40 p-4 transition-colors hover:border-primary/40">
-                  <div className="font-medium">{event.title}</div>
-                  <div className="mt-1 text-sm text-muted-foreground">
-                    {new Date(event.startsAt).toLocaleString()} / {event.location}
-                  </div>
-                  {event.lineupTags?.length ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {event.lineupTags.slice(0, 4).map((tag) => <Badge key={tag} variant="secondary">{tag}</Badge>)}
-                    </div>
-                  ) : null}
-                </div>
-              </Link>
-            )) : (
-              <div className="rounded-2xl border border-dashed border-border/50 bg-background/30 p-6 text-sm text-muted-foreground">
-                No upcoming appearances linked yet.
-              </div>
-            )}
-          </div>
-        </section>
+      {upcomingEvents.length ? (
+        <BuilderEventCarousel items={eventShowcaseItems} />
+      ) : (
+        <div className="rounded-2xl border border-dashed border-border/50 bg-background/30 p-6 text-sm text-muted-foreground">
+          No upcoming appearances linked yet.
+        </div>
+      )}
 
+      {pastEvents.length ? (
         <section className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">Past Appearances</h3>
           </div>
-          <div className="space-y-3">
-            {pastEvents.length ? pastEvents.map((event) => (
+          <div className="grid gap-3 md:grid-cols-2">
+            {pastEvents.map((event) => (
               <Link key={event.id} href={`/events/${event.id}`}>
                 <div className="rounded-2xl border border-border/50 bg-background/40 p-4 transition-colors hover:border-primary/40">
                   <div className="font-medium">{event.title}</div>
@@ -829,14 +1016,10 @@ export default function ArtistProfile({ id }: { id: string }) {
                   </div>
                 </div>
               </Link>
-            )) : (
-              <div className="rounded-2xl border border-dashed border-border/50 bg-background/30 p-6 text-sm text-muted-foreground">
-                No past events linked yet.
-              </div>
-            )}
+            ))}
           </div>
         </section>
-      </div>
+      ) : null}
     </div>
   );
 
@@ -847,14 +1030,38 @@ export default function ArtistProfile({ id }: { id: string }) {
         <p className="text-sm text-muted-foreground">The main way people can reach this page or take the next step.</p>
       </div>
       <div className="space-y-4">
-        <div className="rounded-2xl border border-border/50 bg-background/40 p-5">
-          <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Primary call to action</div>
-          <div className="mt-2 text-2xl font-semibold">{actionLabel}</div>
-          <p className="mt-3 text-sm text-muted-foreground">{actionMeta.hint}</p>
-        </div>
+        <CreatorInfoCard
+          creator={{
+            ...creatorInfoBase,
+            bio: actionMeta.hint,
+            ctaText: actionLabel,
+            ctaHref: creator?.primaryActionUrl && (actionType === "shop" || actionType === "store")
+              ? creator.primaryActionUrl
+              : undefined,
+          }}
+          className="bg-background/35"
+          compact
+          showImage={false}
+        />
         {artist.bookingEmail && (
           <div className="rounded-2xl border border-border/50 bg-background/40 p-4 text-sm">
             Booking email: <span className="text-muted-foreground">{artist.bookingEmail}</span>
+          </div>
+        )}
+        {(pricingSummary || turnaroundInfo) && (
+          <div className="grid gap-3 md:grid-cols-2">
+            {pricingSummary ? (
+              <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
+                <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Pricing</div>
+                <div className="mt-1 text-sm font-medium">{pricingSummary}</div>
+              </div>
+            ) : null}
+            {turnaroundInfo ? (
+              <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
+                <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Turnaround</div>
+                <div className="mt-1 text-sm font-medium">{turnaroundInfo}</div>
+              </div>
+            ) : null}
           </div>
         )}
         <div className="flex flex-wrap gap-3">
@@ -877,86 +1084,88 @@ export default function ArtistProfile({ id }: { id: string }) {
   const sections: Record<string, ReactNode> = {
     featured: renderFeatured(),
     about: renderAbout(),
-    media: renderMedia(),
+    gallery: renderMedia(),
+    video: assignedVideoPlaylistItems.length ? (
+      <div className="space-y-5">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Video className="h-5 w-5 text-primary" />
+            <h2 className="text-2xl font-bold tracking-tight md:text-[2rem]">Video Playlist</h2>
+          </div>
+          <p className="text-sm text-muted-foreground">Embedded videos, reels, and moving-image work.</p>
+        </div>
+        <BuilderVideoPlaylist items={videoPlaylistItems} />
+      </div>
+    ) : null,
+    audio: audioGallery.length ? (
+      <div className="space-y-5">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Mic2 className="h-5 w-5 text-primary" />
+            <h2 className="text-2xl font-bold tracking-tight md:text-[2rem]">Audio Player</h2>
+          </div>
+          <p className="text-sm text-muted-foreground">Tracks, playlists, and audio releases.</p>
+        </div>
+        <BuilderAudioPlayer tracks={audioShowcaseTracks} />
+      </div>
+    ) : null,
+    links: renderLinks(),
     posts: renderPosts(),
     events: renderEvents(),
     contact: renderContact(),
   };
 
-  const visibleSections = moduleOrder.filter((key) => sections[key]);
-  const rightRailKeys = layoutTemplate === "music"
-    ? ["featured", "events", "contact"]
-    : layoutTemplate === "performer"
-      ? ["events", "contact", "featured"]
-      : layoutTemplate === "shop"
-        ? ["featured", "media", "contact"]
-        : layoutTemplate === "editorial"
-          ? ["about", "featured", "contact"]
-          : ["featured", "about", "contact"];
+  const visibleSections = builderMeta.sections.filter((section) => section.visible && sections[section.key]).map((section) => section.key);
 
-  const primaryKeys = visibleSections.filter((key) => !rightRailKeys.includes(key));
-  const secondaryKeys = visibleSections.filter((key) => rightRailKeys.includes(key));
-  const pageGridClass = layoutTemplate === "editorial"
-    ? "lg:grid-cols-[1.1fr_0.9fr]"
-    : layoutTemplate === "music"
-      ? "lg:grid-cols-[1.2fr_0.8fr]"
-      : "lg:grid-cols-[0.95fr_1.05fr]";
+  const renderSectionBlock = (key: string) => {
+    const { wrapperClassName, contentClassName } = getSectionPresentation(key);
+    return (
+      <div key={key} className={wrapperClassName}>
+        <div className={contentClassName}>{sections[key]}</div>
+      </div>
+    );
+  };
 
   return (
     <div className={cn("w-full pb-20", fontClass)}>
-      <section className="relative overflow-hidden border-b border-border">
-        {artistPageBanner && (
-          <div
-            className="absolute inset-0 bg-cover bg-center opacity-60"
-            style={{ backgroundImage: `url(${artistPageBanner})` }}
-          />
-        )}
-        <div className={cn("absolute inset-0", artistPageBanner ? "bg-gradient-to-br opacity-70" : "bg-gradient-to-br", mood.shell)} />
-        <div className={cn("absolute inset-0 bg-[radial-gradient(circle_at_top_left,var(--tw-gradient-stops))]", artistPageBanner ? "opacity-60" : "", mood.glow)} />
-        <div className={cn("absolute inset-0", artistPageBanner ? "bg-gradient-to-t from-background/72 via-background/38 to-background/8 dark:from-background/78 dark:via-background/28 dark:to-background/6" : "bg-gradient-to-t from-background via-background/78 to-background/18")} />
-        <div className={cn("absolute inset-0", artistPageBanner ? "bg-black/6 dark:bg-black/14" : "bg-black/12 dark:bg-black/22")} />
+      <section className={cn("relative overflow-hidden border-b border-border", heroShellClass)}>
+        <CreatorHeroSlider
+          slides={heroSlides}
+          autoplay={false}
+          className="min-h-[34rem]"
+          contentClassName="min-h-[34rem]"
+          overlayClassName={artistPageBanner ? "bg-gradient-to-t from-background/82 via-background/34 to-background/5" : "bg-gradient-to-t from-background via-background/78 to-background/18"}
+        >
+          <div className={cn("absolute inset-0 bg-gradient-to-br opacity-70", mood.shell)} />
+          <div className={cn("absolute inset-0 bg-[radial-gradient(circle_at_top_left,var(--tw-gradient-stops))]", mood.glow)} />
+          <div className={cn("absolute inset-0", artistPageBanner ? "bg-black/12 dark:bg-black/20" : "bg-black/18 dark:bg-black/28")} />
 
-        <div className="relative z-10 mx-auto max-w-7xl px-4 py-14 md:py-20">
-          <div className={cn("grid gap-10 md:gap-12", heroGridClass)}>
-            <Avatar className="h-32 w-32 border-4 border-background/80 shadow-2xl md:h-40 md:w-40">
-              <AvatarImage src={artistPageAvatar || ""} />
-              <AvatarFallback>{artistPageName.slice(0, 2).toUpperCase()}</AvatarFallback>
-            </Avatar>
+          <div className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 items-end px-4 py-12 md:py-16">
+            <div className="w-full rounded-[2rem] border border-white/10 bg-black/20 p-5 shadow-[0_30px_100px_-60px_rgba(0,0,0,0.9)] backdrop-blur-sm md:p-8">
+              <div className="flex flex-col gap-8">
+                <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+                  <div className="max-w-5xl">
+                    <div className="mb-5 flex flex-wrap gap-2" />
+                    <div>
+                      <div className="grid gap-5 md:grid-cols-[auto_1fr] md:items-end">
+                        <Avatar className="h-24 w-24 border-4 border-background/80 shadow-2xl md:h-32 md:w-32">
+                          <AvatarImage src={artistPageAvatar || ""} />
+                          <AvatarFallback>{artistPageName.slice(0, 2).toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <h1 className={cn("text-4xl font-bold leading-none tracking-tight md:text-6xl", headingClass)}>{artistPageName}</h1>
+                          <p className={cn("mt-5 max-w-3xl text-lg font-medium leading-8 text-foreground/95 md:text-[1.35rem]", layoutTemplate === "editorial" && "max-w-2xl text-xl", layoutTemplate === "music" && "text-xl")}>{heroTagline}</p>
+                          <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm font-medium text-foreground/78">
+                            <span>{profile.user.followerCount} followers</span>
+                            <span>{profile.user.followingCount} following</span>
+                            <span>{upcomingEvents.length} upcoming events</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
-            <div className="space-y-8">
-              <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
-                <div className="max-w-4xl">
-                  <div className="mb-5 flex flex-wrap gap-2">
-                    <Badge variant="secondary" className="px-3 py-1 text-[11px] font-medium tracking-[0.18em] uppercase">
-                      {artist.category}
-                    </Badge>
-                    {primaryTag ? (
-                      <Badge variant="outline" className="px-3 py-1 text-[11px] font-medium tracking-[0.18em] uppercase">
-                        {primaryTag}
-                      </Badge>
-                    ) : null}
-                  </div>
-                  <h1 className={cn("text-4xl font-bold leading-none tracking-tight md:text-6xl", headingClass)}>{artistPageName}</h1>
-                  <p className={cn("mt-5 max-w-3xl text-lg font-medium leading-8 text-foreground/95 md:text-[1.35rem]", layoutTemplate === "editorial" && "max-w-2xl text-xl", layoutTemplate === "music" && "text-xl")}>{heroTagline}</p>
-                  <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm font-medium text-foreground/78">
-                    {artistBaseLocation && (
-                      <span className="inline-flex items-center"><MapPin className="mr-1.5 h-4 w-4" /> {artistBaseLocation}</span>
-                    )}
-                    <span>{profile.user.followerCount} followers</span>
-                    <span>{profile.user.followingCount} following</span>
-                    <span>{upcomingEvents.length} upcoming events</span>
-                  </div>
-                  <div className="mt-5 flex flex-wrap gap-2 text-xs uppercase tracking-[0.18em] text-foreground/65">
-                    <span className="rounded-full border border-border/50 bg-background/25 px-3 py-1">
-                      {layoutTemplate}
-                    </span>
-                    <span className="rounded-full border border-border/50 bg-background/25 px-3 py-1">
-                      {fontPreset}
-                    </span>
-                  </div>
-                </div>
-
-                <div className={cn("flex flex-wrap items-center gap-2.5 md:gap-3", heroActionsClass)}>
+                  <div className={cn("flex flex-wrap items-center gap-2.5 md:gap-3", heroActionsClass)}>
                   {!currentUser?.hasArtistPage && (
                     <Link href="/settings?tab=creator">
                       <Button variant="outline" className="border-border/60 bg-background/30">
@@ -1061,6 +1270,9 @@ export default function ArtistProfile({ id }: { id: string }) {
                       </Button>
                     </Link>
                   ) : null}
+                  <Button variant="outline" className="border-border/60 bg-background/30" onClick={() => setLocation(`/artists/${userId}?view=gallery`)}>
+                    <ImageIcon className="mr-2 h-4 w-4" /> Gallery
+                  </Button>
                   {!isOwnArtistPage ? (
                     <Button variant="outline" className="border-border/60 bg-background/30" onClick={handleSaveToggle}>
                       <Heart className={cn("mr-2 h-4 w-4", saved && "fill-current")} /> {saved ? "Saved" : "Save"}
@@ -1125,43 +1337,34 @@ export default function ArtistProfile({ id }: { id: string }) {
                       )}
                     </DropdownMenuContent>
                   </DropdownMenu>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {artist.tags?.slice(1, 4).map((tag: string) => (
-                  <Badge key={tag} variant="secondary" className="bg-background/25 px-3 py-1 text-[11px] tracking-[0.16em] text-foreground/75">
-                    {tag}
-                  </Badge>
-                ))}
-              </div>
-              {currentUser?.id !== userId ? (
-                <div className="flex flex-wrap items-center gap-3 pt-1">
-                  <div className="inline-flex items-center rounded-full border border-border/40 bg-background/20 px-4 py-2 text-sm text-foreground/75">
-                    <HeartHandshake className="mr-2 h-4 w-4 text-primary" />
-                    {profile.user.friendCount} friends
                   </div>
-                  {profile.canInteract ? <ProfileReactionBar userId={userId} summary={profile.profileReactions} invalidateKeys={[["profile", userId], ["/api/users", userId]]} /> : null}
                 </div>
-              ) : null}
-              {currentUser?.id !== userId && !profile.canInteract ? (
-                <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-                  {profile.blockState?.hasBlockedUser
-                    ? "You blocked this creator. Follow, messaging, and inquiry actions are disabled until you unblock them."
-                    : "This creator has blocked you. Social actions and inquiries are unavailable."}
-                </div>
-              ) : null}
+                {currentUser?.id !== userId ? (
+                  <div className="flex flex-wrap items-center gap-3 pt-1">
+                    <div className="inline-flex items-center rounded-full border border-border/40 bg-background/20 px-4 py-2 text-sm text-foreground/75">
+                      <HeartHandshake className="mr-2 h-4 w-4 text-primary" />
+                      {profile.user.friendCount} friends
+                    </div>
+                    {profile.canInteract ? <ProfileReactionBar userId={userId} summary={profile.profileReactions} invalidateKeys={[["profile", userId], ["/api/users", userId]]} /> : null}
+                  </div>
+                ) : null}
+                {currentUser?.id !== userId && !profile.canInteract ? (
+                  <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+                    {profile.blockState?.hasBlockedUser
+                      ? "You blocked this creator. Follow, messaging, and inquiry actions are disabled until you unblock them."
+                      : "This creator has blocked you. Social actions and inquiries are unavailable."}
+                  </div>
+                ) : null}
+              </div>
             </div>
           </div>
-        </div>
+        </CreatorHeroSlider>
       </section>
 
-      <div className={cn("mx-auto mt-10 grid max-w-7xl gap-8 px-4 md:mt-12 md:gap-10", pageGridClass)}>
-        <div className="space-y-8">
-          {primaryKeys.map((key) => <div key={key}>{sections[key]}</div>)}
-        </div>
-        <div className="space-y-8">
-          {secondaryKeys.map((key) => <div key={key}>{sections[key]}</div>)}
+      <div className="mx-auto mt-10 max-w-7xl px-4 md:mt-12">
+        <div className="space-y-8 md:space-y-10">
+          {renderHeroRow()}
+          {visibleSections.map((key) => renderSectionBlock(key))}
         </div>
       </div>
     </div>

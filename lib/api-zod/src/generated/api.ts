@@ -439,15 +439,57 @@ export const GetUserResponse = zod.object({
       primaryActionType: zod.string(),
       primaryActionLabel: zod.string(),
       primaryActionUrl: zod.string().nullish(),
+      pageType: zod.string(),
+      pageArchetype: zod.string(),
+      pageStatus: zod.string(),
       featuredTitle: zod.string().nullish(),
       featuredDescription: zod.string().nullish(),
       featuredUrl: zod.string().nullish(),
       featuredType: zod.string(),
+      featuredContent: zod
+        .object({
+          type: zod.string(),
+          title: zod.string().nullish(),
+          description: zod.string().nullish(),
+          url: zod.string().nullish(),
+          postId: zod.number().nullish(),
+          imageUrl: zod.string().nullish(),
+          thumbnailUrl: zod.string().nullish(),
+        })
+        .nullish(),
       moodPreset: zod.string(),
       layoutTemplate: zod.string(),
       fontPreset: zod.string(),
+      accentColor: zod.string().nullish(),
+      backgroundStyle: zod.string(),
+      lightThemeVariant: zod.string(),
+      linkItems: zod.array(
+        zod.object({
+          label: zod.string(),
+          url: zod.string(),
+          kind: zod.string().nullish(),
+        }),
+      ),
+      serviceItems: zod.array(
+        zod.object({
+          title: zod.string(),
+          description: zod.string().nullish(),
+          price: zod.string().nullish(),
+          turnaround: zod.string().nullish(),
+        }),
+      ),
+      pricingSummary: zod.string().nullish(),
+      turnaroundInfo: zod.string().nullish(),
       enabledModules: zod.array(zod.string()),
       moduleOrder: zod.array(zod.string()),
+      sectionConfigs: zod.record(
+        zod.string(),
+        zod.object({
+          visible: zod.boolean().optional(),
+          style: zod.string().nullish(),
+          density: zod.string().nullish(),
+        }),
+      ),
       pinnedPost: zod
         .object({
           id: zod.number(),
@@ -576,6 +618,66 @@ export const GetUserResponse = zod.object({
             .optional(),
         })
         .nullish(),
+      pageBuilder: zod.object({
+        identity: zod.object({
+          pageType: zod.string(),
+          pageArchetype: zod.string(),
+          pageStatus: zod.string(),
+        }),
+        showcase: zod.object({
+          featuredContent: zod
+            .object({
+              type: zod.string(),
+              title: zod.string().nullish(),
+              description: zod.string().nullish(),
+              url: zod.string().nullish(),
+              postId: zod.number().nullish(),
+              imageUrl: zod.string().nullish(),
+              thumbnailUrl: zod.string().nullish(),
+            })
+            .nullish(),
+          linkItems: zod.array(
+            zod.object({
+              label: zod.string(),
+              url: zod.string(),
+              kind: zod.string().nullish(),
+            }),
+          ),
+        }),
+        work: zod.object({
+          primaryActionType: zod.string(),
+          primaryActionLabel: zod.string(),
+          primaryActionUrl: zod.string().nullish(),
+          serviceItems: zod.array(
+            zod.object({
+              title: zod.string(),
+              description: zod.string().nullish(),
+              price: zod.string().nullish(),
+              turnaround: zod.string().nullish(),
+            }),
+          ),
+          pricingSummary: zod.string().nullish(),
+          turnaroundInfo: zod.string().nullish(),
+        }),
+        style: zod.object({
+          accentColor: zod.string().nullish(),
+          moodPreset: zod.string(),
+          backgroundStyle: zod.string(),
+          lightThemeVariant: zod.string(),
+          layoutTemplate: zod.string(),
+          fontPreset: zod.string(),
+          enabledModules: zod.array(zod.string()),
+          moduleOrder: zod.array(zod.string()),
+          sectionConfigs: zod.record(
+            zod.string(),
+            zod.object({
+              visible: zod.boolean().optional(),
+              style: zod.string().nullish(),
+              density: zod.string().nullish(),
+            }),
+          ),
+        }),
+      }),
     })
     .nullish(),
   details: zod
@@ -607,6 +709,9 @@ export const GetUserResponse = zod.object({
     })
     .nullish(),
   creatorSettings: zod.object({
+    pageType: zod.string(),
+    pageArchetype: zod.string(),
+    pageStatus: zod.string(),
     primaryActionType: zod.string(),
     primaryActionLabel: zod.string(),
     primaryActionUrl: zod.string().nullish(),
@@ -614,11 +719,50 @@ export const GetUserResponse = zod.object({
     featuredDescription: zod.string().nullish(),
     featuredUrl: zod.string().nullish(),
     featuredType: zod.string(),
+    featuredContent: zod
+      .object({
+        type: zod.string(),
+        title: zod.string().nullish(),
+        description: zod.string().nullish(),
+        url: zod.string().nullish(),
+        postId: zod.number().nullish(),
+        imageUrl: zod.string().nullish(),
+        thumbnailUrl: zod.string().nullish(),
+      })
+      .nullish(),
     moodPreset: zod.string(),
     layoutTemplate: zod.string(),
     fontPreset: zod.string(),
+    accentColor: zod.string().nullish(),
+    backgroundStyle: zod.string(),
+    lightThemeVariant: zod.string(),
+    linkItems: zod.array(
+      zod.object({
+        label: zod.string(),
+        url: zod.string(),
+        kind: zod.string().nullish(),
+      }),
+    ),
+    serviceItems: zod.array(
+      zod.object({
+        title: zod.string(),
+        description: zod.string().nullish(),
+        price: zod.string().nullish(),
+        turnaround: zod.string().nullish(),
+      }),
+    ),
+    pricingSummary: zod.string().nullish(),
+    turnaroundInfo: zod.string().nullish(),
     enabledModules: zod.array(zod.string()),
     moduleOrder: zod.array(zod.string()),
+    sectionConfigs: zod.record(
+      zod.string(),
+      zod.object({
+        visible: zod.boolean().optional(),
+        style: zod.string().nullish(),
+        density: zod.string().nullish(),
+      }),
+    ),
     pinnedPost: zod
       .object({
         id: zod.number(),
@@ -747,6 +891,66 @@ export const GetUserResponse = zod.object({
           .optional(),
       })
       .nullish(),
+    pageBuilder: zod.object({
+      identity: zod.object({
+        pageType: zod.string(),
+        pageArchetype: zod.string(),
+        pageStatus: zod.string(),
+      }),
+      showcase: zod.object({
+        featuredContent: zod
+          .object({
+            type: zod.string(),
+            title: zod.string().nullish(),
+            description: zod.string().nullish(),
+            url: zod.string().nullish(),
+            postId: zod.number().nullish(),
+            imageUrl: zod.string().nullish(),
+            thumbnailUrl: zod.string().nullish(),
+          })
+          .nullish(),
+        linkItems: zod.array(
+          zod.object({
+            label: zod.string(),
+            url: zod.string(),
+            kind: zod.string().nullish(),
+          }),
+        ),
+      }),
+      work: zod.object({
+        primaryActionType: zod.string(),
+        primaryActionLabel: zod.string(),
+        primaryActionUrl: zod.string().nullish(),
+        serviceItems: zod.array(
+          zod.object({
+            title: zod.string(),
+            description: zod.string().nullish(),
+            price: zod.string().nullish(),
+            turnaround: zod.string().nullish(),
+          }),
+        ),
+        pricingSummary: zod.string().nullish(),
+        turnaroundInfo: zod.string().nullish(),
+      }),
+      style: zod.object({
+        accentColor: zod.string().nullish(),
+        moodPreset: zod.string(),
+        backgroundStyle: zod.string(),
+        lightThemeVariant: zod.string(),
+        layoutTemplate: zod.string(),
+        fontPreset: zod.string(),
+        enabledModules: zod.array(zod.string()),
+        moduleOrder: zod.array(zod.string()),
+        sectionConfigs: zod.record(
+          zod.string(),
+          zod.object({
+            visible: zod.boolean().optional(),
+            style: zod.string().nullish(),
+            density: zod.string().nullish(),
+          }),
+        ),
+      }),
+    }),
   }),
   customFeeds: zod.array(
     zod.object({
@@ -1094,15 +1298,57 @@ export const GetSuggestedCreatorsResponse = zod.object({
       primaryActionType: zod.string(),
       primaryActionLabel: zod.string(),
       primaryActionUrl: zod.string().nullish(),
+      pageType: zod.string(),
+      pageArchetype: zod.string(),
+      pageStatus: zod.string(),
       featuredTitle: zod.string().nullish(),
       featuredDescription: zod.string().nullish(),
       featuredUrl: zod.string().nullish(),
       featuredType: zod.string(),
+      featuredContent: zod
+        .object({
+          type: zod.string(),
+          title: zod.string().nullish(),
+          description: zod.string().nullish(),
+          url: zod.string().nullish(),
+          postId: zod.number().nullish(),
+          imageUrl: zod.string().nullish(),
+          thumbnailUrl: zod.string().nullish(),
+        })
+        .nullish(),
       moodPreset: zod.string(),
       layoutTemplate: zod.string(),
       fontPreset: zod.string(),
+      accentColor: zod.string().nullish(),
+      backgroundStyle: zod.string(),
+      lightThemeVariant: zod.string(),
+      linkItems: zod.array(
+        zod.object({
+          label: zod.string(),
+          url: zod.string(),
+          kind: zod.string().nullish(),
+        }),
+      ),
+      serviceItems: zod.array(
+        zod.object({
+          title: zod.string(),
+          description: zod.string().nullish(),
+          price: zod.string().nullish(),
+          turnaround: zod.string().nullish(),
+        }),
+      ),
+      pricingSummary: zod.string().nullish(),
+      turnaroundInfo: zod.string().nullish(),
       enabledModules: zod.array(zod.string()),
       moduleOrder: zod.array(zod.string()),
+      sectionConfigs: zod.record(
+        zod.string(),
+        zod.object({
+          visible: zod.boolean().optional(),
+          style: zod.string().nullish(),
+          density: zod.string().nullish(),
+        }),
+      ),
       pinnedPost: zod
         .object({
           id: zod.number(),
@@ -1231,6 +1477,66 @@ export const GetSuggestedCreatorsResponse = zod.object({
             .optional(),
         })
         .nullish(),
+      pageBuilder: zod.object({
+        identity: zod.object({
+          pageType: zod.string(),
+          pageArchetype: zod.string(),
+          pageStatus: zod.string(),
+        }),
+        showcase: zod.object({
+          featuredContent: zod
+            .object({
+              type: zod.string(),
+              title: zod.string().nullish(),
+              description: zod.string().nullish(),
+              url: zod.string().nullish(),
+              postId: zod.number().nullish(),
+              imageUrl: zod.string().nullish(),
+              thumbnailUrl: zod.string().nullish(),
+            })
+            .nullish(),
+          linkItems: zod.array(
+            zod.object({
+              label: zod.string(),
+              url: zod.string(),
+              kind: zod.string().nullish(),
+            }),
+          ),
+        }),
+        work: zod.object({
+          primaryActionType: zod.string(),
+          primaryActionLabel: zod.string(),
+          primaryActionUrl: zod.string().nullish(),
+          serviceItems: zod.array(
+            zod.object({
+              title: zod.string(),
+              description: zod.string().nullish(),
+              price: zod.string().nullish(),
+              turnaround: zod.string().nullish(),
+            }),
+          ),
+          pricingSummary: zod.string().nullish(),
+          turnaroundInfo: zod.string().nullish(),
+        }),
+        style: zod.object({
+          accentColor: zod.string().nullish(),
+          moodPreset: zod.string(),
+          backgroundStyle: zod.string(),
+          lightThemeVariant: zod.string(),
+          layoutTemplate: zod.string(),
+          fontPreset: zod.string(),
+          enabledModules: zod.array(zod.string()),
+          moduleOrder: zod.array(zod.string()),
+          sectionConfigs: zod.record(
+            zod.string(),
+            zod.object({
+              visible: zod.boolean().optional(),
+              style: zod.string().nullish(),
+              density: zod.string().nullish(),
+            }),
+          ),
+        }),
+      }),
     }),
   ),
   total: zod.number(),
@@ -2465,15 +2771,57 @@ export const GetArtistsResponse = zod.object({
       primaryActionType: zod.string(),
       primaryActionLabel: zod.string(),
       primaryActionUrl: zod.string().nullish(),
+      pageType: zod.string(),
+      pageArchetype: zod.string(),
+      pageStatus: zod.string(),
       featuredTitle: zod.string().nullish(),
       featuredDescription: zod.string().nullish(),
       featuredUrl: zod.string().nullish(),
       featuredType: zod.string(),
+      featuredContent: zod
+        .object({
+          type: zod.string(),
+          title: zod.string().nullish(),
+          description: zod.string().nullish(),
+          url: zod.string().nullish(),
+          postId: zod.number().nullish(),
+          imageUrl: zod.string().nullish(),
+          thumbnailUrl: zod.string().nullish(),
+        })
+        .nullish(),
       moodPreset: zod.string(),
       layoutTemplate: zod.string(),
       fontPreset: zod.string(),
+      accentColor: zod.string().nullish(),
+      backgroundStyle: zod.string(),
+      lightThemeVariant: zod.string(),
+      linkItems: zod.array(
+        zod.object({
+          label: zod.string(),
+          url: zod.string(),
+          kind: zod.string().nullish(),
+        }),
+      ),
+      serviceItems: zod.array(
+        zod.object({
+          title: zod.string(),
+          description: zod.string().nullish(),
+          price: zod.string().nullish(),
+          turnaround: zod.string().nullish(),
+        }),
+      ),
+      pricingSummary: zod.string().nullish(),
+      turnaroundInfo: zod.string().nullish(),
       enabledModules: zod.array(zod.string()),
       moduleOrder: zod.array(zod.string()),
+      sectionConfigs: zod.record(
+        zod.string(),
+        zod.object({
+          visible: zod.boolean().optional(),
+          style: zod.string().nullish(),
+          density: zod.string().nullish(),
+        }),
+      ),
       pinnedPost: zod
         .object({
           id: zod.number(),
@@ -2602,6 +2950,66 @@ export const GetArtistsResponse = zod.object({
             .optional(),
         })
         .nullish(),
+      pageBuilder: zod.object({
+        identity: zod.object({
+          pageType: zod.string(),
+          pageArchetype: zod.string(),
+          pageStatus: zod.string(),
+        }),
+        showcase: zod.object({
+          featuredContent: zod
+            .object({
+              type: zod.string(),
+              title: zod.string().nullish(),
+              description: zod.string().nullish(),
+              url: zod.string().nullish(),
+              postId: zod.number().nullish(),
+              imageUrl: zod.string().nullish(),
+              thumbnailUrl: zod.string().nullish(),
+            })
+            .nullish(),
+          linkItems: zod.array(
+            zod.object({
+              label: zod.string(),
+              url: zod.string(),
+              kind: zod.string().nullish(),
+            }),
+          ),
+        }),
+        work: zod.object({
+          primaryActionType: zod.string(),
+          primaryActionLabel: zod.string(),
+          primaryActionUrl: zod.string().nullish(),
+          serviceItems: zod.array(
+            zod.object({
+              title: zod.string(),
+              description: zod.string().nullish(),
+              price: zod.string().nullish(),
+              turnaround: zod.string().nullish(),
+            }),
+          ),
+          pricingSummary: zod.string().nullish(),
+          turnaroundInfo: zod.string().nullish(),
+        }),
+        style: zod.object({
+          accentColor: zod.string().nullish(),
+          moodPreset: zod.string(),
+          backgroundStyle: zod.string(),
+          lightThemeVariant: zod.string(),
+          layoutTemplate: zod.string(),
+          fontPreset: zod.string(),
+          enabledModules: zod.array(zod.string()),
+          moduleOrder: zod.array(zod.string()),
+          sectionConfigs: zod.record(
+            zod.string(),
+            zod.object({
+              visible: zod.boolean().optional(),
+              style: zod.string().nullish(),
+              density: zod.string().nullish(),
+            }),
+          ),
+        }),
+      }),
     }),
   ),
   total: zod.number(),
@@ -2691,15 +3099,57 @@ export const GetArtistProfileResponse = zod.object({
   primaryActionType: zod.string(),
   primaryActionLabel: zod.string(),
   primaryActionUrl: zod.string().nullish(),
+  pageType: zod.string(),
+  pageArchetype: zod.string(),
+  pageStatus: zod.string(),
   featuredTitle: zod.string().nullish(),
   featuredDescription: zod.string().nullish(),
   featuredUrl: zod.string().nullish(),
   featuredType: zod.string(),
+  featuredContent: zod
+    .object({
+      type: zod.string(),
+      title: zod.string().nullish(),
+      description: zod.string().nullish(),
+      url: zod.string().nullish(),
+      postId: zod.number().nullish(),
+      imageUrl: zod.string().nullish(),
+      thumbnailUrl: zod.string().nullish(),
+    })
+    .nullish(),
   moodPreset: zod.string(),
   layoutTemplate: zod.string(),
   fontPreset: zod.string(),
+  accentColor: zod.string().nullish(),
+  backgroundStyle: zod.string(),
+  lightThemeVariant: zod.string(),
+  linkItems: zod.array(
+    zod.object({
+      label: zod.string(),
+      url: zod.string(),
+      kind: zod.string().nullish(),
+    }),
+  ),
+  serviceItems: zod.array(
+    zod.object({
+      title: zod.string(),
+      description: zod.string().nullish(),
+      price: zod.string().nullish(),
+      turnaround: zod.string().nullish(),
+    }),
+  ),
+  pricingSummary: zod.string().nullish(),
+  turnaroundInfo: zod.string().nullish(),
   enabledModules: zod.array(zod.string()),
   moduleOrder: zod.array(zod.string()),
+  sectionConfigs: zod.record(
+    zod.string(),
+    zod.object({
+      visible: zod.boolean().optional(),
+      style: zod.string().nullish(),
+      density: zod.string().nullish(),
+    }),
+  ),
   pinnedPost: zod
     .object({
       id: zod.number(),
@@ -2828,6 +3278,66 @@ export const GetArtistProfileResponse = zod.object({
         .optional(),
     })
     .nullish(),
+  pageBuilder: zod.object({
+    identity: zod.object({
+      pageType: zod.string(),
+      pageArchetype: zod.string(),
+      pageStatus: zod.string(),
+    }),
+    showcase: zod.object({
+      featuredContent: zod
+        .object({
+          type: zod.string(),
+          title: zod.string().nullish(),
+          description: zod.string().nullish(),
+          url: zod.string().nullish(),
+          postId: zod.number().nullish(),
+          imageUrl: zod.string().nullish(),
+          thumbnailUrl: zod.string().nullish(),
+        })
+        .nullish(),
+      linkItems: zod.array(
+        zod.object({
+          label: zod.string(),
+          url: zod.string(),
+          kind: zod.string().nullish(),
+        }),
+      ),
+    }),
+    work: zod.object({
+      primaryActionType: zod.string(),
+      primaryActionLabel: zod.string(),
+      primaryActionUrl: zod.string().nullish(),
+      serviceItems: zod.array(
+        zod.object({
+          title: zod.string(),
+          description: zod.string().nullish(),
+          price: zod.string().nullish(),
+          turnaround: zod.string().nullish(),
+        }),
+      ),
+      pricingSummary: zod.string().nullish(),
+      turnaroundInfo: zod.string().nullish(),
+    }),
+    style: zod.object({
+      accentColor: zod.string().nullish(),
+      moodPreset: zod.string(),
+      backgroundStyle: zod.string(),
+      lightThemeVariant: zod.string(),
+      layoutTemplate: zod.string(),
+      fontPreset: zod.string(),
+      enabledModules: zod.array(zod.string()),
+      moduleOrder: zod.array(zod.string()),
+      sectionConfigs: zod.record(
+        zod.string(),
+        zod.object({
+          visible: zod.boolean().optional(),
+          style: zod.string().nullish(),
+          density: zod.string().nullish(),
+        }),
+      ),
+    }),
+  }),
 });
 
 /**
@@ -2863,6 +3373,9 @@ export const UpdateArtistProfileBody = zod.object({
     )
     .optional(),
   bookingEmail: zod.string().nullish(),
+  pageType: zod.string().optional(),
+  pageArchetype: zod.string().optional(),
+  pageStatus: zod.string().optional(),
   primaryActionType: zod.string().optional(),
   primaryActionLabel: zod.string().optional(),
   primaryActionUrl: zod.string().nullish(),
@@ -2870,11 +3383,56 @@ export const UpdateArtistProfileBody = zod.object({
   featuredDescription: zod.string().nullish(),
   featuredUrl: zod.string().nullish(),
   featuredType: zod.string().optional(),
+  featuredContent: zod
+    .object({
+      type: zod.string(),
+      title: zod.string().nullish(),
+      description: zod.string().nullish(),
+      url: zod.string().nullish(),
+      postId: zod.number().nullish(),
+      imageUrl: zod.string().nullish(),
+      thumbnailUrl: zod.string().nullish(),
+    })
+    .nullish(),
   moodPreset: zod.string().optional(),
   layoutTemplate: zod.string().optional(),
   fontPreset: zod.string().optional(),
+  accentColor: zod.string().nullish(),
+  backgroundStyle: zod.string().optional(),
+  lightThemeVariant: zod.string().optional(),
+  linkItems: zod
+    .array(
+      zod.object({
+        label: zod.string(),
+        url: zod.string(),
+        kind: zod.string().nullish(),
+      }),
+    )
+    .optional(),
+  serviceItems: zod
+    .array(
+      zod.object({
+        title: zod.string(),
+        description: zod.string().nullish(),
+        price: zod.string().nullish(),
+        turnaround: zod.string().nullish(),
+      }),
+    )
+    .optional(),
+  pricingSummary: zod.string().nullish(),
+  turnaroundInfo: zod.string().nullish(),
   enabledModules: zod.array(zod.string()).optional(),
   moduleOrder: zod.array(zod.string()).optional(),
+  sectionConfigs: zod
+    .record(
+      zod.string(),
+      zod.object({
+        visible: zod.boolean().optional(),
+        style: zod.string().nullish(),
+        density: zod.string().nullish(),
+      }),
+    )
+    .optional(),
   pinnedPostId: zod.number().nullish(),
 });
 
@@ -2953,15 +3511,57 @@ export const UpdateArtistProfileResponse = zod.object({
   primaryActionType: zod.string(),
   primaryActionLabel: zod.string(),
   primaryActionUrl: zod.string().nullish(),
+  pageType: zod.string(),
+  pageArchetype: zod.string(),
+  pageStatus: zod.string(),
   featuredTitle: zod.string().nullish(),
   featuredDescription: zod.string().nullish(),
   featuredUrl: zod.string().nullish(),
   featuredType: zod.string(),
+  featuredContent: zod
+    .object({
+      type: zod.string(),
+      title: zod.string().nullish(),
+      description: zod.string().nullish(),
+      url: zod.string().nullish(),
+      postId: zod.number().nullish(),
+      imageUrl: zod.string().nullish(),
+      thumbnailUrl: zod.string().nullish(),
+    })
+    .nullish(),
   moodPreset: zod.string(),
   layoutTemplate: zod.string(),
   fontPreset: zod.string(),
+  accentColor: zod.string().nullish(),
+  backgroundStyle: zod.string(),
+  lightThemeVariant: zod.string(),
+  linkItems: zod.array(
+    zod.object({
+      label: zod.string(),
+      url: zod.string(),
+      kind: zod.string().nullish(),
+    }),
+  ),
+  serviceItems: zod.array(
+    zod.object({
+      title: zod.string(),
+      description: zod.string().nullish(),
+      price: zod.string().nullish(),
+      turnaround: zod.string().nullish(),
+    }),
+  ),
+  pricingSummary: zod.string().nullish(),
+  turnaroundInfo: zod.string().nullish(),
   enabledModules: zod.array(zod.string()),
   moduleOrder: zod.array(zod.string()),
+  sectionConfigs: zod.record(
+    zod.string(),
+    zod.object({
+      visible: zod.boolean().optional(),
+      style: zod.string().nullish(),
+      density: zod.string().nullish(),
+    }),
+  ),
   pinnedPost: zod
     .object({
       id: zod.number(),
@@ -3090,6 +3690,66 @@ export const UpdateArtistProfileResponse = zod.object({
         .optional(),
     })
     .nullish(),
+  pageBuilder: zod.object({
+    identity: zod.object({
+      pageType: zod.string(),
+      pageArchetype: zod.string(),
+      pageStatus: zod.string(),
+    }),
+    showcase: zod.object({
+      featuredContent: zod
+        .object({
+          type: zod.string(),
+          title: zod.string().nullish(),
+          description: zod.string().nullish(),
+          url: zod.string().nullish(),
+          postId: zod.number().nullish(),
+          imageUrl: zod.string().nullish(),
+          thumbnailUrl: zod.string().nullish(),
+        })
+        .nullish(),
+      linkItems: zod.array(
+        zod.object({
+          label: zod.string(),
+          url: zod.string(),
+          kind: zod.string().nullish(),
+        }),
+      ),
+    }),
+    work: zod.object({
+      primaryActionType: zod.string(),
+      primaryActionLabel: zod.string(),
+      primaryActionUrl: zod.string().nullish(),
+      serviceItems: zod.array(
+        zod.object({
+          title: zod.string(),
+          description: zod.string().nullish(),
+          price: zod.string().nullish(),
+          turnaround: zod.string().nullish(),
+        }),
+      ),
+      pricingSummary: zod.string().nullish(),
+      turnaroundInfo: zod.string().nullish(),
+    }),
+    style: zod.object({
+      accentColor: zod.string().nullish(),
+      moodPreset: zod.string(),
+      backgroundStyle: zod.string(),
+      lightThemeVariant: zod.string(),
+      layoutTemplate: zod.string(),
+      fontPreset: zod.string(),
+      enabledModules: zod.array(zod.string()),
+      moduleOrder: zod.array(zod.string()),
+      sectionConfigs: zod.record(
+        zod.string(),
+        zod.object({
+          visible: zod.boolean().optional(),
+          style: zod.string().nullish(),
+          density: zod.string().nullish(),
+        }),
+      ),
+    }),
+  }),
 });
 
 /**
@@ -3351,15 +4011,57 @@ export const SearchResponse = zod.object({
       primaryActionType: zod.string(),
       primaryActionLabel: zod.string(),
       primaryActionUrl: zod.string().nullish(),
+      pageType: zod.string(),
+      pageArchetype: zod.string(),
+      pageStatus: zod.string(),
       featuredTitle: zod.string().nullish(),
       featuredDescription: zod.string().nullish(),
       featuredUrl: zod.string().nullish(),
       featuredType: zod.string(),
+      featuredContent: zod
+        .object({
+          type: zod.string(),
+          title: zod.string().nullish(),
+          description: zod.string().nullish(),
+          url: zod.string().nullish(),
+          postId: zod.number().nullish(),
+          imageUrl: zod.string().nullish(),
+          thumbnailUrl: zod.string().nullish(),
+        })
+        .nullish(),
       moodPreset: zod.string(),
       layoutTemplate: zod.string(),
       fontPreset: zod.string(),
+      accentColor: zod.string().nullish(),
+      backgroundStyle: zod.string(),
+      lightThemeVariant: zod.string(),
+      linkItems: zod.array(
+        zod.object({
+          label: zod.string(),
+          url: zod.string(),
+          kind: zod.string().nullish(),
+        }),
+      ),
+      serviceItems: zod.array(
+        zod.object({
+          title: zod.string(),
+          description: zod.string().nullish(),
+          price: zod.string().nullish(),
+          turnaround: zod.string().nullish(),
+        }),
+      ),
+      pricingSummary: zod.string().nullish(),
+      turnaroundInfo: zod.string().nullish(),
       enabledModules: zod.array(zod.string()),
       moduleOrder: zod.array(zod.string()),
+      sectionConfigs: zod.record(
+        zod.string(),
+        zod.object({
+          visible: zod.boolean().optional(),
+          style: zod.string().nullish(),
+          density: zod.string().nullish(),
+        }),
+      ),
       pinnedPost: zod
         .object({
           id: zod.number(),
@@ -3488,6 +4190,66 @@ export const SearchResponse = zod.object({
             .optional(),
         })
         .nullish(),
+      pageBuilder: zod.object({
+        identity: zod.object({
+          pageType: zod.string(),
+          pageArchetype: zod.string(),
+          pageStatus: zod.string(),
+        }),
+        showcase: zod.object({
+          featuredContent: zod
+            .object({
+              type: zod.string(),
+              title: zod.string().nullish(),
+              description: zod.string().nullish(),
+              url: zod.string().nullish(),
+              postId: zod.number().nullish(),
+              imageUrl: zod.string().nullish(),
+              thumbnailUrl: zod.string().nullish(),
+            })
+            .nullish(),
+          linkItems: zod.array(
+            zod.object({
+              label: zod.string(),
+              url: zod.string(),
+              kind: zod.string().nullish(),
+            }),
+          ),
+        }),
+        work: zod.object({
+          primaryActionType: zod.string(),
+          primaryActionLabel: zod.string(),
+          primaryActionUrl: zod.string().nullish(),
+          serviceItems: zod.array(
+            zod.object({
+              title: zod.string(),
+              description: zod.string().nullish(),
+              price: zod.string().nullish(),
+              turnaround: zod.string().nullish(),
+            }),
+          ),
+          pricingSummary: zod.string().nullish(),
+          turnaroundInfo: zod.string().nullish(),
+        }),
+        style: zod.object({
+          accentColor: zod.string().nullish(),
+          moodPreset: zod.string(),
+          backgroundStyle: zod.string(),
+          lightThemeVariant: zod.string(),
+          layoutTemplate: zod.string(),
+          fontPreset: zod.string(),
+          enabledModules: zod.array(zod.string()),
+          moduleOrder: zod.array(zod.string()),
+          sectionConfigs: zod.record(
+            zod.string(),
+            zod.object({
+              visible: zod.boolean().optional(),
+              style: zod.string().nullish(),
+              density: zod.string().nullish(),
+            }),
+          ),
+        }),
+      }),
     }),
   ),
   total: zod.number(),
@@ -3503,6 +4265,9 @@ export const UpdateCreatorSettingsParams = zod.object({
 });
 
 export const UpdateCreatorSettingsBody = zod.object({
+  pageType: zod.string().optional(),
+  pageArchetype: zod.string().optional(),
+  pageStatus: zod.string().optional(),
   primaryActionType: zod.string().optional(),
   primaryActionLabel: zod.string().optional(),
   primaryActionUrl: zod.string().nullish(),
@@ -3510,11 +4275,56 @@ export const UpdateCreatorSettingsBody = zod.object({
   featuredDescription: zod.string().nullish(),
   featuredUrl: zod.string().nullish(),
   featuredType: zod.string().optional(),
+  featuredContent: zod
+    .object({
+      type: zod.string(),
+      title: zod.string().nullish(),
+      description: zod.string().nullish(),
+      url: zod.string().nullish(),
+      postId: zod.number().nullish(),
+      imageUrl: zod.string().nullish(),
+      thumbnailUrl: zod.string().nullish(),
+    })
+    .nullish(),
   moodPreset: zod.string().optional(),
   layoutTemplate: zod.string().optional(),
   fontPreset: zod.string().optional(),
+  accentColor: zod.string().nullish(),
+  backgroundStyle: zod.string().optional(),
+  lightThemeVariant: zod.string().optional(),
+  linkItems: zod
+    .array(
+      zod.object({
+        label: zod.string(),
+        url: zod.string(),
+        kind: zod.string().nullish(),
+      }),
+    )
+    .optional(),
+  serviceItems: zod
+    .array(
+      zod.object({
+        title: zod.string(),
+        description: zod.string().nullish(),
+        price: zod.string().nullish(),
+        turnaround: zod.string().nullish(),
+      }),
+    )
+    .optional(),
+  pricingSummary: zod.string().nullish(),
+  turnaroundInfo: zod.string().nullish(),
   enabledModules: zod.array(zod.string()).optional(),
   moduleOrder: zod.array(zod.string()).optional(),
+  sectionConfigs: zod
+    .record(
+      zod.string(),
+      zod.object({
+        visible: zod.boolean().optional(),
+        style: zod.string().nullish(),
+        density: zod.string().nullish(),
+      }),
+    )
+    .optional(),
   pinnedPostId: zod.number().nullish(),
 });
 

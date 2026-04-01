@@ -28,9 +28,84 @@ import { and, count, desc, eq, inArray, lt, notInArray, or, sql } from "drizzle-
 const REACTION_TYPES = ["like", "heart", "wow", "angry"] as const;
 const POST_VISIBILITIES = new Set(["public", "friends", "private"]);
 const EMPTY_ARRAY_SENTINEL = -1;
+const DEFAULT_ENABLED_MODULES = ["featured", "about", "media", "posts", "events", "contact"];
+const DEFAULT_MODULE_ORDER = ["featured", "about", "media", "posts", "events", "contact"];
 
 type PostRecord = typeof postsTable.$inferSelect;
 type PostSurface = "personal" | "artist";
+
+function formatCreatorSettingsRecord(
+  settings: typeof creatorProfileSettingsTable.$inferSelect | undefined,
+  pinnedPost: any,
+) {
+  const featuredContent = settings?.featuredContent ?? {
+    type: settings?.featuredType ?? "highlight",
+    title: settings?.featuredTitle ?? null,
+    description: settings?.featuredDescription ?? null,
+    url: settings?.featuredUrl ?? null,
+    postId: settings?.pinnedPostId ?? null,
+  };
+
+  return {
+    primaryActionType: settings?.primaryActionType ?? "contact",
+    primaryActionLabel: settings?.primaryActionLabel ?? "Contact Me",
+    primaryActionUrl: settings?.primaryActionUrl ?? null,
+    featuredTitle: settings?.featuredTitle ?? null,
+    featuredDescription: settings?.featuredDescription ?? null,
+    featuredUrl: settings?.featuredUrl ?? null,
+    featuredType: settings?.featuredType ?? "highlight",
+    featuredContent,
+    moodPreset: settings?.moodPreset ?? "sleek",
+    layoutTemplate: settings?.layoutTemplate ?? "portfolio",
+    fontPreset: settings?.fontPreset ?? "modern",
+    pageType: settings?.pageType ?? "creator",
+    pageArchetype: settings?.pageArchetype ?? "business",
+    pageStatus: settings?.pageStatus ?? "published",
+    accentColor: settings?.accentColor ?? "#8b5cf6",
+    backgroundStyle: settings?.backgroundStyle ?? "soft-glow",
+    lightThemeVariant: settings?.lightThemeVariant ?? "studio",
+    linkItems: settings?.linkItems ?? [],
+    serviceItems: settings?.serviceItems ?? [],
+    pricingSummary: settings?.pricingSummary ?? null,
+    turnaroundInfo: settings?.turnaroundInfo ?? null,
+    enabledModules: settings?.enabledModules ?? DEFAULT_ENABLED_MODULES,
+    moduleOrder: settings?.moduleOrder ?? DEFAULT_MODULE_ORDER,
+    sectionConfigs: settings?.sectionConfigs ?? {},
+    pinnedPost,
+    pageBuilder: {
+      identity: {
+        pageType: settings?.pageType ?? "creator",
+        pageArchetype: settings?.pageArchetype ?? "business",
+        pageStatus: settings?.pageStatus ?? "published",
+      },
+      showcase: {
+        featuredContent,
+        linkItems: settings?.linkItems ?? [],
+      },
+      work: {
+        primaryActionType: settings?.primaryActionType ?? "contact",
+        primaryActionLabel: settings?.primaryActionLabel ?? "Contact Me",
+        primaryActionUrl: settings?.primaryActionUrl ?? null,
+        serviceItems: settings?.serviceItems ?? [],
+        pricingSummary: settings?.pricingSummary ?? null,
+        turnaroundInfo: settings?.turnaroundInfo ?? null,
+      },
+      style: {
+        accentColor: settings?.accentColor ?? "#8b5cf6",
+        moodPreset: settings?.moodPreset ?? "sleek",
+        backgroundStyle: settings?.backgroundStyle ?? "soft-glow",
+        lightThemeVariant: settings?.lightThemeVariant ?? "studio",
+        layoutTemplate: settings?.layoutTemplate ?? "portfolio",
+        fontPreset: settings?.fontPreset ?? "modern",
+        enabledModules: settings?.enabledModules ?? DEFAULT_ENABLED_MODULES,
+        moduleOrder: settings?.moduleOrder ?? DEFAULT_MODULE_ORDER,
+        sectionConfigs: settings?.sectionConfigs ?? {},
+      },
+    },
+  };
+}
+
+export { formatCreatorSettingsRecord };
 
 export async function getBlockState(currentUserId: number | undefined, targetUserId: number) {
   if (!currentUserId || currentUserId === targetUserId) {
@@ -278,19 +353,7 @@ export async function formatArtistProfile(profile: typeof artistProfilesTable.$i
     avatarUrl: profile.avatarUrl ?? null,
     bannerUrl: profile.bannerUrl ?? null,
     user: summary,
-    primaryActionType: settings?.primaryActionType ?? "contact",
-    primaryActionLabel: settings?.primaryActionLabel ?? "Contact Me",
-    primaryActionUrl: settings?.primaryActionUrl ?? null,
-    featuredTitle: settings?.featuredTitle ?? null,
-    featuredDescription: settings?.featuredDescription ?? null,
-    featuredUrl: settings?.featuredUrl ?? null,
-    featuredType: settings?.featuredType ?? "highlight",
-    moodPreset: settings?.moodPreset ?? "sleek",
-    layoutTemplate: settings?.layoutTemplate ?? "portfolio",
-    fontPreset: settings?.fontPreset ?? "modern",
-    enabledModules: settings?.enabledModules ?? ["featured", "about", "media", "posts", "events", "contact"],
-    moduleOrder: settings?.moduleOrder ?? ["featured", "about", "media", "posts", "events", "contact"],
-    pinnedPost,
+    ...formatCreatorSettingsRecord(settings, pinnedPost),
   };
 }
 

@@ -85,6 +85,53 @@ async function ensureArtistProfileBrandingColumns() {
   }
 }
 
+async function ensureCreatorProfileBuilderColumns() {
+  const result = await pool.query<{ column_name: string }>(`
+    select column_name
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'creator_profile_settings'
+      and column_name in (
+        'page_type',
+        'page_archetype',
+        'page_status',
+        'featured_content',
+        'link_items',
+        'service_items',
+        'pricing_summary',
+        'turnaround_info',
+        'accent_color',
+        'background_style',
+        'light_theme_variant',
+        'section_configs'
+      )
+  `);
+
+  const existing = new Set(result.rows.map((row) => row.column_name));
+  const statements: string[] = [];
+
+  if (!existing.has("page_type")) statements.push(`alter table "creator_profile_settings" add column "page_type" text default 'creator' not null`);
+  if (!existing.has("page_archetype")) statements.push(`alter table "creator_profile_settings" add column "page_archetype" text default 'business' not null`);
+  if (!existing.has("page_status")) statements.push(`alter table "creator_profile_settings" add column "page_status" text default 'published' not null`);
+  if (!existing.has("featured_content")) statements.push(`alter table "creator_profile_settings" add column "featured_content" jsonb`);
+  if (!existing.has("link_items")) statements.push(`alter table "creator_profile_settings" add column "link_items" jsonb default '[]'::jsonb not null`);
+  if (!existing.has("service_items")) statements.push(`alter table "creator_profile_settings" add column "service_items" jsonb default '[]'::jsonb not null`);
+  if (!existing.has("pricing_summary")) statements.push(`alter table "creator_profile_settings" add column "pricing_summary" text`);
+  if (!existing.has("turnaround_info")) statements.push(`alter table "creator_profile_settings" add column "turnaround_info" text`);
+  if (!existing.has("accent_color")) statements.push(`alter table "creator_profile_settings" add column "accent_color" text default '#8b5cf6'`);
+  if (!existing.has("background_style")) statements.push(`alter table "creator_profile_settings" add column "background_style" text default 'soft-glow' not null`);
+  if (!existing.has("light_theme_variant")) statements.push(`alter table "creator_profile_settings" add column "light_theme_variant" text default 'studio' not null`);
+  if (!existing.has("section_configs")) statements.push(`alter table "creator_profile_settings" add column "section_configs" jsonb default '{}'::jsonb not null`);
+
+  for (const statement of statements) {
+    await pool.query(statement);
+  }
+
+  if (statements.length > 0) {
+    console.log("Applied creator page builder compatibility patch");
+  }
+}
+
 async function main() {
   const migrationsFolder = path.resolve(import.meta.dirname, "..", "migrations");
 
@@ -97,6 +144,7 @@ async function main() {
   await ensureMigrationBaseline(migrationsFolder);
   await migrate(db, { migrationsFolder });
   await ensureArtistProfileBrandingColumns();
+  await ensureCreatorProfileBuilderColumns();
   await pool.end();
   console.log(`Applied migrations from ${migrationsFolder}`);
 }

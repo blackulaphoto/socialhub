@@ -68,8 +68,15 @@ export default defineConfig({
   },
   server: {
     port,
+    strictPort: true,
     host: "0.0.0.0",
     allowedHosts: true,
+    hmr: {
+      protocol: "ws",
+      host: "localhost",
+      port,
+      clientPort: port,
+    },
     proxy: {
       "/api": {
         target: process.env.VITE_API_BASE_URL || "http://localhost:3001",

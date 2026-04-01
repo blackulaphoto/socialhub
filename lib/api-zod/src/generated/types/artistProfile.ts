@@ -5,9 +5,14 @@
  * ArtistHub Social Platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { ArtistProfileSectionConfigs } from "./artistProfileSectionConfigs";
+import type { FeaturedContent } from "./featuredContent";
 import type { GalleryItem } from "./galleryItem";
+import type { PageBuilderState } from "./pageBuilderState";
+import type { PageLinkItem } from "./pageLinkItem";
 import type { Post } from "./post";
 import type { ProfileCustomField } from "./profileCustomField";
+import type { ServiceItem } from "./serviceItem";
 import type { UserSummary } from "./userSummary";
 
 export interface ArtistProfile {
@@ -36,14 +41,27 @@ export interface ArtistProfile {
   primaryActionType: string;
   primaryActionLabel: string;
   primaryActionUrl?: string | null;
+  pageType: string;
+  pageArchetype: string;
+  pageStatus: string;
   featuredTitle?: string | null;
   featuredDescription?: string | null;
   featuredUrl?: string | null;
   featuredType: string;
+  featuredContent?: FeaturedContent | null;
   moodPreset: string;
   layoutTemplate: string;
   fontPreset: string;
+  accentColor?: string | null;
+  backgroundStyle: string;
+  lightThemeVariant: string;
+  linkItems: PageLinkItem[];
+  serviceItems: ServiceItem[];
+  pricingSummary?: string | null;
+  turnaroundInfo?: string | null;
   enabledModules: string[];
   moduleOrder: string[];
+  sectionConfigs: ArtistProfileSectionConfigs;
   pinnedPost?: Post | null;
+  pageBuilder: PageBuilderState;
 }

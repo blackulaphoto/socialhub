@@ -135,6 +135,78 @@ export interface ActivitySummary {
   recentItems: NotificationItem[];
 }
 
+export interface PageLinkItem {
+  label: string;
+  url: string;
+  kind?: string | null;
+}
+
+export interface ServiceItem {
+  title: string;
+  description?: string | null;
+  price?: string | null;
+  turnaround?: string | null;
+}
+
+export interface SectionConfig {
+  visible?: boolean;
+  style?: string | null;
+  density?: string | null;
+}
+
+export interface FeaturedContent {
+  type: string;
+  title?: string | null;
+  description?: string | null;
+  url?: string | null;
+  postId?: number | null;
+  imageUrl?: string | null;
+  thumbnailUrl?: string | null;
+}
+
+export type PageBuilderStateIdentity = {
+  pageType: string;
+  pageArchetype: string;
+  pageStatus: string;
+};
+
+export type PageBuilderStateShowcase = {
+  featuredContent?: FeaturedContent | null;
+  linkItems: PageLinkItem[];
+};
+
+export type PageBuilderStateWork = {
+  primaryActionType: string;
+  primaryActionLabel: string;
+  primaryActionUrl?: string | null;
+  serviceItems: ServiceItem[];
+  pricingSummary?: string | null;
+  turnaroundInfo?: string | null;
+};
+
+export type PageBuilderStateStyleSectionConfigs = {
+  [key: string]: SectionConfig;
+};
+
+export type PageBuilderStateStyle = {
+  accentColor?: string | null;
+  moodPreset: string;
+  backgroundStyle: string;
+  lightThemeVariant: string;
+  layoutTemplate: string;
+  fontPreset: string;
+  enabledModules: string[];
+  moduleOrder: string[];
+  sectionConfigs: PageBuilderStateStyleSectionConfigs;
+};
+
+export interface PageBuilderState {
+  identity: PageBuilderStateIdentity;
+  showcase: PageBuilderStateShowcase;
+  work: PageBuilderStateWork;
+  style: PageBuilderStateStyle;
+}
+
 export interface ProfileCustomField {
   label: string;
   value: string;
@@ -277,6 +349,8 @@ export interface Post {
   media?: PostMedia[];
 }
 
+export type ArtistProfileSectionConfigs = { [key: string]: SectionConfig };
+
 export interface ArtistProfile {
   id: number;
   userId: number;
@@ -303,16 +377,29 @@ export interface ArtistProfile {
   primaryActionType: string;
   primaryActionLabel: string;
   primaryActionUrl?: string | null;
+  pageType: string;
+  pageArchetype: string;
+  pageStatus: string;
   featuredTitle?: string | null;
   featuredDescription?: string | null;
   featuredUrl?: string | null;
   featuredType: string;
+  featuredContent?: FeaturedContent | null;
   moodPreset: string;
   layoutTemplate: string;
   fontPreset: string;
+  accentColor?: string | null;
+  backgroundStyle: string;
+  lightThemeVariant: string;
+  linkItems: PageLinkItem[];
+  serviceItems: ServiceItem[];
+  pricingSummary?: string | null;
+  turnaroundInfo?: string | null;
   enabledModules: string[];
   moduleOrder: string[];
+  sectionConfigs: ArtistProfileSectionConfigs;
   pinnedPost?: Post | null;
+  pageBuilder: PageBuilderState;
 }
 
 export interface UserProfileDetails {
@@ -335,7 +422,12 @@ export interface UserProfileDetails {
   updatedAt?: string;
 }
 
+export type CreatorSettingsSectionConfigs = { [key: string]: SectionConfig };
+
 export interface CreatorSettings {
+  pageType: string;
+  pageArchetype: string;
+  pageStatus: string;
   primaryActionType: string;
   primaryActionLabel: string;
   primaryActionUrl?: string | null;
@@ -343,12 +435,22 @@ export interface CreatorSettings {
   featuredDescription?: string | null;
   featuredUrl?: string | null;
   featuredType: string;
+  featuredContent?: FeaturedContent | null;
   moodPreset: string;
   layoutTemplate: string;
   fontPreset: string;
+  accentColor?: string | null;
+  backgroundStyle: string;
+  lightThemeVariant: string;
+  linkItems: PageLinkItem[];
+  serviceItems: ServiceItem[];
+  pricingSummary?: string | null;
+  turnaroundInfo?: string | null;
   enabledModules: string[];
   moduleOrder: string[];
+  sectionConfigs: CreatorSettingsSectionConfigs;
   pinnedPost?: Post | null;
+  pageBuilder: PageBuilderState;
 }
 
 export interface CustomFeed {
@@ -396,7 +498,14 @@ export interface UpdateProfileRequest {
   links?: LinkItem[];
 }
 
+export type UpdateCreatorSettingsRequestSectionConfigs = {
+  [key: string]: SectionConfig;
+};
+
 export interface UpdateCreatorSettingsRequest {
+  pageType?: string;
+  pageArchetype?: string;
+  pageStatus?: string;
   primaryActionType?: string;
   primaryActionLabel?: string;
   primaryActionUrl?: string | null;
@@ -404,11 +513,20 @@ export interface UpdateCreatorSettingsRequest {
   featuredDescription?: string | null;
   featuredUrl?: string | null;
   featuredType?: string;
+  featuredContent?: FeaturedContent | null;
   moodPreset?: string;
   layoutTemplate?: string;
   fontPreset?: string;
+  accentColor?: string | null;
+  backgroundStyle?: string;
+  lightThemeVariant?: string;
+  linkItems?: PageLinkItem[];
+  serviceItems?: ServiceItem[];
+  pricingSummary?: string | null;
+  turnaroundInfo?: string | null;
   enabledModules?: string[];
   moduleOrder?: string[];
+  sectionConfigs?: UpdateCreatorSettingsRequestSectionConfigs;
   pinnedPostId?: number | null;
 }
 
@@ -506,6 +624,10 @@ export type FeedResponse = PostsResponse & {
   mode: string;
 };
 
+export type UpdateArtistRequestSectionConfigs = {
+  [key: string]: SectionConfig;
+};
+
 export interface UpdateArtistRequest {
   displayName?: string | null;
   avatarUrl?: string | null;
@@ -525,6 +647,9 @@ export interface UpdateArtistRequest {
   acceptsCollaborations?: boolean;
   customFields?: ProfileCustomField[];
   bookingEmail?: string | null;
+  pageType?: string;
+  pageArchetype?: string;
+  pageStatus?: string;
   primaryActionType?: string;
   primaryActionLabel?: string;
   primaryActionUrl?: string | null;
@@ -532,11 +657,20 @@ export interface UpdateArtistRequest {
   featuredDescription?: string | null;
   featuredUrl?: string | null;
   featuredType?: string;
+  featuredContent?: FeaturedContent | null;
   moodPreset?: string;
   layoutTemplate?: string;
   fontPreset?: string;
+  accentColor?: string | null;
+  backgroundStyle?: string;
+  lightThemeVariant?: string;
+  linkItems?: PageLinkItem[];
+  serviceItems?: ServiceItem[];
+  pricingSummary?: string | null;
+  turnaroundInfo?: string | null;
   enabledModules?: string[];
   moduleOrder?: string[];
+  sectionConfigs?: UpdateArtistRequestSectionConfigs;
   pinnedPostId?: number | null;
 }
 

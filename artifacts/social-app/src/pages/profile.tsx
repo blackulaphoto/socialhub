@@ -1,4 +1,4 @@
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useEffect, useMemo, useState } from "react";
 import {
   Camera,
@@ -37,6 +37,7 @@ import { ProfileReactionBar } from "@/components/profile-reaction-bar";
 import { BlockActionButton } from "@/components/block-action-button";
 import { LoadMoreSentinel } from "@/components/load-more-sentinel";
 import { useActiveIdentity } from "@/hooks/useActiveIdentity";
+import { groupItemsByFolder, readMediaFolderState } from "@/lib/media-folders";
 import { cn } from "@/lib/utils";
 
 function formatPlace(parts: Array<string | null | undefined>) {
@@ -67,11 +68,13 @@ const PROFILE_THEME_STYLES: Record<string, { shell: string; overlay: string; car
 
 export default function Profile({ id }: { id: string }) {
   const userId = parseInt(id, 10);
+  const [location] = useLocation();
   const { user: currentUser } = useAuth();
   const { setActiveIdentity } = useActiveIdentity();
   const queryClient = useQueryClient();
   const isOwnProfile = currentUser?.id === userId;
   const [activePhotoIndex, setActivePhotoIndex] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<"posts" | "photos" | "about">("posts");
 
   const {
     data: profile,
@@ -87,6 +90,16 @@ export default function Profile({ id }: { id: string }) {
       setActiveIdentity("personal");
     }
   }, [isOwnProfile, setActiveIdentity]);
+
+  useEffect(() => {
+    const rawSearch = typeof window !== "undefined" ? window.location.search : "";
+    const tab = new URLSearchParams(rawSearch).get("tab");
+    if (tab === "photos" || tab === "about" || tab === "posts") {
+      setActiveTab(tab);
+    } else {
+      setActiveTab("posts");
+    }
+  }, [location]);
 
   const {
     data: postsData,
@@ -157,6 +170,11 @@ export default function Profile({ id }: { id: string }) {
       return right - left;
     });
   }, [profilePosts, userPhotos]);
+  const profileFolderState = useMemo(() => readMediaFolderState("profile", userId), [location, userId]);
+  const groupedPhotoGalleryItems = useMemo(
+    () => groupItemsByFolder(photoGalleryItems, (item) => item.url, profileFolderState.assignments),
+    [photoGalleryItems, profileFolderState.assignments],
+  );
   const handleShare = async () => {
     const url = `${window.location.origin}/profile/${userId}`;
     try {
@@ -289,6 +307,11 @@ export default function Profile({ id }: { id: string }) {
                       </Button>
                     </Link>
                   )}
+                  <Link href={`/profile/${user.id}?tab=photos`}>
+                    <Button variant="outline">
+                      <Camera className="mr-2 h-4 w-4" /> Photos
+                    </Button>
+                  </Link>
                 </div>
               </div>
 
@@ -348,7 +371,7 @@ export default function Profile({ id }: { id: string }) {
 
       <div className="mx-auto mt-8 grid max-w-5xl grid-cols-1 gap-6 px-4 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="space-y-6">
-          <Tabs defaultValue="posts" className="w-full">
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "posts" | "photos" | "about")} className="w-full">
             <TabsList className="h-12 w-full justify-start rounded-none border-b border-border/50 bg-transparent p-0">
               <TabsTrigger value="posts" className="h-full rounded-none border-primary px-6 font-medium data-[state=active]:border-b-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none">
                 <Grid className="mr-2 h-4 w-4" /> Posts
@@ -402,22 +425,35 @@ export default function Profile({ id }: { id: string }) {
                 </CardHeader>
                 <CardContent>
                   {photoGalleryItems.length ? (
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                      {photoGalleryItems.map((photo, index) => (
-                        <button
-                          key={`${photo.url}-${index}`}
-                          type="button"
-                          onClick={() => setActivePhotoIndex(index)}
-                          className="group overflow-hidden rounded-2xl bg-background/40 text-left shadow-sm transition-transform hover:scale-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-                        >
-                          <img
-                            src={photo.url}
-                            alt={photo.caption || `${user.username} photo`}
-                            loading="lazy"
-                            decoding="async"
-                            className="aspect-square w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
-                          />
-                        </button>
+                    <div className="space-y-5">
+                      {groupedPhotoGalleryItems.map((group) => (
+                        <div key={group.folder} className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">{group.folder}</div>
+                            <div className="text-xs text-muted-foreground">{group.items.length} item{group.items.length === 1 ? "" : "s"}</div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                            {group.items.map((photo) => {
+                              const index = photoGalleryItems.findIndex((item) => item.url === photo.url);
+                              return (
+                                <button
+                                  key={photo.url}
+                                  type="button"
+                                  onClick={() => setActivePhotoIndex(index)}
+                                  className="group overflow-hidden rounded-2xl bg-background/40 text-left shadow-sm transition-transform hover:scale-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                                >
+                                  <img
+                                    src={photo.url}
+                                    alt={photo.caption || `${user.username} photo`}
+                                    loading="lazy"
+                                    decoding="async"
+                                    className="aspect-square w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
+                                  />
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
                       ))}
                     </div>
                   ) : (

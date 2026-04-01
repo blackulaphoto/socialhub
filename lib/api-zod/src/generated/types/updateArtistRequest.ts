@@ -5,7 +5,11 @@
  * ArtistHub Social Platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { FeaturedContent } from "./featuredContent";
+import type { PageLinkItem } from "./pageLinkItem";
 import type { ProfileCustomField } from "./profileCustomField";
+import type { ServiceItem } from "./serviceItem";
+import type { UpdateArtistRequestSectionConfigs } from "./updateArtistRequestSectionConfigs";
 
 export interface UpdateArtistRequest {
   displayName?: string | null;
@@ -26,6 +30,9 @@ export interface UpdateArtistRequest {
   acceptsCollaborations?: boolean;
   customFields?: ProfileCustomField[];
   bookingEmail?: string | null;
+  pageType?: string;
+  pageArchetype?: string;
+  pageStatus?: string;
   primaryActionType?: string;
   primaryActionLabel?: string;
   primaryActionUrl?: string | null;
@@ -33,10 +40,19 @@ export interface UpdateArtistRequest {
   featuredDescription?: string | null;
   featuredUrl?: string | null;
   featuredType?: string;
+  featuredContent?: FeaturedContent | null;
   moodPreset?: string;
   layoutTemplate?: string;
   fontPreset?: string;
+  accentColor?: string | null;
+  backgroundStyle?: string;
+  lightThemeVariant?: string;
+  linkItems?: PageLinkItem[];
+  serviceItems?: ServiceItem[];
+  pricingSummary?: string | null;
+  turnaroundInfo?: string | null;
   enabledModules?: string[];
   moduleOrder?: string[];
+  sectionConfigs?: UpdateArtistRequestSectionConfigs;
   pinnedPostId?: number | null;
 }

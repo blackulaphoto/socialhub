@@ -35,6 +35,9 @@ export const userProfileDetailsTable = pgTable("user_profile_details", {
 
 export const creatorProfileSettingsTable = pgTable("creator_profile_settings", {
   userId: integer("user_id").primaryKey().references(() => usersTable.id, { onDelete: "cascade" }),
+  pageType: text("page_type").notNull().default("creator"),
+  pageArchetype: text("page_archetype").notNull().default("business"),
+  pageStatus: text("page_status").notNull().default("published"),
   primaryActionType: text("primary_action_type").notNull().default("contact"),
   primaryActionLabel: text("primary_action_label").notNull().default("Contact Me"),
   primaryActionUrl: text("primary_action_url"),
@@ -42,11 +45,41 @@ export const creatorProfileSettingsTable = pgTable("creator_profile_settings", {
   featuredDescription: text("featured_description"),
   featuredUrl: text("featured_url"),
   featuredType: text("featured_type").notNull().default("highlight"),
+  featuredContent: jsonb("featured_content").$type<{
+    type: string;
+    title?: string | null;
+    description?: string | null;
+    url?: string | null;
+    postId?: number | null;
+    imageUrl?: string | null;
+    thumbnailUrl?: string | null;
+  } | null>(),
+  linkItems: jsonb("link_items").$type<Array<{
+    label: string;
+    url: string;
+    kind?: string | null;
+  }>>().notNull().default([]),
+  serviceItems: jsonb("service_items").$type<Array<{
+    title: string;
+    description?: string | null;
+    price?: string | null;
+    turnaround?: string | null;
+  }>>().notNull().default([]),
+  pricingSummary: text("pricing_summary"),
+  turnaroundInfo: text("turnaround_info"),
   moodPreset: text("mood_preset").notNull().default("sleek"),
   layoutTemplate: text("layout_template").notNull().default("portfolio"),
   fontPreset: text("font_preset").notNull().default("modern"),
+  accentColor: text("accent_color").default("#8b5cf6"),
+  backgroundStyle: text("background_style").notNull().default("soft-glow"),
+  lightThemeVariant: text("light_theme_variant").notNull().default("studio"),
   enabledModules: text("enabled_modules").array().notNull().default(["featured", "about", "media", "posts", "events", "contact"]),
   moduleOrder: text("module_order").array().notNull().default(["featured", "about", "media", "posts", "events", "contact"]),
+  sectionConfigs: jsonb("section_configs").$type<Record<string, {
+    visible?: boolean;
+    style?: string | null;
+    density?: string | null;
+  }>>().notNull().default({}),
   pinnedPostId: integer("pinned_post_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

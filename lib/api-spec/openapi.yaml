@@ -2006,6 +2006,147 @@ components:
           type: string
       required: [label, url]
 
+    PageLinkItem:
+      type: object
+      properties:
+        label:
+          type: string
+        url:
+          type: string
+        kind:
+          type: string
+          nullable: true
+      required: [label, url]
+
+    ServiceItem:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        price:
+          type: string
+          nullable: true
+        turnaround:
+          type: string
+          nullable: true
+      required: [title]
+
+    SectionConfig:
+      type: object
+      properties:
+        visible:
+          type: boolean
+        style:
+          type: string
+          nullable: true
+        density:
+          type: string
+          nullable: true
+
+    FeaturedContent:
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        url:
+          type: string
+          nullable: true
+        postId:
+          type: integer
+          nullable: true
+        imageUrl:
+          type: string
+          nullable: true
+        thumbnailUrl:
+          type: string
+          nullable: true
+      required: [type]
+
+    PageBuilderState:
+      type: object
+      properties:
+        identity:
+          type: object
+          properties:
+            pageType:
+              type: string
+            pageArchetype:
+              type: string
+            pageStatus:
+              type: string
+          required: [pageType, pageArchetype, pageStatus]
+        showcase:
+          type: object
+          properties:
+            featuredContent:
+              $ref: "#/components/schemas/FeaturedContent"
+              nullable: true
+            linkItems:
+              type: array
+              items:
+                $ref: "#/components/schemas/PageLinkItem"
+          required: [linkItems]
+        work:
+          type: object
+          properties:
+            primaryActionType:
+              type: string
+            primaryActionLabel:
+              type: string
+            primaryActionUrl:
+              type: string
+              nullable: true
+            serviceItems:
+              type: array
+              items:
+                $ref: "#/components/schemas/ServiceItem"
+            pricingSummary:
+              type: string
+              nullable: true
+            turnaroundInfo:
+              type: string
+              nullable: true
+          required: [primaryActionType, primaryActionLabel, serviceItems]
+        style:
+          type: object
+          properties:
+            accentColor:
+              type: string
+              nullable: true
+            moodPreset:
+              type: string
+            backgroundStyle:
+              type: string
+            lightThemeVariant:
+              type: string
+            layoutTemplate:
+              type: string
+            fontPreset:
+              type: string
+            enabledModules:
+              type: array
+              items:
+                type: string
+            moduleOrder:
+              type: array
+              items:
+                type: string
+            sectionConfigs:
+              type: object
+              additionalProperties:
+                $ref: "#/components/schemas/SectionConfig"
+          required: [moodPreset, backgroundStyle, lightThemeVariant, layoutTemplate, fontPreset, enabledModules, moduleOrder, sectionConfigs]
+      required: [identity, showcase, work, style]
+
     ProfileCustomField:
       type: object
       properties:
@@ -2181,6 +2322,12 @@ components:
     CreatorSettings:
       type: object
       properties:
+        pageType:
+          type: string
+        pageArchetype:
+          type: string
+        pageStatus:
+          type: string
         primaryActionType:
           type: string
         primaryActionLabel:
@@ -2199,12 +2346,36 @@ components:
           nullable: true
         featuredType:
           type: string
+        featuredContent:
+          $ref: "#/components/schemas/FeaturedContent"
+          nullable: true
         moodPreset:
           type: string
         layoutTemplate:
           type: string
         fontPreset:
           type: string
+        accentColor:
+          type: string
+          nullable: true
+        backgroundStyle:
+          type: string
+        lightThemeVariant:
+          type: string
+        linkItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/PageLinkItem"
+        serviceItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/ServiceItem"
+        pricingSummary:
+          type: string
+          nullable: true
+        turnaroundInfo:
+          type: string
+          nullable: true
         enabledModules:
           type: array
           items:
@@ -2213,10 +2384,16 @@ components:
           type: array
           items:
             type: string
+        sectionConfigs:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/SectionConfig"
         pinnedPost:
           $ref: "#/components/schemas/Post"
           nullable: true
-      required: [primaryActionType, primaryActionLabel, featuredType, moodPreset, layoutTemplate, fontPreset, enabledModules, moduleOrder]
+        pageBuilder:
+          $ref: "#/components/schemas/PageBuilderState"
+      required: [pageType, pageArchetype, pageStatus, primaryActionType, primaryActionLabel, featuredType, moodPreset, layoutTemplate, fontPreset, backgroundStyle, lightThemeVariant, linkItems, serviceItems, enabledModules, moduleOrder, sectionConfigs, pageBuilder]
 
     UpdateProfileRequest:
       type: object
@@ -2273,6 +2450,12 @@ components:
     UpdateCreatorSettingsRequest:
       type: object
       properties:
+        pageType:
+          type: string
+        pageArchetype:
+          type: string
+        pageStatus:
+          type: string
         primaryActionType:
           type: string
         primaryActionLabel:
@@ -2291,12 +2474,36 @@ components:
           nullable: true
         featuredType:
           type: string
+        featuredContent:
+          $ref: "#/components/schemas/FeaturedContent"
+          nullable: true
         moodPreset:
           type: string
         layoutTemplate:
           type: string
         fontPreset:
           type: string
+        accentColor:
+          type: string
+          nullable: true
+        backgroundStyle:
+          type: string
+        lightThemeVariant:
+          type: string
+        linkItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/PageLinkItem"
+        serviceItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/ServiceItem"
+        pricingSummary:
+          type: string
+          nullable: true
+        turnaroundInfo:
+          type: string
+          nullable: true
         enabledModules:
           type: array
           items:
@@ -2305,6 +2512,10 @@ components:
           type: array
           items:
             type: string
+        sectionConfigs:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/SectionConfig"
         pinnedPostId:
           type: integer
           nullable: true
@@ -2648,6 +2859,12 @@ components:
         primaryActionUrl:
           type: string
           nullable: true
+        pageType:
+          type: string
+        pageArchetype:
+          type: string
+        pageStatus:
+          type: string
         featuredTitle:
           type: string
           nullable: true
@@ -2659,12 +2876,36 @@ components:
           nullable: true
         featuredType:
           type: string
+        featuredContent:
+          $ref: "#/components/schemas/FeaturedContent"
+          nullable: true
         moodPreset:
           type: string
         layoutTemplate:
           type: string
         fontPreset:
           type: string
+        accentColor:
+          type: string
+          nullable: true
+        backgroundStyle:
+          type: string
+        lightThemeVariant:
+          type: string
+        linkItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/PageLinkItem"
+        serviceItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/ServiceItem"
+        pricingSummary:
+          type: string
+          nullable: true
+        turnaroundInfo:
+          type: string
+          nullable: true
         enabledModules:
           type: array
           items:
@@ -2673,10 +2914,16 @@ components:
           type: array
           items:
             type: string
+        sectionConfigs:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/SectionConfig"
         pinnedPost:
           $ref: "#/components/schemas/Post"
           nullable: true
-      required: [id, userId, category, tags, gallery, user, primaryActionType, primaryActionLabel, openForCommissions, touring, acceptsCollaborations, customFields, featuredType, moodPreset, layoutTemplate, fontPreset, enabledModules, moduleOrder]
+        pageBuilder:
+          $ref: "#/components/schemas/PageBuilderState"
+      required: [id, userId, category, tags, gallery, user, pageType, pageArchetype, pageStatus, primaryActionType, primaryActionLabel, openForCommissions, touring, acceptsCollaborations, customFields, featuredType, moodPreset, layoutTemplate, fontPreset, backgroundStyle, lightThemeVariant, linkItems, serviceItems, enabledModules, moduleOrder, sectionConfigs, pageBuilder]
 
     UpdateArtistRequest:
       type: object
@@ -2733,6 +2980,12 @@ components:
         bookingEmail:
           type: string
           nullable: true
+        pageType:
+          type: string
+        pageArchetype:
+          type: string
+        pageStatus:
+          type: string
         primaryActionType:
           type: string
         primaryActionLabel:
@@ -2751,12 +3004,36 @@ components:
           nullable: true
         featuredType:
           type: string
+        featuredContent:
+          $ref: "#/components/schemas/FeaturedContent"
+          nullable: true
         moodPreset:
           type: string
         layoutTemplate:
           type: string
         fontPreset:
           type: string
+        accentColor:
+          type: string
+          nullable: true
+        backgroundStyle:
+          type: string
+        lightThemeVariant:
+          type: string
+        linkItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/PageLinkItem"
+        serviceItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/ServiceItem"
+        pricingSummary:
+          type: string
+          nullable: true
+        turnaroundInfo:
+          type: string
+          nullable: true
         enabledModules:
           type: array
           items:
@@ -2765,6 +3042,10 @@ components:
           type: array
           items:
             type: string
+        sectionConfigs:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/SectionConfig"
         pinnedPostId:
           type: integer
           nullable: true
