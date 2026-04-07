@@ -69,6 +69,78 @@ router.post("/events", requireAuth, async (req, res) => {
   res.status(201).json(await formatEvent(event));
 });
 
+router.patch("/events/:eventId", requireAuth, async (req, res) => {
+  const eventId = Number(req.params.eventId);
+  if (Number.isNaN(eventId)) {
+    res.status(400).json({ error: "Invalid ID" });
+    return;
+  }
+
+  const [existingEvent] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+  if (!existingEvent) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+
+  if (existingEvent.hostUserId !== req.session.userId) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const { title, description, startsAt, location, city, imageUrl, lineupArtistIds, lineupTags } = req.body;
+  if (!title || !description || !startsAt || !location) {
+    res.status(400).json({ error: "title, description, startsAt, and location are required" });
+    return;
+  }
+
+  const [event] = await db.update(eventsTable).set({
+    title,
+    description,
+    startsAt: new Date(startsAt),
+    location,
+    city: city || null,
+    imageUrl: imageUrl || null,
+    lineupTags: Array.isArray(lineupTags) ? lineupTags : [],
+    updatedAt: new Date(),
+  }).where(eq(eventsTable.id, eventId)).returning();
+
+  await db.delete(eventArtistsTable).where(eq(eventArtistsTable.eventId, eventId));
+  const artistIds = Array.isArray(lineupArtistIds) ? lineupArtistIds.map(Number).filter(Boolean) : [];
+  if (artistIds.length > 0) {
+    await db.insert(eventArtistsTable).values(
+      artistIds.map((userId, index) => ({
+        eventId: event.id,
+        userId,
+        isHeadliner: index === 0,
+      })),
+    ).onConflictDoNothing();
+  }
+
+  res.json(await formatEvent(event));
+});
+
+router.delete("/events/:eventId", requireAuth, async (req, res) => {
+  const eventId = Number(req.params.eventId);
+  if (Number.isNaN(eventId)) {
+    res.status(400).json({ error: "Invalid ID" });
+    return;
+  }
+
+  const [existingEvent] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+  if (!existingEvent) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+
+  if (existingEvent.hostUserId !== req.session.userId) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  await db.delete(eventsTable).where(eq(eventsTable.id, eventId));
+  res.status(204).send();
+});
+
 router.get("/events/:eventId", async (req, res) => {
   const eventId = Number(req.params.eventId);
   if (Number.isNaN(eventId)) {

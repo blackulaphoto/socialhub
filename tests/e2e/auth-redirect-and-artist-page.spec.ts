@@ -30,7 +30,7 @@ test.describe("Auth redirect and artist page stability", () => {
     await page.goto("/artists/1");
 
     await expect(page).toHaveURL(/\/artists\/1$/);
-    await expect(page.getByText("About").first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Gallery" }).first()).toBeVisible();
     expect(pageErrors).toEqual([]);
   });
 });

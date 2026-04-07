@@ -38,6 +38,9 @@ export default function Messages({ conversationId }: { conversationId?: string }
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [isWindowVisible, setIsWindowVisible] = useState(() =>
+    typeof document === "undefined" ? true : document.visibilityState === "visible",
+  );
   const [messageText, setMessageText] = useState("");
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [composeQuery, setComposeQuery] = useState("");
@@ -56,7 +59,11 @@ export default function Messages({ conversationId }: { conversationId?: string }
     isError: isConversationsError,
     refetch: refetchConversations,
   } = useGetConversations({
-    query: { queryKey: ["/api/messages/conversations"] },
+    query: {
+      queryKey: ["/api/messages/conversations"],
+      refetchInterval: isWindowVisible ? 5000 : 15000,
+      refetchOnWindowFocus: true,
+    },
   });
 
   const activeConvId = conversationId ? parseInt(conversationId, 10) : undefined;
@@ -73,6 +80,8 @@ export default function Messages({ conversationId }: { conversationId?: string }
       query: {
         enabled: !!activeConvId,
         queryKey: ["/api/messages/conversations", activeConvId],
+        refetchInterval: activeConvId ? (isWindowVisible ? 2500 : 10000) : false,
+        refetchOnWindowFocus: true,
       },
     },
   );
@@ -104,6 +113,15 @@ export default function Messages({ conversationId }: { conversationId?: string }
 
   const { mutate: sendMessage, isPending: isSending } = useSendMessage();
   const activeConversation = convData?.find((conversation) => conversation.id === activeConvId);
+  const latestOwnMessageId = useMemo(() => {
+    if (!messages || !currentUser?.id) return null;
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      if (messages[index].senderId === currentUser.id) {
+        return messages[index].id;
+      }
+    }
+    return null;
+  }, [currentUser?.id, messages]);
 
   const recipientOptions = useMemo(() => {
     const byId = new Map<number, { id: number; name: string; avatarUrl?: string | null; subtitle?: string | null }>();
@@ -150,7 +168,19 @@ export default function Messages({ conversationId }: { conversationId?: string }
   }, [messages]);
 
   useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+    const handleVisibilityChange = () => {
+      setIsWindowVisible(document.visibilityState === "visible");
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!activeConvId || !messages) return;
+    queryClient.invalidateQueries({ queryKey: ["/api/messages/conversations"] });
     queryClient.invalidateQueries({ queryKey: ["/api/activity/summary"] });
     queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
   }, [activeConvId, messages, queryClient]);
@@ -390,6 +420,11 @@ export default function Messages({ conversationId }: { conversationId?: string }
                           <div className="mt-1 flex items-center gap-2 px-1 text-[10px] text-muted-foreground">
                             {msg.inquiry?.budget && <span className="inline-flex items-center gap-1"><Wallet className="h-3 w-3" /> {msg.inquiry.budget}</span>}
                             <span>{new Date(msg.createdAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</span>
+                            {isMe && msg.id === latestOwnMessageId ? (
+                              <span className={msg.isRead ? "text-primary" : ""}>
+                                {msg.isRead ? "Seen" : "Sent"}
+                              </span>
+                            ) : null}
                           </div>
                         </div>
                       );

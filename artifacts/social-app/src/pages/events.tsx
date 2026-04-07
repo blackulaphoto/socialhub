@@ -2,10 +2,21 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCreateEvent, useGetArtists, useGetEvents, useSearch } from "@workspace/api-client-react";
-import { CalendarRange, MapPin, Plus, Search, Sparkles, Users, X } from "lucide-react";
+import { CalendarRange, MapPin, Pencil, Plus, Search, Sparkles, Trash2, Users, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
@@ -13,15 +24,41 @@ import { Badge } from "@/components/ui/badge";
 import { QueryErrorState } from "@/components/query-error-state";
 import { LocationInput } from "@/components/location-input";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { uploadImage } from "@/lib/upload-image";
 
+type EventFormState = {
+  title: string;
+  description: string;
+  startsAt: string;
+  location: string;
+  city: string;
+  imageUrl: string;
+  lineupTags: string;
+};
+
+const EMPTY_FORM: EventFormState = {
+  title: "",
+  description: "",
+  startsAt: "",
+  location: "",
+  city: "",
+  imageUrl: "",
+  lineupTags: "",
+};
+
 export default function Events() {
+  const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
   const [city, setCity] = useState("");
   const [query, setQuery] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [editingEventId, setEditingEventId] = useState<number | null>(null);
+  const [eventPendingDelete, setEventPendingDelete] = useState<number | null>(null);
+  const [isSavingEvent, setIsSavingEvent] = useState(false);
+  const [isDeletingEvent, setIsDeletingEvent] = useState(false);
   const [artistSearch, setArtistSearch] = useState("");
   const [selectedArtists, setSelectedArtists] = useState<Array<{
     userId: number;
@@ -29,15 +66,7 @@ export default function Events() {
     category?: string;
     location?: string | null;
   }>>([]);
-  const [form, setForm] = useState({
-    title: "",
-    description: "",
-    startsAt: "",
-    location: "",
-    city: "",
-    imageUrl: "",
-    lineupTags: "",
-  });
+  const [form, setForm] = useState<EventFormState>(EMPTY_FORM);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const currentSearch = typeof window !== "undefined" ? window.location.search : "";
   const returnTo = useMemo(() => new URLSearchParams(currentSearch).get("returnTo"), [currentSearch]);
@@ -46,6 +75,7 @@ export default function Events() {
   useEffect(() => {
     if (shouldOpenComposer) {
       setIsCreateOpen(true);
+      setEditingEventId(null);
     }
   }, [shouldOpenComposer]);
 
@@ -85,11 +115,15 @@ export default function Events() {
   const createEvent = useCreateEvent({
     mutation: {
       onSuccess: () => {
-        setForm({ title: "", description: "", startsAt: "", location: "", city: "", imageUrl: "", lineupTags: "" });
+        setForm(EMPTY_FORM);
         setSelectedArtists([]);
         setArtistSearch("");
         setIsCreateOpen(false);
         queryClient.invalidateQueries({ queryKey: ["events"] });
+        if (returnTo === "creator") {
+          setLocation("/settings?tab=creator");
+          return;
+        }
         toast({ title: "Event created" });
       },
       onError: () => {
@@ -125,7 +159,7 @@ export default function Events() {
       {
         userId: artist.userId,
         name: artist.displayName || artist.user.username,
-        category: artist.category,
+        category: artist.category || undefined,
         location: artist.location,
       },
     ]);
@@ -134,6 +168,124 @@ export default function Events() {
 
   const removeArtistFromLineup = (userId: number) => {
     setSelectedArtists((current) => current.filter((artist) => artist.userId !== userId));
+  };
+
+  const resetComposer = () => {
+    setEditingEventId(null);
+    setForm(EMPTY_FORM);
+    setSelectedArtists([]);
+    setArtistSearch("");
+    setIsCreateOpen(false);
+  };
+
+  const openCreateComposer = () => {
+    setEditingEventId(null);
+    setForm(EMPTY_FORM);
+    setSelectedArtists([]);
+    setArtistSearch("");
+    setIsCreateOpen(true);
+  };
+
+  const openEditComposer = (event: NonNullable<typeof data>[number]) => {
+    setEditingEventId(event.id);
+    setForm({
+      title: event.title,
+      description: event.description,
+      startsAt: new Date(event.startsAt).toISOString().slice(0, 16),
+      location: event.location,
+      city: event.city || "",
+      imageUrl: event.imageUrl || "",
+      lineupTags: event.lineupTags.join(", "),
+    });
+    setSelectedArtists(
+      (event.artists || []).map((artist) => ({
+        userId: artist.id,
+        name: artist.username,
+        category: artist.category || undefined,
+        location: artist.location,
+      })),
+    );
+    setArtistSearch("");
+    setIsCreateOpen(true);
+  };
+
+  const saveEvent = async () => {
+    if (!form.title.trim() || !form.description.trim() || !form.startsAt || !form.location.trim()) return;
+    if (editingEventId == null) {
+      createEvent.mutate({
+        data: {
+          title: form.title,
+          description: form.description,
+          startsAt: form.startsAt,
+          location: form.location,
+          city: form.city || undefined,
+          imageUrl: form.imageUrl || undefined,
+          lineupTags: form.lineupTags.split(",").map((tag) => tag.trim()).filter(Boolean),
+          lineupArtistIds: selectedArtists.map((artist) => artist.userId),
+        },
+      });
+      return;
+    }
+
+    setIsSavingEvent(true);
+    try {
+      const response = await fetch(`/api/events/${editingEventId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: form.title,
+          description: form.description,
+          startsAt: form.startsAt,
+          location: form.location,
+          city: form.city || undefined,
+          imageUrl: form.imageUrl || undefined,
+          lineupTags: form.lineupTags.split(",").map((tag) => tag.trim()).filter(Boolean),
+          lineupArtistIds: selectedArtists.map((artist) => artist.userId),
+        }),
+      });
+      if (!response.ok) {
+        throw new Error("Request failed");
+      }
+      queryClient.invalidateQueries({ queryKey: ["events"] });
+      queryClient.invalidateQueries({ queryKey: ["event", editingEventId] });
+      resetComposer();
+      if (returnTo === "creator") {
+        setLocation("/settings?tab=creator");
+      } else {
+        toast({ title: "Event updated" });
+      }
+    } catch {
+      toast({ title: "Could not update event", variant: "destructive" });
+    } finally {
+      setIsSavingEvent(false);
+    }
+  };
+
+  const deleteEvent = async (eventId: number) => {
+    setIsDeletingEvent(true);
+    try {
+      const response = await fetch(`/api/events/${eventId}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        throw new Error("Request failed");
+      }
+      setEventPendingDelete(null);
+      if (editingEventId === eventId) {
+        resetComposer();
+      }
+      queryClient.invalidateQueries({ queryKey: ["events"] });
+      queryClient.invalidateQueries({ queryKey: ["event", eventId] });
+      if (returnTo === "creator") {
+        setLocation("/settings?tab=creator");
+      } else {
+        toast({ title: "Event deleted" });
+      }
+    } catch {
+      toast({ title: "Could not delete event", variant: "destructive" });
+    } finally {
+      setIsDeletingEvent(false);
+    }
   };
 
   return (
@@ -149,12 +301,21 @@ export default function Events() {
               Back to Editing
             </Button>
           ) : null}
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+          <Dialog
+            open={isCreateOpen}
+            onOpenChange={(open) => {
+              if (!open) {
+                resetComposer();
+                return;
+              }
+              setIsCreateOpen(true);
+            }}
+          >
             <DialogTrigger asChild>
-              <Button><Plus className="mr-2 h-4 w-4" /> Add Event</Button>
+              <Button onClick={openCreateComposer}><Plus className="mr-2 h-4 w-4" /> Add Event</Button>
             </DialogTrigger>
           <DialogContent className="max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>Create Event</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{editingEventId == null ? "Create Event" : "Edit Event"}</DialogTitle></DialogHeader>
             <div className="space-y-3">
               <Input placeholder="Title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
               <Textarea placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
@@ -232,23 +393,10 @@ export default function Events() {
               </div>
               <Button
                 className="w-full"
-                onClick={() =>
-                  createEvent.mutate({
-                    data: {
-                      title: form.title,
-                      description: form.description,
-                      startsAt: form.startsAt,
-                      location: form.location,
-                      city: form.city || undefined,
-                      imageUrl: form.imageUrl || undefined,
-                      lineupTags: form.lineupTags.split(",").map((tag) => tag.trim()).filter(Boolean),
-                      lineupArtistIds: selectedArtists.map((artist) => artist.userId),
-                    },
-                  })
-                }
-                disabled={createEvent.isPending || isUploadingImage || !form.title.trim() || !form.description.trim() || !form.startsAt || !form.location.trim()}
+                onClick={saveEvent}
+                disabled={createEvent.isPending || isSavingEvent || isUploadingImage || !form.title.trim() || !form.description.trim() || !form.startsAt || !form.location.trim()}
               >
-                Create Event
+                {editingEventId == null ? "Create Event" : "Save Changes"}
               </Button>
             </div>
           </DialogContent>
@@ -292,6 +440,53 @@ export default function Events() {
                     {event.host && <span>Hosted by {event.host.username}</span>}
                     <span className="inline-flex items-center gap-1"><Users className="h-3.5 w-3.5" /> {event.artists?.length || 0} linked artists</span>
                   </div>
+                  {user && event.hostUserId === user.id ? (
+                    <div className="flex flex-wrap gap-2 pt-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          openEditComposer(event);
+                        }}
+                      >
+                        <Pencil className="mr-2 h-3.5 w-3.5" />
+                        Edit
+                      </Button>
+                      <AlertDialog open={eventPendingDelete === event.id} onOpenChange={(open) => setEventPendingDelete(open ? event.id : null)}>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="destructive"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }}
+                          >
+                            <Trash2 className="mr-2 h-3.5 w-3.5" />
+                            Delete
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete event?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will permanently remove {event.title} and its lineup links.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => deleteEvent(event.id)} disabled={isDeletingEvent}>
+                              Delete Event
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  ) : null}
                 </CardContent>
               </Card>
             </Link>

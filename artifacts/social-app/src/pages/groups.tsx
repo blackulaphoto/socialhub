@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCreateGroup, useGetGroups } from "@workspace/api-client-react";
+import { useCreateGroup, useGetGroups, useJoinGroup, useLeaveGroup } from "@workspace/api-client-react";
 import { Eye, Lock, MapPin, Plus, Users } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,8 +15,10 @@ import { QueryErrorState } from "@/components/query-error-state";
 import { LocationInput } from "@/components/location-input";
 import { uploadImage } from "@/lib/upload-image";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Groups() {
+  const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
@@ -42,6 +44,32 @@ export default function Groups() {
       onSuccess: () => {
         setForm({ name: "", description: "", category: "", location: "", coverImageUrl: "", visibility: "public", tags: "" });
         queryClient.invalidateQueries({ queryKey: ["groups"] });
+      },
+    },
+  });
+
+  const joinGroup = useJoinGroup({
+    mutation: {
+      onSuccess: (_data, variables) => {
+        queryClient.invalidateQueries({ queryKey: ["groups"] });
+        queryClient.invalidateQueries({ queryKey: ["group", variables.groupId] });
+        toast({ title: "Joined group" });
+      },
+      onError: () => {
+        toast({ title: "Could not join group", variant: "destructive" });
+      },
+    },
+  });
+
+  const leaveGroup = useLeaveGroup({
+    mutation: {
+      onSuccess: (_data, variables) => {
+        queryClient.invalidateQueries({ queryKey: ["groups"] });
+        queryClient.invalidateQueries({ queryKey: ["group", variables.groupId] });
+        toast({ title: "Left group" });
+      },
+      onError: () => {
+        toast({ title: "Could not leave group", variant: "destructive" });
       },
     },
   });
@@ -162,6 +190,45 @@ export default function Groups() {
                   <div className="flex flex-wrap gap-2">
                     {group.category && <Badge variant="secondary">{group.category}</Badge>}
                     {group.tags?.slice(0, 4).map((tag) => <Badge key={tag} variant="outline">{tag}</Badge>)}
+                  </div>
+                  <div className="flex items-center justify-between gap-3 pt-2">
+                    <div className="text-xs text-muted-foreground">
+                      {group.postCount} post{group.postCount === 1 ? "" : "s"}
+                    </div>
+                    {user ? (
+                      group.ownerId === user.id ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                          }}
+                        >
+                          Owner
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={group.isMember ? "outline" : "default"}
+                          disabled={joinGroup.isPending || leaveGroup.isPending}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            if (group.isMember) {
+                              leaveGroup.mutate({ groupId: group.id });
+                            } else {
+                              joinGroup.mutate({ groupId: group.id });
+                            }
+                          }}
+                        >
+                          {group.isMember ? "Leave Group" : "Join Group"}
+                        </Button>
+                      )
+                    ) : null}
                   </div>
                 </CardContent>
               </Card>

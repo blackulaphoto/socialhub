@@ -6,6 +6,7 @@ import session from "express-session";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { getMediaStorageRoot } from "./lib/media-storage.js";
+import shareRouter from "./routes/share.js";
 
 const app: Express = express();
 const isProduction = process.env.NODE_ENV === "production";
@@ -125,6 +126,7 @@ app.use(
   }),
 );
 
+app.use(shareRouter);
 app.use("/api", router);
 
 export default app;

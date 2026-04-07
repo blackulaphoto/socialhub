@@ -15,7 +15,16 @@ async function loginAsAdmin(page: Page) {
 
 async function openCreatorBuilder(page: Page) {
   await page.waitForLoadState("networkidle");
-  await page.goto("/settings?tab=creator", { waitUntil: "networkidle" });
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await page.goto("/settings?tab=creator", { waitUntil: "networkidle" });
+    } catch {
+      // auth/bootstrap redirects can briefly interrupt this navigation on the first hop
+    }
+    if (/\/settings\?tab=creator/.test(page.url())) {
+      break;
+    }
+  }
   await page.waitForURL(/\/settings\?tab=creator/);
   await expect(page.getByText("Build the creator page directly.")).toBeVisible();
 }
@@ -107,9 +116,8 @@ test.describe("Creator media picker flow", () => {
     await page.getByRole("button", { name: /Select Playlist Videos/i }).click();
     await page.waitForURL(/\/settings\?tab=gallery&returnTo=creator&picker=video/);
 
-    await page.getByRole("combobox").first().click();
-    await page.getByRole("option", { name: "Video" }).click();
-    await page.getByPlaceholder("Media URL").fill("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+    await expect(page.getByText(/Media type: Video/i)).toBeVisible();
+    await page.getByPlaceholder("Video URL").fill("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
     await page.getByRole("button", { name: /Add Item/i }).click();
 
     await expect(page.getByText(/1 item selected/i)).toBeVisible();

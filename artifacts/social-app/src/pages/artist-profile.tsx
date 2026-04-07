@@ -123,6 +123,26 @@ const BACKGROUND_STYLE_CLASSES: Record<string, string> = {
   flat: "before:absolute before:inset-0 before:bg-black/5 before:pointer-events-none",
 };
 
+function upsertMetaTag(selector: string, attrs: Record<string, string>) {
+  if (typeof document === "undefined") return;
+  let tag = document.head.querySelector(selector) as HTMLMetaElement | null;
+  if (!tag) {
+    tag = document.createElement("meta");
+    document.head.appendChild(tag);
+  }
+  Object.entries(attrs).forEach(([key, value]) => tag!.setAttribute(key, value));
+}
+
+function upsertLinkTag(selector: string, attrs: Record<string, string>) {
+  if (typeof document === "undefined") return;
+  let tag = document.head.querySelector(selector) as HTMLLinkElement | null;
+  if (!tag) {
+    tag = document.createElement("link");
+    document.head.appendChild(tag);
+  }
+  Object.entries(attrs).forEach(([key, value]) => tag!.setAttribute(key, value));
+}
+
 const LIGHT_THEME_VARIANT_CLASSES: Record<string, string> = {
   studio: "",
   paper: "light:[&_section]:border-slate-300/60 light:[&_section]:bg-white/85",
@@ -223,6 +243,31 @@ export default function ArtistProfile({ id }: { id: string }) {
   });
 
   const isOwnArtistPage = currentUser?.id === userId;
+
+  useEffect(() => {
+    if (typeof document === "undefined" || !profile?.artistProfile) return;
+    const artist = profile.artistProfile;
+    const pageTitle = `${artist.displayName || artist.user.username} | ArtistHub`;
+    const pageDescription =
+      artist.tagline
+      || artist.bio
+      || [artist.category, artist.location].filter(Boolean).join(" · ")
+      || "Explore this creator page on ArtistHub.";
+    const pageUrl = window.location.href;
+    const pageImage = artist.bannerUrl || artist.avatarUrl || `${window.location.origin}/opengraph.png`;
+
+    document.title = pageTitle;
+    upsertMetaTag('meta[name="description"]', { name: "description", content: pageDescription });
+    upsertMetaTag('meta[property="og:type"]', { property: "og:type", content: "profile" });
+    upsertMetaTag('meta[property="og:title"]', { property: "og:title", content: pageTitle });
+    upsertMetaTag('meta[property="og:description"]', { property: "og:description", content: pageDescription });
+    upsertMetaTag('meta[property="og:url"]', { property: "og:url", content: pageUrl });
+    upsertMetaTag('meta[property="og:image"]', { property: "og:image", content: pageImage });
+    upsertMetaTag('meta[name="twitter:title"]', { name: "twitter:title", content: pageTitle });
+    upsertMetaTag('meta[name="twitter:description"]', { name: "twitter:description", content: pageDescription });
+    upsertMetaTag('meta[name="twitter:image"]', { name: "twitter:image", content: pageImage });
+    upsertLinkTag('link[rel="canonical"]', { rel: "canonical", href: pageUrl });
+  }, [profile, userId]);
 
   useEffect(() => {
     if (isOwnArtistPage) {
@@ -523,10 +568,12 @@ export default function ArtistProfile({ id }: { id: string }) {
   };
 
   const handleShare = async () => {
-    const url = typeof window !== "undefined" ? window.location.href : `/artists/${userId}`;
+    const url = typeof window !== "undefined"
+      ? `${window.location.origin}/artists/${userId}/share`
+      : `/artists/${userId}/share`;
     try {
       if (typeof navigator !== "undefined" && navigator.share) {
-        await navigator.share({ title: profile.user.username, url });
+        await navigator.share({ title: artistPageName, url });
       } else if (typeof navigator !== "undefined" && navigator.clipboard) {
         await navigator.clipboard.writeText(url);
       }

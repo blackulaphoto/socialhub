@@ -1375,6 +1375,27 @@ export default function Settings() {
       ? "video"
       : "image";
 
+  const pickerDestinationLabel = creatorPickerTarget === "hero-slider"
+    ? "Hero Slider"
+    : creatorPickerTarget === "hero"
+      ? "Hero Section"
+      : creatorPickerTarget === "gallery"
+        ? "Media Gallery"
+        : creatorPickerTarget === "video"
+          ? "Video Playlist"
+          : null;
+
+  useEffect(() => {
+    if (!creatorPickerTarget) return;
+    if (showcasePickerType === "video") {
+      setShowcaseCategory("videos");
+      setGallery((current) => ({ ...current, type: GalleryItemRequestType.video }));
+    } else {
+      setShowcaseCategory("photos");
+      setGallery((current) => ({ ...current, type: GalleryItemRequestType.image }));
+    }
+  }, [creatorPickerTarget, showcasePickerType]);
+
   const pickerSelectedIds = creatorPickerTarget === "hero-slider"
     ? currentBuilderMeta.heroSliderItemIds || []
     : creatorPickerTarget === "gallery"
@@ -3564,7 +3585,7 @@ export default function Settings() {
             {creatorPickerTarget && (() => {
               const pickerType = creatorPickerTarget === "video" ? "video" : "image";
               const pickerLabel = pickerType === "video" ? "Videos" : "Images";
-              const destinationLabel = creatorPickerTarget === "hero-slider" ? "Hero Slider" : creatorPickerTarget === "hero" ? "Hero Section" : creatorPickerTarget === "gallery" ? "Media Gallery" : "Video Playlist";
+              const destinationLabel = pickerDestinationLabel || "Page Section";
 
               return (
                 <div className="sticky top-0 z-10 mb-6 rounded-2xl border border-primary/30 bg-primary/10 p-4 shadow-lg backdrop-blur-sm">
@@ -3579,6 +3600,16 @@ export default function Settings() {
                       <div className="text-sm text-muted-foreground">
                         {pickerSelectedIds.length} item{pickerSelectedIds.length === 1 ? "" : "s"} selected
                       </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant={showcasePickerType === "image" ? "default" : "secondary"} className="gap-2 px-3 py-1 text-xs uppercase tracking-[0.18em]">
+                        <ImageIcon className="h-3.5 w-3.5" />
+                        Photos only
+                      </Badge>
+                      <Badge variant={showcasePickerType === "video" ? "default" : "secondary"} className="gap-2 px-3 py-1 text-xs uppercase tracking-[0.18em]">
+                        <Video className="h-3.5 w-3.5" />
+                        Videos only
+                      </Badge>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <Button type="button" onClick={applyShowcaseSelection} disabled={pickerSelectedIds.length === 0}>
@@ -3596,20 +3627,39 @@ export default function Settings() {
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               <Card className="border-border/50 bg-card/50">
                 <CardHeader>
-                  <CardTitle>Creator Showcase</CardTitle>
-                  <CardDescription>This is separate from your personal photo gallery. Use it for portfolio media, videos, tracks, and polished showcase items on your creator page.</CardDescription>
+                  <CardTitle>{creatorPickerTarget ? `Add ${showcasePickerType === "video" ? "Videos" : "Images"} to ${pickerDestinationLabel}` : "Creator Showcase"}</CardTitle>
+                  <CardDescription>
+                    {creatorPickerTarget
+                      ? `You are in picker mode for ${pickerDestinationLabel}. Select existing ${showcasePickerType === "video" ? "videos" : "images"} or upload new ones and they will be assigned to that section.`
+                      : "This is separate from your personal photo gallery. Use it for portfolio media, videos, tracks, and polished showcase items on your creator page."}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <Select value={gallery.type} onValueChange={(value) => setGallery({ ...gallery, type: value as GalleryItemRequestType })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={GalleryItemRequestType.image}>Image</SelectItem>
-                      <SelectItem value={GalleryItemRequestType.video}>Video</SelectItem>
-                      <SelectItem value={GalleryItemRequestType.audio}>Audio</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  {creatorPickerTarget ? (
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="outline" className="px-3 py-1 text-xs uppercase tracking-[0.18em]">
+                        Destination: {pickerDestinationLabel}
+                      </Badge>
+                      <Badge variant="outline" className="px-3 py-1 text-xs uppercase tracking-[0.18em]">
+                        Media type: {showcasePickerType === "video" ? "Video" : "Image"}
+                      </Badge>
+                    </div>
+                  ) : (
+                    <Select value={gallery.type} onValueChange={(value) => setGallery({ ...gallery, type: value as GalleryItemRequestType })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={GalleryItemRequestType.image}>Image</SelectItem>
+                        <SelectItem value={GalleryItemRequestType.video}>Video</SelectItem>
+                        <SelectItem value={GalleryItemRequestType.audio}>Audio</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
                   <div className="space-y-2">
-                    <Input placeholder="Media URL" value={gallery.url} onChange={(e) => setGallery({ ...gallery, url: e.target.value })} />
+                    <Input
+                      placeholder={showcasePickerType === "video" || gallery.type === GalleryItemRequestType.video ? "Video URL" : gallery.type === GalleryItemRequestType.audio ? "Audio URL" : "Image URL"}
+                      value={gallery.url}
+                      onChange={(e) => setGallery({ ...gallery, url: e.target.value })}
+                    />
                     {(gallery.type === GalleryItemRequestType.image || gallery.type === GalleryItemRequestType.video) && (
                       <>
                         <Input
@@ -3697,8 +3747,13 @@ export default function Settings() {
 
                   return (
                     <div className="flex items-center justify-between rounded-2xl border border-border/50 bg-background/40 p-3">
-                      <div className="text-sm text-muted-foreground">
-                        {allMatchingIds.length} {showcasePickerType === "image" ? "photo" : showcasePickerType === "video" ? "video" : "audio"}{allMatchingIds.length === 1 ? "" : "s"} available
+                      <div className="space-y-1">
+                        <div className="text-sm font-medium">
+                          {showcasePickerType === "image" ? "Image picker" : showcasePickerType === "video" ? "Video picker" : "Audio picker"}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {allMatchingIds.length} {showcasePickerType === "image" ? "photo" : showcasePickerType === "video" ? "video" : "audio"}{allMatchingIds.length === 1 ? "" : "s"} available for {pickerDestinationLabel}
+                        </div>
                       </div>
                       <div className="flex gap-2">
                         <Button
