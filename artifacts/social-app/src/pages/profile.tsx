@@ -38,6 +38,7 @@ import { BlockActionButton } from "@/components/block-action-button";
 import { LoadMoreSentinel } from "@/components/load-more-sentinel";
 import { useActiveIdentity } from "@/hooks/useActiveIdentity";
 import { groupItemsByFolder, readMediaFolderState } from "@/lib/media-folders";
+import { MosaicLightboxGallery } from "@/components/mosaic-lightbox-gallery";
 import { cn } from "@/lib/utils";
 
 function formatPlace(parts: Array<string | null | undefined>) {
@@ -73,7 +74,6 @@ export default function Profile({ id }: { id: string }) {
   const { setActiveIdentity } = useActiveIdentity();
   const queryClient = useQueryClient();
   const isOwnProfile = currentUser?.id === userId;
-  const [activePhotoIndex, setActivePhotoIndex] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<"posts" | "photos" | "about">("posts");
 
   const {
@@ -425,37 +425,18 @@ export default function Profile({ id }: { id: string }) {
                 </CardHeader>
                 <CardContent>
                   {photoGalleryItems.length ? (
-                    <div className="space-y-5">
-                      {groupedPhotoGalleryItems.map((group) => (
-                        <div key={group.folder} className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <div className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">{group.folder}</div>
-                            <div className="text-xs text-muted-foreground">{group.items.length} item{group.items.length === 1 ? "" : "s"}</div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                            {group.items.map((photo) => {
-                              const index = photoGalleryItems.findIndex((item) => item.url === photo.url);
-                              return (
-                                <button
-                                  key={photo.url}
-                                  type="button"
-                                  onClick={() => setActivePhotoIndex(index)}
-                                  className="group overflow-hidden rounded-2xl bg-background/40 text-left shadow-sm transition-transform hover:scale-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-                                >
-                                  <img
-                                    src={photo.url}
-                                    alt={photo.caption || `${user.username} photo`}
-                                    loading="lazy"
-                                    decoding="async"
-                                    className="aspect-square w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
-                                  />
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <MosaicLightboxGallery
+                      groups={groupedPhotoGalleryItems.map((group) => ({
+                        label: group.folder,
+                        items: group.items.map((photo) => ({
+                          id: photo.url,
+                          imageUrl: photo.url,
+                          title: photo.caption || `${user.username} photo`,
+                          caption: photo.caption || null,
+                          meta: photo.createdAt ? new Date(photo.createdAt).toLocaleDateString() : null,
+                        })),
+                      }))}
+                    />
                   ) : (
                     <div className="rounded-xl border border-dashed border-border/50 bg-card/20 py-12 text-center text-muted-foreground">
                       No photos yet.
@@ -605,42 +586,6 @@ export default function Profile({ id }: { id: string }) {
         </aside>
       </div>
 
-      {activePhotoIndex !== null && photoGalleryItems[activePhotoIndex] ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm"
-          onClick={() => setActivePhotoIndex(null)}
-        >
-          <button
-            type="button"
-            className="absolute right-4 top-4 rounded-full border border-white/20 bg-black/40 p-2 text-white"
-            onClick={() => setActivePhotoIndex(null)}
-          >
-            <X className="h-5 w-5" />
-          </button>
-          <div
-            className="max-h-[90vh] max-w-5xl overflow-hidden rounded-3xl bg-black/20"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <img
-              src={photoGalleryItems[activePhotoIndex].url}
-              alt={photoGalleryItems[activePhotoIndex].caption || `${user.username} photo`}
-              className="max-h-[80vh] w-full object-contain"
-            />
-            {(photoGalleryItems[activePhotoIndex].caption || photoGalleryItems[activePhotoIndex].createdAt) ? (
-              <div className="space-y-2 bg-black/65 px-5 py-4 text-white">
-                {photoGalleryItems[activePhotoIndex].caption ? (
-                  <div className="text-sm">{photoGalleryItems[activePhotoIndex].caption}</div>
-                ) : null}
-                {photoGalleryItems[activePhotoIndex].createdAt ? (
-                  <div className="text-xs text-white/70">
-                    {new Date(photoGalleryItems[activePhotoIndex].createdAt as string).toLocaleDateString()}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

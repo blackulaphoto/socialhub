@@ -372,10 +372,20 @@ export function FeedPostCard({
     hour: "numeric",
     minute: "2-digit",
   });
+  const originalAuthorDisplayName = post.originalPost?.actorSurface === "artist"
+    ? (post.originalPost.author?.artistDisplayName || post.originalPost.author?.username || "Unknown")
+    : (post.originalPost?.author?.username || "Unknown");
+  const originalAuthorAvatar = post.originalPost?.actorSurface === "artist"
+    ? (post.originalPost.author?.artistAvatarUrl || post.originalPost.author?.avatarUrl || "")
+    : (post.originalPost?.author?.avatarUrl || "");
+  const originalAuthorHref = post.originalPost?.actorSurface === "artist"
+    ? `/artists/${post.originalPost.author?.id ?? post.originalPost.userId}`
+    : `/profile/${post.originalPost?.author?.id ?? post.originalPost?.userId ?? post.userId}`;
+  const showHeaderIdentity = Boolean(post.author);
 
   return (
     <Card id={`post-${post.id}`} data-testid={`post-card-${post.id}`} className="overflow-hidden border-border/50 bg-card/60">
-      {showAuthor && post.author && (
+      {showHeaderIdentity ? (
         <CardHeader className="flex flex-row items-start gap-3 space-y-0 pb-3">
           <Link href={authorHref}>
             <Avatar className="h-10 w-10 cursor-pointer">
@@ -429,37 +439,6 @@ export function FeedPostCard({
             </div>
           </div>
         </CardHeader>
-      )}
-      {!showAuthor && canDelete ? (
-        <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 pb-3">
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            {post.actorSurface === "artist" ? (
-              <span className="inline-flex items-center rounded-full border border-border/60 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-foreground/70">
-                {surfaceLabel}
-              </span>
-            ) : null}
-            <span className="inline-flex items-center">
-              <VisibilityIcon className="mr-1 h-3 w-3" />
-              {visibilityLabel}
-            </span>
-            {post.updatedAt && new Date(post.updatedAt).getTime() - new Date(post.createdAt).getTime() > 60_000 ? (
-              <span>edited</span>
-            ) : null}
-          </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" disabled={isDeleting}>
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {canEdit ? <DropdownMenuItem onClick={() => setIsEditOpen(true)}>Edit post</DropdownMenuItem> : null}
-              <DropdownMenuItem onClick={handleDelete} className="text-destructive focus:text-destructive">
-                <Trash2 className="mr-2 h-4 w-4" /> Delete post
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </CardHeader>
       ) : null}
       <CardContent className="space-y-4">
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
@@ -497,10 +476,21 @@ export function FeedPostCard({
         </Dialog>
         {post.repostOfPostId && post.originalPost ? (
           <div className="rounded-2xl border border-dashed border-primary/35 bg-background/35 p-4 text-sm">
-            <div className="mb-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">
-              Reposted from {post.originalPost.actorSurface === "artist"
-                ? (post.originalPost.author?.artistDisplayName || post.originalPost.author?.username)
-                : post.originalPost.author?.username}
+            <div className="mb-3 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+              Reposted from
+            </div>
+            <div className="mb-3 flex items-center gap-3">
+              <Link href={originalAuthorHref}>
+                <Avatar className="h-9 w-9 cursor-pointer">
+                  <AvatarImage src={originalAuthorAvatar} />
+                  <AvatarFallback>{originalAuthorDisplayName.slice(0, 2).toUpperCase()}</AvatarFallback>
+                </Avatar>
+              </Link>
+              <div className="min-w-0">
+                <Link href={originalAuthorHref} className="block truncate font-semibold hover:text-primary">
+                  {originalAuthorDisplayName}
+                </Link>
+              </div>
             </div>
             <div className="whitespace-pre-wrap text-muted-foreground">{post.originalPost.content}</div>
           </div>

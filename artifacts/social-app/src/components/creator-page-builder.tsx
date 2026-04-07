@@ -397,7 +397,7 @@ export function CreatorPageBuilder({
           <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
             <div className="text-sm font-semibold">Creation description block</div>
             <div className="mt-1 text-sm text-muted-foreground">
-              This block sits beside the hero media. Use it for what the creator makes, short business context, and direct contact paths.
+              This block sits beside the hero media. Use it for what the creator makes, short business context, and the key details shown in the top creator info card.
             </div>
           </div>
           <div className="space-y-2">
@@ -423,6 +423,42 @@ export function CreatorPageBuilder({
               placeholder="+1 (555) 555-5555"
               onChange={(event) => updateBuilderMeta({ ...builderMeta, heroInfoPhone: event.target.value })}
             />
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Booking email</Label>
+              <Input
+                value={artist.bookingEmail || ""}
+                placeholder="bookings@example.com"
+                onChange={(event) => setArtist((current) => ({ ...current, bookingEmail: event.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Availability</Label>
+              <Input
+                value={artist.availabilityStatus || ""}
+                placeholder="Available now / booking summer 2026"
+                onChange={(event) => setArtist((current) => ({ ...current, availabilityStatus: event.target.value }))}
+              />
+            </div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Pricing summary</Label>
+              <Input
+                value={creator.pricingSummary || ""}
+                placeholder="From $500"
+                onChange={(event) => setCreator((current) => ({ ...current, pricingSummary: event.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Turnaround</Label>
+              <Input
+                value={creator.turnaroundInfo || ""}
+                placeholder="2-3 weeks"
+                onChange={(event) => setCreator((current) => ({ ...current, turnaroundInfo: event.target.value }))}
+              />
+            </div>
           </div>
           <div className="space-y-3">
             <Label>Links</Label>
@@ -492,16 +528,6 @@ export function CreatorPageBuilder({
             <Label>Influences</Label>
             <Textarea value={artist.influences || ""} placeholder="References, inspirations, scene, or process." onChange={(event) => setArtist((current) => ({ ...current, influences: event.target.value }))} />
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Availability</Label>
-              <Input value={artist.availabilityStatus || ""} onChange={(event) => setArtist((current) => ({ ...current, availabilityStatus: event.target.value }))} />
-            </div>
-            <div className="space-y-2">
-              <Label>Booking email</Label>
-              <Input value={artist.bookingEmail || ""} onChange={(event) => setArtist((current) => ({ ...current, bookingEmail: event.target.value }))} />
-            </div>
-          </div>
         </div>
       );
     }
@@ -561,16 +587,6 @@ export function CreatorPageBuilder({
           <div className="space-y-2">
             <Label>Action URL</Label>
             <Input value={creator.primaryActionUrl || ""} placeholder="Optional booking, store, or contact link" onChange={(event) => setCreator((current) => ({ ...current, primaryActionUrl: event.target.value }))} />
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Pricing summary</Label>
-              <Input value={creator.pricingSummary || ""} onChange={(event) => setCreator((current) => ({ ...current, pricingSummary: event.target.value }))} />
-            </div>
-            <div className="space-y-2">
-              <Label>Turnaround</Label>
-              <Input value={creator.turnaroundInfo || ""} onChange={(event) => setCreator((current) => ({ ...current, turnaroundInfo: event.target.value }))} />
-            </div>
           </div>
         </div>
       );

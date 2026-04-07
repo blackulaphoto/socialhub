@@ -77,6 +77,7 @@ import { uploadImage } from "@/lib/upload-image";
 import { getEmbedDescriptor } from "@/lib/embeds";
 import { groupItemsByFolder, readMediaFolderState } from "@/lib/media-folders";
 import { LoadMoreSentinel } from "@/components/load-more-sentinel";
+import { MosaicLightboxGallery } from "@/components/mosaic-lightbox-gallery";
 import { useTheme } from "next-themes";
 
 const ACTION_HELPERS: Record<string, { title: string; fields: string[]; hint: string }> = {
@@ -170,12 +171,13 @@ export default function ArtistProfile({ id }: { id: string }) {
   const { theme } = useTheme();
   const userId = Number(id);
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [open, setOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [isUploadingArtistImage, setIsUploadingArtistImage] = useState(false);
+  const [mobileTabOverride, setMobileTabOverride] = useState<"posts" | "gallery" | "about" | "events" | "contact" | null>(null);
   const [artistPostForm, setArtistPostForm] = useState({
     content: "",
     imageUrl: "",
@@ -227,16 +229,6 @@ export default function ArtistProfile({ id }: { id: string }) {
       setActiveIdentity("artist");
     }
   }, [isOwnArtistPage, setActiveIdentity]);
-
-  useEffect(() => {
-    const rawSearch = typeof window !== "undefined" ? window.location.search : "";
-    const view = new URLSearchParams(rawSearch).get("view");
-    if (view === "gallery" && typeof document !== "undefined") {
-      window.setTimeout(() => {
-        document.getElementById("creator-gallery")?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 50);
-    }
-  }, []);
 
   const follow = useFollowUser();
   const unfollow = useUnfollowUser();
@@ -466,6 +458,11 @@ export default function ArtistProfile({ id }: { id: string }) {
     : [];
   const groupedAssignedGalleryImages = groupItemsByFolder(
     assignedGalleryImages,
+    (item) => String(item.id),
+    showcaseFolderState.assignments,
+  );
+  const groupedCreatorGalleryImages = groupItemsByFolder(
+    imageGallery,
     (item) => String(item.id),
     showcaseFolderState.assignments,
   );
@@ -1134,15 +1131,78 @@ export default function ArtistProfile({ id }: { id: string }) {
   };
 
   const visibleSections = builderMeta.sections.filter((section) => section.visible && sections[section.key]).map((section) => section.key);
+  const mobileTabSectionMap = {
+    posts: ["featured", "posts"],
+    gallery: ["gallery", "video", "audio", "links"],
+    about: ["about"],
+    events: ["events"],
+    contact: ["contact"],
+  } as const;
+  type MobileHeaderTabKey = keyof typeof mobileTabSectionMap;
+  const mobileHeaderTabsSource: Array<{ key: MobileHeaderTabKey; label: string }> = [
+    { key: "posts", label: "Posts" },
+    { key: "gallery", label: "Gallery" },
+    { key: "about", label: "About" },
+    { key: "events", label: "Events" },
+    { key: "contact", label: "Contact" },
+  ];
+  const mobileHeaderTabs = mobileHeaderTabsSource.filter((item) =>
+    mobileTabSectionMap[item.key].some((sectionKey) => visibleSections.includes(sectionKey)),
+  );
+
+  const renderCreatorGalleryTab = () => (
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <ImageIcon className="h-5 w-5 text-primary" />
+          <h2 className="text-2xl font-bold tracking-tight">Creator Gallery</h2>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          All creator images in one full gallery. This is separate from the page-layout image gallery block.
+        </p>
+      </div>
+      <MosaicLightboxGallery
+        groups={groupedCreatorGalleryImages.map((group) => ({
+          label: group.folder,
+          items: group.items.map((item) => ({
+            id: String(item.id),
+            imageUrl: item.url,
+            title: item.caption || artistPageName,
+            caption: item.caption || null,
+            meta: item.createdAt ? new Date(item.createdAt).toLocaleDateString() : null,
+          })),
+        }))}
+        emptyMessage="No creator gallery images yet."
+      />
+    </div>
+  );
+  const requestedMobileView = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search).get("view")
+    : null;
+  const requestedMobileTab: MobileHeaderTabKey | null = requestedMobileView === "gallery" ? "gallery" : null;
+  const firstVisibleMobileTab: MobileHeaderTabKey = mobileHeaderTabs[0]?.key || "posts";
+  const activeMobileTab: MobileHeaderTabKey = mobileTabOverride && mobileHeaderTabs.some((tab) => tab.key === mobileTabOverride)
+    ? mobileTabOverride
+    : requestedMobileTab && mobileHeaderTabs.some((tab) => tab.key === requestedMobileTab)
+      ? requestedMobileTab
+      : firstVisibleMobileTab;
+  const mobileHeroOwnerTab: MobileHeaderTabKey = mobileHeaderTabs.some((tab) => tab.key === "gallery")
+    ? "gallery"
+    : mobileHeaderTabs.some((tab) => tab.key === "about")
+      ? "about"
+      : (mobileHeaderTabs[0]?.key || "posts");
 
   const renderSectionBlock = (key: string) => {
     const { wrapperClassName, contentClassName } = getSectionPresentation(key);
     return (
-      <div key={key} className={wrapperClassName}>
+      <div key={key} id={`artist-section-${key}`} className={wrapperClassName}>
         <div className={contentClassName}>{sections[key]}</div>
       </div>
     );
   };
+
+  const mobileVisibleSections = (mobileTabSectionMap[activeMobileTab] || []).filter((key) => visibleSections.includes(key));
+  const showHeroRowInActiveMobileTab = activeMobileTab === mobileHeroOwnerTab;
 
   return (
     <div className={cn("w-full pb-20", fontClass)}>
@@ -1163,21 +1223,53 @@ export default function ArtistProfile({ id }: { id: string }) {
               <div className="flex flex-col gap-8">
                 <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
                   <div className="max-w-5xl">
-                    <div className="mb-5 flex flex-wrap gap-2" />
                     <div>
                       <div className="grid gap-5 md:grid-cols-[auto_1fr] md:items-end">
-                        <Avatar className="h-24 w-24 border-4 border-background/80 shadow-2xl md:h-32 md:w-32">
+                        <Avatar className="h-28 w-28 border-4 border-background/80 shadow-2xl md:h-36 md:w-36">
                           <AvatarImage src={artistPageAvatar || ""} />
                           <AvatarFallback>{artistPageName.slice(0, 2).toUpperCase()}</AvatarFallback>
                         </Avatar>
                         <div>
+                          <div className="mb-4 flex flex-wrap items-center gap-2">
+                            <Badge variant="outline" className="border-white/20 bg-black/30 capitalize text-white/90">{profile.user.profileType}</Badge>
+                            {artist.category ? (
+                              <Badge variant="secondary" className="bg-white/12 text-white">
+                                {artist.category}
+                              </Badge>
+                            ) : null}
+                            <Badge className="bg-primary text-primary-foreground">
+                              {actionLabel}
+                            </Badge>
+                          </div>
                           <h1 className={cn("text-4xl font-bold leading-none tracking-tight md:text-6xl", headingClass)}>{artistPageName}</h1>
                           <p className={cn("mt-5 max-w-3xl text-lg font-medium leading-8 text-foreground/95 md:text-[1.35rem]", layoutTemplate === "editorial" && "max-w-2xl text-xl", layoutTemplate === "music" && "text-xl")}>{heroTagline}</p>
+                          {artist.location ? (
+                            <div className="mt-4 flex flex-wrap items-center gap-3 text-sm font-medium text-foreground/80">
+                              <span className="inline-flex items-center">
+                                <Pin className="mr-1.5 h-4 w-4" /> {artist.location}
+                              </span>
+                            </div>
+                          ) : null}
+                          {artist.bio ? (
+                            <p className="mt-5 max-w-3xl whitespace-pre-wrap text-sm leading-7 text-foreground/78 md:text-base">
+                              {artist.bio}
+                            </p>
+                          ) : null}
                           <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm font-medium text-foreground/78">
+                            <span>{artistPosts.length} posts</span>
                             <span>{profile.user.followerCount} followers</span>
                             <span>{profile.user.followingCount} following</span>
                             <span>{upcomingEvents.length} upcoming events</span>
                           </div>
+                          {heroTags.length ? (
+                            <div className="mt-5 flex flex-wrap gap-2">
+                              {heroTags.slice(0, 4).map((tag) => (
+                                <Badge key={tag} variant="secondary" className="bg-white/10 text-white">
+                                  {tag}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                     </div>
@@ -1381,8 +1473,73 @@ export default function ArtistProfile({ id }: { id: string }) {
 
       <div className="mx-auto mt-10 max-w-7xl px-4 md:mt-12">
         <div className="space-y-8 md:space-y-10">
-          {renderHeroRow()}
-          {visibleSections.map((key) => renderSectionBlock(key))}
+          <div id="artist-section-overview" className="hidden md:block">
+            {renderHeroRow()}
+          </div>
+          <div className="space-y-4 md:hidden">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-border/50 bg-background/35 p-4">
+                <div className="text-xs text-muted-foreground">Posts</div>
+                <div className="mt-1 text-3xl font-bold">{artistPosts.length}</div>
+              </div>
+              <div className="rounded-2xl border border-border/50 bg-background/35 p-4">
+                <div className="text-xs text-muted-foreground">Followers</div>
+                <div className="mt-1 text-3xl font-bold">{profile.user.followerCount}</div>
+              </div>
+              <div className="rounded-2xl border border-border/50 bg-background/35 p-4">
+                <div className="text-xs text-muted-foreground">Following</div>
+                <div className="mt-1 text-3xl font-bold">{profile.user.followingCount}</div>
+              </div>
+              <div className="rounded-2xl border border-border/50 bg-background/35 p-4">
+                <div className="text-xs text-muted-foreground">Events</div>
+                <div className="mt-1 text-3xl font-bold">{upcomingEvents.length}</div>
+              </div>
+            </div>
+            {mobileHeaderTabs.length ? (
+              <div className="overflow-x-auto border-b border-border/50">
+                <div className="flex min-w-max items-center gap-1">
+                  {mobileHeaderTabs.map((tab) => (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      onClick={() => setMobileTabOverride(tab.key)}
+                      className={cn(
+                        "border-b-2 px-4 py-3 text-sm font-medium transition-colors",
+                        activeMobileTab === tab.key
+                          ? "border-primary text-foreground"
+                          : "border-transparent text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+          <div className="space-y-8 md:hidden">
+            {showHeroRowInActiveMobileTab ? (
+              <div className="space-y-5">
+                <div className="space-y-2 px-1">
+                  <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
+                    {activeMobileTab === "gallery" ? "Gallery overview" : "Creator overview"}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {activeMobileTab === "gallery"
+                      ? "Hero media and creator details live inside this tab on mobile."
+                      : "Core creator details for this page."}
+                  </div>
+                </div>
+                {renderHeroRow()}
+              </div>
+            ) : null}
+            {activeMobileTab === "gallery"
+              ? renderCreatorGalleryTab()
+              : mobileVisibleSections.map((key) => renderSectionBlock(key))}
+          </div>
+          <div className="hidden space-y-8 md:space-y-10 md:block">
+            {visibleSections.map((key) => renderSectionBlock(key))}
+          </div>
         </div>
       </div>
     </div>
