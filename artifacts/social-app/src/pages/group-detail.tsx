@@ -99,16 +99,17 @@ export default function GroupDetail({ id }: { id: string }) {
     }
   };
 
+  const groupPosts = useMemo(
+    () => groupPostsData?.pages.flatMap((page) => page.posts) || data?.posts || [],
+    [data?.posts, groupPostsData],
+  );
+
   if (isLoading) return <div className="flex justify-center py-20"><Spinner size="lg" /></div>;
   if (isError) return <div className="mx-auto w-full max-w-5xl p-4 md:py-8"><QueryErrorState title="Could not load group" description="The group detail request failed. Check the API and retry." onRetry={() => refetch()} /></div>;
   if (!data) return <div className="p-8">Group not found.</div>;
 
   const isOwner = data.group.ownerId === user?.id;
   const canPost = Boolean(data.group.isMember || isOwner);
-  const groupPosts = useMemo(
-    () => groupPostsData?.pages.flatMap((page) => page.posts) || data.posts || [],
-    [data.posts, groupPostsData],
-  );
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-8 p-4 md:py-8">
