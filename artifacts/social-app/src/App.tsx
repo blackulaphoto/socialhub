@@ -26,6 +26,7 @@ import Events from "@/pages/events";
 import EventDetail from "@/pages/event-detail";
 import Notifications from "@/pages/notifications";
 import Onboarding from "@/pages/onboarding";
+import PendingWallPosts from "@/pages/pending-wall-posts";
 import { ActiveIdentityProvider } from "@/hooks/useActiveIdentity";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 
@@ -133,6 +134,9 @@ function Router() {
       </Route>
       <Route path="/notifications">
         <AppLayout><Notifications /></AppLayout>
+      </Route>
+      <Route path="/pending-wall-posts">
+        <AppLayout><PendingWallPosts /></AppLayout>
       </Route>
       <Route path="/settings">
         <AppLayout><Settings /></AppLayout>

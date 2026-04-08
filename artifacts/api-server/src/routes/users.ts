@@ -592,6 +592,142 @@ router.get("/:userId/posts", async (req, res) => {
   });
 });
 
+router.post("/:userId/wall-posts", requireAuth, async (req, res) => {
+  const targetUserId = Number(req.params.userId);
+  if (Number.isNaN(targetUserId)) {
+    res.status(400).json({ error: "Invalid user ID" });
+    return;
+  }
+
+  const { content, imageUrl, media } = req.body;
+  const normalizedContent = typeof content === "string" ? content.trim() : "";
+  const hasMedia = Boolean(
+    (typeof imageUrl === "string" && imageUrl.trim()) ||
+    (Array.isArray(media) && media.length > 0),
+  );
+
+  if (!normalizedContent && !hasMedia) {
+    res.status(400).json({ error: "Content or media is required" });
+    return;
+  }
+
+  const blockState = await getBlockState(req.session.userId, targetUserId);
+  if (blockState.isBlockedEitherWay) {
+    res.status(403).json({ error: "Cannot post on this user's wall" });
+    return;
+  }
+
+  const [targetUser] = await db.select().from(usersTable).where(eq(usersTable.id, targetUserId)).limit(1);
+  if (!targetUser) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  const [post] = await db.insert(postsTable).values({
+    userId: req.session.userId!,
+    actorSurface: "personal",
+    content: normalizedContent,
+    imageUrl: imageUrl || media?.[0]?.url || null,
+    visibility: "public",
+    wallPostStatus: "pending",
+    wallPostTargetUserId: targetUserId,
+  }).returning();
+
+  if (Array.isArray(media) && media.length > 0) {
+    await db.insert(postMediaTable).values(
+      media.map((item: { type: string; url: string; title?: string; thumbnailUrl?: string }) => ({
+        postId: post.id,
+        type: item.type,
+        url: item.url,
+        title: item.title || null,
+        thumbnailUrl: item.thumbnailUrl || null,
+      })),
+    );
+  }
+
+  await createNotification({
+    userId: targetUserId,
+    actorUserId: req.session.userId!,
+    type: "wall_post",
+    title: "New wall post pending approval",
+    body: `Someone posted on your wall.`,
+    href: `/pending-wall-posts`,
+    entityType: "post",
+    entityId: post.id,
+  });
+
+  res.status(201).json(await enrichPost(post, req.session.userId));
+});
+
+router.get("/:userId/wall-posts/pending", requireAuth, async (req, res) => {
+  const userId = Number(req.params.userId);
+  if (Number.isNaN(userId) || userId !== req.session.userId) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const pendingPosts = await db.select()
+    .from(postsTable)
+    .where(
+      and(
+        eq(postsTable.wallPostTargetUserId, userId),
+        eq(postsTable.wallPostStatus, "pending")
+      )
+    )
+    .orderBy(desc(postsTable.createdAt));
+
+  const enrichedPosts = await Promise.all(
+    pendingPosts.map((post) => enrichPost(post, req.session.userId))
+  );
+
+  res.json(enrichedPosts);
+});
+
+router.get("/:userId/artist-posts", async (req, res) => {
+  const userId = Number(req.params.userId);
+  if (Number.isNaN(userId)) {
+    res.status(400).json({ error: "Invalid ID" });
+    return;
+  }
+
+  const cursor = req.query.cursor ? Number(req.query.cursor) : undefined;
+  const limit = Math.min(Math.max(Number(req.query.limit) || 12, 1), 30);
+
+  const conditions = or(
+    eq(postsTable.userId, userId),
+    and(
+      eq(postsTable.wallPostTargetUserId, userId),
+      eq(postsTable.wallPostStatus, "approved")
+    )
+  );
+
+  let query = db.select()
+    .from(postsTable)
+    .where(conditions)
+    .orderBy(desc(postsTable.createdAt))
+    .limit(limit + 1);
+
+  if (cursor) {
+    query = query.where(and(conditions, sql`${postsTable.id} < ${cursor}`));
+  }
+
+  const posts = await query;
+  const hasMore = posts.length > limit;
+  const returnPosts = hasMore ? posts.slice(0, limit) : posts;
+
+  const enrichedPosts = await Promise.all(
+    returnPosts.map((post) => enrichPost(post, req.session.userId))
+  );
+
+  res.json({
+    posts: enrichedPosts,
+    total: enrichedPosts.length,
+    limit,
+    nextCursor: hasMore ? returnPosts[returnPosts.length - 1].id : null,
+    hasMore,
+  });
+});
+
 router.get("/:userId/photos", async (req, res) => {
   const userId = Number(req.params.userId);
   if (Number.isNaN(userId)) {

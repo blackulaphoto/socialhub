@@ -484,6 +484,65 @@ router.post("/posts/:postId/repost", requireAuth, async (req, res) => {
   res.status(201).json(await enrichPost(repost, req.session.userId));
 });
 
+router.patch("/wall-posts/:postId/moderate", requireAuth, async (req, res) => {
+  const postId = Number(req.params.postId);
+  const action = req.body?.action;
+
+  if (Number.isNaN(postId)) {
+    res.status(400).json({ error: "Invalid post ID" });
+    return;
+  }
+
+  if (action !== "approve" && action !== "deny") {
+    res.status(400).json({ error: "Action must be 'approve' or 'deny'" });
+    return;
+  }
+
+  const [post] = await db.select().from(postsTable).where(eq(postsTable.id, postId)).limit(1);
+  if (!post) {
+    res.status(404).json({ error: "Post not found" });
+    return;
+  }
+
+  if (post.wallPostTargetUserId !== req.session.userId) {
+    res.status(403).json({ error: "Only the target user can moderate this wall post" });
+    return;
+  }
+
+  if (post.wallPostStatus !== "pending") {
+    res.status(400).json({ error: "Post is not pending moderation" });
+    return;
+  }
+
+  const newStatus = action === "approve" ? "approved" : "denied";
+  const [updatedPost] = await db.update(postsTable)
+    .set({
+      wallPostStatus: newStatus,
+      updatedAt: new Date(),
+    })
+    .where(eq(postsTable.id, postId))
+    .returning();
+
+  if (action === "approve") {
+    await createNotification({
+      userId: post.userId,
+      actorUserId: req.session.userId!,
+      type: "wall_post_approved",
+      title: "Wall post approved",
+      body: "Your wall post was approved and is now visible.",
+      href: `/profile/${req.session.userId}`,
+      entityType: "post",
+      entityId: post.id,
+    });
+  }
+
+  res.json({
+    success: true,
+    message: action === "approve" ? "Post approved and published" : "Post denied",
+    post: await enrichPost(updatedPost, req.session.userId),
+  });
+});
+
 router.get("/posts/:postId/comments", async (req, res) => {
   const postId = Number(req.params.postId);
   if (Number.isNaN(postId)) {

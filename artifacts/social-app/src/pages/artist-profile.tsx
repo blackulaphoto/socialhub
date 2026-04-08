@@ -51,6 +51,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { FeedPostCard } from "@/components/feed-post-card";
+import { WallPostComposer } from "@/components/wall-post-composer";
 import { CreatorHeroSlider } from "@/components/creator-page/creator-hero-slider";
 import { CreatorInfoCard } from "@/components/creator-page/creator-info-card";
 import { BuilderAudioPlayer } from "@/components/page-builder-blocks/builder-audio-player";
@@ -231,14 +232,19 @@ export default function ArtistProfile({ id }: { id: string }) {
     hasNextPage: hasMoreArtistPosts,
     isFetchingNextPage: isFetchingNextArtistPosts,
   } = useInfiniteQuery({
-    queryKey: ["/api/users", userId, "posts", "artist"],
+    queryKey: ["/api/users", userId, "artist-posts"],
     enabled: Number.isFinite(userId),
     initialPageParam: undefined as number | undefined,
-    queryFn: ({ pageParam, signal }) => getUserPosts(userId, {
-      cursor: pageParam,
-      limit: 8,
-      surface: "artist",
-    }, { signal }),
+    queryFn: async ({ pageParam, signal }) => {
+      const response = await fetch(`/api/users/${userId}/artist-posts?cursor=${pageParam || ''}&limit=8`, {
+        credentials: "include",
+        signal,
+      });
+      if (!response.ok) {
+        throw new Error("Failed to fetch artist posts");
+      }
+      return response.json();
+    },
     getNextPageParam: (lastPage) => lastPage.hasMore ? (lastPage.nextCursor ?? undefined) : undefined,
   });
 
@@ -1066,6 +1072,14 @@ export default function ArtistProfile({ id }: { id: string }) {
         </section>
       )}
 
+      {!isOwnArtistPage && currentUser && (
+        <WallPostComposer
+          targetUserId={userId}
+          targetUserName={artist.displayName || profile.user.username}
+          onSuccess={() => refetchArtistPosts()}
+        />
+      )}
+
       {isLoadingArtistPosts ? (
         <div className="flex justify-center py-8"><Spinner /></div>
       ) : isArtistPostsError ? (
@@ -1230,7 +1244,14 @@ export default function ArtistProfile({ id }: { id: string }) {
     contact: renderContact(),
   };
 
-  const visibleSections = builderMeta.sections.filter((section) => section.visible && sections[section.key]).map((section) => section.key);
+  const visibleSections = builderMeta.sections
+    .filter((section) => {
+      // Posts section is always visible
+      if (section.key === "posts") return true;
+      // Other sections only visible if enabled and have content
+      return section.visible && sections[section.key];
+    })
+    .map((section) => section.key);
   const mobileTabSectionMap = {
     posts: ["featured", "posts"],
     gallery: ["gallery", "video", "audio", "links"],

@@ -11,6 +11,8 @@ export const postsTable = pgTable("posts", {
   imageUrl: text("image_url"),
   visibility: text("visibility").notNull().default("public"),
   repostOfPostId: integer("repost_of_post_id"),
+  wallPostStatus: text("wall_post_status"), // 'pending' | 'approved' | 'denied' | null
+  wallPostTargetUserId: integer("wall_post_target_user_id").references(() => usersTable.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
