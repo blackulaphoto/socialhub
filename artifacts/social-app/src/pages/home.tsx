@@ -884,14 +884,11 @@ export default function Home() {
             {!selectedFeed && mode === "following" ? (
               <CardContent className="pt-0">
                 <div className="rounded-2xl border border-border/50 bg-background/35 p-4">
-                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <div className="text-sm font-medium">Following</div>
-                      <div className="mt-1 text-sm text-muted-foreground">
-                        {followingCount
-                          ? `You are following ${followingCount} ${followingCount === 1 ? "person or page" : "people and pages"}.`
-                          : "You are not following anyone yet."}
-                      </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm text-muted-foreground">
+                      {followingCount
+                        ? `You are following ${followingCount} ${followingCount === 1 ? "person or page" : "people and pages"}.`
+                        : "You are not following anyone yet."}
                     </div>
                     <Link href="/discover">
                       <Button variant="outline" size="sm">Find people to follow</Button>
@@ -900,29 +897,42 @@ export default function Home() {
                   {isLoadingFollowingPreview ? (
                     <div className="mt-4 flex justify-center py-4"><Spinner /></div>
                   ) : followingCount ? (
-                    <div className="mt-4 flex items-center gap-3">
-                      <div className="flex items-center -space-x-3">
-                        {followingPreview!.slice(0, 6).map((followedUser) => (
-                          <Link
-                            key={followedUser.id}
-                            href={followedUser.hasArtistPage ? `/artists/${followedUser.id}` : `/profile/${followedUser.id}`}
-                            className="rounded-full ring-2 ring-background transition-transform hover:z-10 hover:scale-105"
-                            title={followedUser.username}
+                    <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+                      {followingPreview!.slice(0, 6).map((followedUser) => (
+                        <Link
+                          key={followedUser.id}
+                          href={followedUser.hasArtistPage ? `/artists/${followedUser.id}` : `/profile/${followedUser.id}`}
+                          className="flex flex-col items-center gap-2 rounded-2xl border border-border/50 bg-background/30 p-3 text-center transition-colors hover:border-primary/30"
+                        >
+                          <Avatar className="h-16 w-16 border-2 border-border/60 bg-card shadow-sm">
+                            <AvatarImage src={followedUser.avatarUrl || ""} />
+                            <AvatarFallback>{followedUser.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          <div className="w-full">
+                            <div className="truncate text-xs font-semibold">{followedUser.username}</div>
+                            {followedUser.city || followedUser.location ? (
+                              <div className="mt-1 truncate text-[10px] text-muted-foreground">{followedUser.city || followedUser.location}</div>
+                            ) : null}
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 w-full text-xs"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              unfollowCreator.mutate({ userId: followedUser.id });
+                            }}
+                            disabled={unfollowCreator.isPending}
                           >
-                            <Avatar className="h-12 w-12 border border-border/60 bg-card shadow-sm">
-                              <AvatarImage src={followedUser.avatarUrl || ""} />
-                              <AvatarFallback>{followedUser.username.slice(0, 2).toUpperCase()}</AvatarFallback>
-                            </Avatar>
-                          </Link>
-                        ))}
-                      </div>
-                      {followingCount > 6 ? (
-                        <div className="text-xs font-medium text-muted-foreground">+{followingCount - 6} more</div>
-                      ) : null}
+                            Following
+                          </Button>
+                        </Link>
+                      ))}
                     </div>
                   ) : (
                     <div className="mt-4 rounded-2xl border border-dashed border-border/50 bg-card/30 p-4 text-sm text-muted-foreground">
-                      Follow a creator or person and the latest six will appear here.
+                      Follow a creator or person and they will appear here.
                     </div>
                   )}
                 </div>
