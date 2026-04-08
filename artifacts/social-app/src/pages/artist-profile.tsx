@@ -762,57 +762,66 @@ export default function ArtistProfile({ id }: { id: string }) {
     </div>
   );
 
-  const renderAbout = () => (
-    <>
-      <Card className="border-border/50 bg-card/60 md:hidden">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between gap-3">
-            <CardTitle>About</CardTitle>
-            <Button variant="outline" size="sm" onClick={() => setAboutOpen(true)}>Open</Button>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3">
-            <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
-              <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">What they do</div>
-              <div className="mt-2 text-sm leading-6">{artist.category || artist.tagline || "Define the business offering."}</div>
+  const renderAbout = () => {
+    // Check if About section has any meaningful content
+    const hasAboutContent = artist.bio || artist.influences || (artist.customFields && artist.customFields.length > 0) || serviceItems.length > 0 || pricingSummary || turnaroundInfo;
+
+    if (!hasAboutContent) {
+      return null;
+    }
+
+    return (
+      <>
+        <Card className="border-border/50 bg-card/60 md:hidden">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle>About</CardTitle>
+              <Button variant="outline" size="sm" onClick={() => setAboutOpen(true)}>Open</Button>
             </div>
-            {creatorInfoServices.length ? (
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
               <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Focus</div>
-                <div className="mt-2 text-sm leading-6">{creatorInfoServices.slice(0, 4).join(", ")}</div>
+                <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">What they do</div>
+                <div className="mt-2 text-sm leading-6">{artist.category || artist.tagline || "Define the business offering."}</div>
+              </div>
+              {creatorInfoServices.length ? (
+                <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
+                  <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Focus</div>
+                  <div className="mt-2 text-sm leading-6">{creatorInfoServices.slice(0, 4).join(", ")}</div>
+                </div>
+              ) : null}
+            </div>
+            <p className="line-clamp-3 text-sm leading-6 text-muted-foreground">
+              {artist.bio || profile.user.bio || "No bio added yet."}
+            </p>
+            {artist.tags?.length ? (
+              <div className="flex flex-wrap gap-2">
+                {artist.tags.slice(0, 4).map((tag: string) => <Badge key={tag} variant="secondary">{tag}</Badge>)}
               </div>
             ) : null}
+          </CardContent>
+        </Card>
+
+        <Dialog open={aboutOpen} onOpenChange={setAboutOpen}>
+          <DialogContent className="max-h-[85vh] overflow-y-auto md:hidden">
+            <DialogHeader>
+              <DialogTitle>About {artistPageName}</DialogTitle>
+            </DialogHeader>
+            {aboutContent}
+          </DialogContent>
+        </Dialog>
+
+        <section className="hidden space-y-4 md:block">
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold tracking-tight md:text-[2rem]">About</h2>
+            <p className="text-sm text-muted-foreground">Background, influences, links, and working details.</p>
           </div>
-          <p className="line-clamp-3 text-sm leading-6 text-muted-foreground">
-            {artist.bio || profile.user.bio || "No bio added yet."}
-          </p>
-          {artist.tags?.length ? (
-            <div className="flex flex-wrap gap-2">
-              {artist.tags.slice(0, 4).map((tag: string) => <Badge key={tag} variant="secondary">{tag}</Badge>)}
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
-
-      <Dialog open={aboutOpen} onOpenChange={setAboutOpen}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto md:hidden">
-          <DialogHeader>
-            <DialogTitle>About {artistPageName}</DialogTitle>
-          </DialogHeader>
           {aboutContent}
-        </DialogContent>
-      </Dialog>
-
-      <section className="hidden space-y-4 md:block">
-        <div className="space-y-2">
-          <h2 className="text-2xl font-bold tracking-tight md:text-[2rem]">About</h2>
-          <p className="text-sm text-muted-foreground">Background, influences, links, and working details.</p>
-        </div>
-        {aboutContent}
-      </section>
-    </>
-  );
+        </section>
+      </>
+    );
+  };
 
   const renderHeroRow = () => (
     <section className="grid gap-5 lg:grid-cols-[minmax(260px,1fr)_minmax(0,1.5fr)] lg:items-stretch">
@@ -883,24 +892,30 @@ export default function ArtistProfile({ id }: { id: string }) {
     </section>
   );
 
-  const renderMedia = () => (
-    <div id="creator-gallery" className="space-y-5">
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <Palette className="h-5 w-5 text-primary" />
-          <h2 className="text-2xl font-bold tracking-tight md:text-[2rem]">Media</h2>
+  const renderMedia = () => {
+    // Check if Media section has any content
+    if (assignedGalleryImages.length === 0) {
+      return null;
+    }
+
+    return (
+      <div id="creator-gallery" className="space-y-5">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Palette className="h-5 w-5 text-primary" />
+            <h2 className="text-2xl font-bold tracking-tight md:text-[2rem]">Media</h2>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Gallery, video, audio, and links collected in one cleaner showcase.
+          </p>
+          <div>
+            <Link href={`/profile/${userId}?tab=photos`}>
+              <Button variant="outline" size="sm">
+                <ImageIcon className="mr-2 h-4 w-4" /> Open Profile Photos
+              </Button>
+            </Link>
+          </div>
         </div>
-        <p className="text-sm text-muted-foreground">
-          Gallery, video, audio, and links collected in one cleaner showcase.
-        </p>
-        <div>
-          <Link href={`/profile/${userId}?tab=photos`}>
-            <Button variant="outline" size="sm">
-              <ImageIcon className="mr-2 h-4 w-4" /> Open Profile Photos
-            </Button>
-          </Link>
-        </div>
-      </div>
 
       {assignedGalleryImages.length > 0 && (
         <section className="space-y-4">
@@ -932,41 +947,34 @@ export default function ArtistProfile({ id }: { id: string }) {
           <BuilderAudioPlayer tracks={audioShowcaseTracks} />
         </section>
       )}
-
-      {!assignedGalleryImages.length && !audioGallery.length && (
-        <Card className="border-dashed border-border/50 bg-card/40">
-          <CardContent className="p-12 text-center text-muted-foreground">
-            <ImageIcon className="mx-auto mb-3 h-10 w-10 opacity-25" />
-            No media modules are turned on yet.
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  );
-
-  const renderLinks = () => (
-    <div className="space-y-5">
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <ExternalLink className="h-5 w-5 text-primary" />
-          <h2 className="text-2xl font-bold tracking-tight md:text-[2rem]">Links and Shop</h2>
-        </div>
-        <p className="text-sm text-muted-foreground">External destinations, merch, shop links, and portfolio paths.</p>
       </div>
-      {allShowcaseLinks.length ? (
+    );
+  };
+
+  const renderLinks = () => {
+    // Hide Links section if no links exist
+    if (allShowcaseLinks.length === 0) {
+      return null;
+    }
+
+    return (
+      <div className="space-y-5">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <ExternalLink className="h-5 w-5 text-primary" />
+            <h2 className="text-2xl font-bold tracking-tight md:text-[2rem]">Links and Shop</h2>
+          </div>
+          <p className="text-sm text-muted-foreground">External destinations, merch, shop links, and portfolio paths.</p>
+        </div>
         <BuilderLinksShowcase items={allShowcaseLinks.map((link, index) => ({
           id: `${link.label}-${index}`,
           label: link.label,
           url: link.url,
           kind: link.kind || null,
         }))} />
-      ) : (
-        <div className="rounded-2xl border border-dashed border-border/50 bg-background/30 p-6 text-sm text-muted-foreground">
-          No links or store destinations have been added yet.
-        </div>
-      )}
-    </div>
-  );
+      </div>
+    );
+  };
 
   const renderPosts = () => (
     <div className="space-y-5">
@@ -1087,45 +1095,48 @@ export default function ArtistProfile({ id }: { id: string }) {
     </div>
   );
 
-  const renderEvents = () => (
-    <div className="space-y-5">
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <CalendarRange className="h-5 w-5 text-primary" />
-          <h2 className="text-2xl font-bold tracking-tight md:text-[2rem]">Events and Appearances</h2>
-        </div>
-        <p className="text-sm text-muted-foreground">Upcoming shows, past appearances, and linked lineups.</p>
-      </div>
+  const renderEvents = () => {
+    // Hide Events section if no events exist
+    if (upcomingEvents.length === 0 && pastEvents.length === 0) {
+      return null;
+    }
 
-      {upcomingEvents.length ? (
-        <BuilderEventCarousel items={eventShowcaseItems} />
-      ) : (
-        <div className="rounded-2xl border border-dashed border-border/50 bg-background/30 p-6 text-sm text-muted-foreground">
-          No upcoming appearances linked yet.
-        </div>
-      )}
-
-      {pastEvents.length ? (
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">Past Appearances</h3>
+    return (
+      <div className="space-y-5">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <CalendarRange className="h-5 w-5 text-primary" />
+            <h2 className="text-2xl font-bold tracking-tight md:text-[2rem]">Events and Appearances</h2>
           </div>
-          <div className="grid gap-3 md:grid-cols-2">
-            {pastEvents.map((event) => (
-              <Link key={event.id} href={`/events/${event.id}`}>
-                <div className="rounded-2xl border border-border/50 bg-background/40 p-4 transition-colors hover:border-primary/40">
-                  <div className="font-medium">{event.title}</div>
-                  <div className="mt-1 text-sm text-muted-foreground">
-                    {new Date(event.startsAt).toLocaleDateString()} / {event.location}
+          <p className="text-sm text-muted-foreground">Upcoming shows, past appearances, and linked lineups.</p>
+        </div>
+
+        {upcomingEvents.length ? (
+          <BuilderEventCarousel items={eventShowcaseItems} />
+        ) : null}
+
+        {pastEvents.length ? (
+          <section className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">Past Appearances</h3>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              {pastEvents.map((event) => (
+                <Link key={event.id} href={`/events/${event.id}`}>
+                  <div className="rounded-2xl border border-border/50 bg-background/40 p-4 transition-colors hover:border-primary/40">
+                    <div className="font-medium">{event.title}</div>
+                    <div className="mt-1 text-sm text-muted-foreground">
+                      {new Date(event.startsAt).toLocaleDateString()} / {event.location}
+                    </div>
                   </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </section>
-      ) : null}
-    </div>
-  );
+                </Link>
+              ))}
+            </div>
+          </section>
+        ) : null}
+      </div>
+    );
+  };
 
   const renderContact = () => (
     <section className="space-y-4">
