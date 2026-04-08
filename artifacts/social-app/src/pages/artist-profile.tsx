@@ -1244,14 +1244,13 @@ export default function ArtistProfile({ id }: { id: string }) {
     contact: renderContact(),
   };
 
-  const visibleSections = builderMeta.sections
-    .filter((section) => {
-      // Posts section is always visible
-      if (section.key === "posts") return true;
-      // Other sections only visible if enabled and have content
-      return section.visible && sections[section.key];
-    })
-    .map((section) => section.key);
+  // Posts section is always visible, even though it's not in the builder
+  const visibleSections = [
+    ...builderMeta.sections
+      .filter((section) => section.visible && sections[section.key])
+      .map((section) => section.key),
+    "posts", // Always include posts section
+  ];
   const mobileTabSectionMap = {
     posts: ["featured", "posts"],
     gallery: ["gallery", "video", "audio", "links"],
