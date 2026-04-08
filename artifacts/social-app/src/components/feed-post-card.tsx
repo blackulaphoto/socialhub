@@ -38,6 +38,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MediaEmbed } from "@/components/media-embed";
+import { MediaLightbox, useMediaLightbox, type MediaLightboxItem } from "@/components/media-lightbox";
 import { ReportDialog } from "@/components/report-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
@@ -116,6 +117,7 @@ export function FeedPostCard({
   const deleteComment = useDeletePostComment();
   const { mutate: deletePost, isPending: isDeleting } = useDeletePost();
   const updatePost = useUpdatePost();
+  const { selectedId, openLightbox, closeLightbox } = useMediaLightbox();
   const [isLiked, setIsLiked] = useState(post.isLiked);
   const [likeCount, setLikeCount] = useState(post.likeCount);
   const [currentReaction, setCurrentReaction] = useState(post.currentUserReaction || (post.isLiked ? "like" : null));
@@ -383,6 +385,19 @@ export function FeedPostCard({
     : `/profile/${post.originalPost?.author?.id ?? post.originalPost?.userId ?? post.userId}`;
   const showHeaderIdentity = Boolean(post.author);
 
+  // Separate image media from video/audio media
+  const imageMedia = post.media?.filter((item) => item.type === "image") || [];
+  const otherMedia = post.media?.filter((item) => item.type !== "image") || [];
+
+  // Convert image media to lightbox items
+  const lightboxItems: MediaLightboxItem[] = imageMedia.map((item) => ({
+    id: item.id,
+    url: item.url,
+    type: "image" as const,
+    title: item.title,
+    thumbnailUrl: item.url,
+  }));
+
   return (
     <Card id={`post-${post.id}`} data-testid={`post-card-${post.id}`} className="overflow-hidden border-border/50 bg-card/60">
       {showHeaderIdentity ? (
@@ -496,15 +511,28 @@ export function FeedPostCard({
           </div>
         ) : null}
         {cleanedContent ? <p className="whitespace-pre-wrap text-sm leading-6">{cleanedContent}</p> : null}
-        {post.media?.length ? (
+        {imageMedia.length > 0 || otherMedia.length > 0 ? (
           <div className="-mx-4 space-y-4 md:-mx-6">
-            {post.media.map((item) => (
+            {imageMedia.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => openLightbox(item.id)}
+                className="block w-full overflow-hidden border-y border-border/50 bg-background shadow-sm transition-opacity hover:opacity-90 sm:rounded-[1.5rem] sm:border sm:border-border/60 md:mx-4"
+              >
+                <img
+                  src={item.url}
+                  alt={item.title || "Post image"}
+                  className="w-full max-h-[44rem] object-cover"
+                />
+              </button>
+            ))}
+            {otherMedia.map((item) => (
               <div key={item.id} className="overflow-hidden border-y border-border/50 bg-background shadow-sm sm:rounded-[1.5rem] sm:border sm:border-border/60 md:mx-4">
                 <MediaEmbed
                   type={item.type}
                   url={item.url}
                   title={item.title || undefined}
-                  className={item.type === "image" ? "w-full max-h-[44rem] object-cover" : undefined}
                 />
               </div>
             ))}
@@ -718,6 +746,15 @@ export function FeedPostCard({
           </div>
         ) : null}
       </CardContent>
+
+      <MediaLightbox
+        items={lightboxItems}
+        selectedId={selectedId}
+        onClose={closeLightbox}
+        showThumbnails={imageMedia.length > 1}
+        showNavigation={imageMedia.length > 1}
+        showMetadata={true}
+      />
     </Card>
   );
 }

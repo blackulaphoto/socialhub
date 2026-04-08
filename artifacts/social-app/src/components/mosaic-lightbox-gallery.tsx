@@ -1,8 +1,7 @@
-import { useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Image as ImageIcon, X } from "lucide-react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { useMemo } from "react";
+import { Image as ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MediaLightbox, useMediaLightbox, type MediaLightboxItem } from "@/components/media-lightbox";
 
 export type MosaicLightboxGalleryItem = {
   id: string;
@@ -28,11 +27,22 @@ export function MosaicLightboxGallery({
   emptyMessage = "No images yet.",
   className,
 }: MosaicLightboxGalleryProps) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const { selectedId, openLightbox, closeLightbox } = useMediaLightbox();
 
   const flatItems = useMemo(() => groups.flatMap((group) => group.items), [groups]);
-  const selectedIndex = selectedId ? flatItems.findIndex((item) => item.id === selectedId) : -1;
-  const selectedItem = selectedIndex >= 0 ? flatItems[selectedIndex] : null;
+
+  // Convert items to lightbox format
+  const lightboxItems: MediaLightboxItem[] = useMemo(
+    () => flatItems.map((item) => ({
+      id: item.id,
+      url: item.imageUrl,
+      type: "image" as const,
+      title: item.title,
+      caption: item.caption || item.meta,
+      thumbnailUrl: item.imageUrl,
+    })),
+    [flatItems]
+  );
 
   if (!flatItems.length) {
     return (
@@ -42,18 +52,6 @@ export function MosaicLightboxGallery({
       </div>
     );
   }
-
-  const showPrevious = () => {
-    if (!flatItems.length || selectedIndex < 0) return;
-    const nextIndex = selectedIndex === 0 ? flatItems.length - 1 : selectedIndex - 1;
-    setSelectedId(flatItems[nextIndex]?.id || null);
-  };
-
-  const showNext = () => {
-    if (!flatItems.length || selectedIndex < 0) return;
-    const nextIndex = selectedIndex === flatItems.length - 1 ? 0 : selectedIndex + 1;
-    setSelectedId(flatItems[nextIndex]?.id || null);
-  };
 
   return (
     <>
@@ -69,7 +67,7 @@ export function MosaicLightboxGallery({
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => setSelectedId(item.id)}
+                  onClick={() => openLightbox(item.id)}
                   className="group mb-3 block w-full break-inside-avoid overflow-hidden rounded-2xl border border-border/50 bg-background/30 text-left shadow-sm transition-transform hover:scale-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                 >
                   <img
@@ -86,57 +84,14 @@ export function MosaicLightboxGallery({
         ))}
       </div>
 
-      <Dialog open={!!selectedItem} onOpenChange={(open) => !open && setSelectedId(null)}>
-        <DialogContent className="max-w-6xl border-border/60 bg-background p-0">
-          {selectedItem ? (
-            <div className="relative overflow-hidden rounded-[1.75rem]">
-              <button
-                type="button"
-                onClick={() => setSelectedId(null)}
-                className="absolute right-4 top-4 z-20 rounded-full border border-white/20 bg-black/45 p-2 text-white"
-              >
-                <X className="h-5 w-5" />
-              </button>
-              {flatItems.length > 1 ? (
-                <>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="outline"
-                    onClick={showPrevious}
-                    className="absolute left-4 top-1/2 z-20 h-11 w-11 -translate-y-1/2 rounded-full border-white/20 bg-black/45 text-white hover:bg-black/60"
-                  >
-                    <ChevronLeft className="h-5 w-5" />
-                  </Button>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="outline"
-                    onClick={showNext}
-                    className="absolute right-4 top-1/2 z-20 h-11 w-11 -translate-y-1/2 rounded-full border-white/20 bg-black/45 text-white hover:bg-black/60"
-                  >
-                    <ChevronRight className="h-5 w-5" />
-                  </Button>
-                </>
-              ) : null}
-              <div className="bg-black">
-                <img
-                  src={selectedItem.imageUrl}
-                  alt={selectedItem.title || selectedItem.caption || "Gallery image"}
-                  className="max-h-[80vh] w-full object-contain"
-                />
-              </div>
-              {(selectedItem.title || selectedItem.caption || selectedItem.meta) ? (
-                <div className="space-y-2 bg-black/90 px-6 py-4 text-white">
-                  {selectedItem.title ? <div className="text-lg font-semibold">{selectedItem.title}</div> : null}
-                  {selectedItem.caption ? <div className="text-sm text-white/85">{selectedItem.caption}</div> : null}
-                  {selectedItem.meta ? <div className="text-xs uppercase tracking-[0.16em] text-white/60">{selectedItem.meta}</div> : null}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-        </DialogContent>
-      </Dialog>
+      <MediaLightbox
+        items={lightboxItems}
+        selectedId={selectedId}
+        onClose={closeLightbox}
+        showThumbnails={flatItems.length > 1}
+        showNavigation={flatItems.length > 1}
+        showMetadata={true}
+      />
     </>
   );
 }

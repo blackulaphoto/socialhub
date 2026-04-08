@@ -1,7 +1,6 @@
 import { useState } from "react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { MediaEmbed } from "@/components/media-embed";
+import { MediaLightbox, useMediaLightbox, type MediaLightboxItem } from "@/components/media-lightbox";
 import {
   Carousel,
   CarouselContent,
@@ -24,10 +23,19 @@ type BuilderMediaGalleryProps = {
 };
 
 export function BuilderMediaGallery({ items, className }: BuilderMediaGalleryProps) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const { selectedId, openLightbox, closeLightbox } = useMediaLightbox();
   const [activeId, setActiveId] = useState<string | null>(items[0]?.id ?? null);
-  const selectedItem = items.find((item) => item.id === selectedId) || null;
   const activeItem = items.find((item) => item.id === activeId) || items[0] || null;
+
+  // Convert items to lightbox format
+  const lightboxItems: MediaLightboxItem[] = items.map((item) => ({
+    id: item.id,
+    url: item.imageUrl || item.mediaUrl || "",
+    type: "image" as const,
+    title: item.title,
+    caption: item.description,
+    thumbnailUrl: item.imageUrl || item.mediaUrl || "",
+  }));
 
   if (!items.length) {
     return (
@@ -43,7 +51,7 @@ export function BuilderMediaGallery({ items, className }: BuilderMediaGalleryPro
         {activeItem ? (
           <button
             type="button"
-            onClick={() => setSelectedId(activeItem.id)}
+            onClick={() => openLightbox(activeItem.id)}
             className="group block w-full overflow-hidden rounded-[2rem] border border-border/60 bg-background/20 text-left shadow-[0_24px_70px_-42px_rgba(15,23,42,0.9)]"
           >
             <div className="relative aspect-[16/9] overflow-hidden bg-muted">
@@ -103,25 +111,14 @@ export function BuilderMediaGallery({ items, className }: BuilderMediaGalleryPro
         ) : null}
       </div>
 
-      <Dialog open={!!selectedItem} onOpenChange={(open) => !open && setSelectedId(null)}>
-        <DialogContent className="max-w-4xl border-border/60 bg-background p-0">
-          {selectedItem ? (
-            <div className="space-y-4 p-4">
-              <div className="overflow-hidden rounded-2xl border border-border/50 bg-background/40">
-                <MediaEmbed
-                  url={selectedItem.mediaUrl || selectedItem.imageUrl}
-                  title={selectedItem.title}
-                  className="w-full max-h-[75vh] object-contain"
-                />
-              </div>
-              <div className="space-y-1 px-1 pb-1">
-                <div className="text-lg font-semibold">{selectedItem.title}</div>
-                {selectedItem.description ? <div className="text-sm text-muted-foreground">{selectedItem.description}</div> : null}
-              </div>
-            </div>
-          ) : null}
-        </DialogContent>
-      </Dialog>
+      <MediaLightbox
+        items={lightboxItems}
+        selectedId={selectedId}
+        onClose={closeLightbox}
+        showThumbnails={true}
+        showNavigation={true}
+        showMetadata={true}
+      />
     </>
   );
 }

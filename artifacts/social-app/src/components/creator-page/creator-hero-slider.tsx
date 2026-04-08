@@ -2,6 +2,7 @@ import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MediaLightbox, useMediaLightbox, type MediaLightboxItem } from "@/components/media-lightbox";
 
 export type CreatorHeroSlide = {
   id: string;
@@ -30,6 +31,17 @@ export function CreatorHeroSlider({
   children,
 }: CreatorHeroSliderProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const { selectedId, openLightbox, closeLightbox } = useMediaLightbox();
+
+  // Convert slides to lightbox items
+  const lightboxItems: MediaLightboxItem[] = slides.map((slide) => ({
+    id: slide.id,
+    url: slide.image,
+    type: "image" as const,
+    title: slide.title,
+    caption: slide.subtitle,
+    thumbnailUrl: slide.image,
+  }));
 
   const goToSlide = useCallback((index: number) => {
     if (!slides.length) return;
@@ -55,24 +67,26 @@ export function CreatorHeroSlider({
   const currentSlide = slides[currentIndex];
 
   return (
-    <div className={cn("relative overflow-hidden", className)}>
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={currentSlide.id}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.6 }}
-          className="absolute inset-0"
-        >
-          <img
-            src={currentSlide.image}
-            alt={currentSlide.title}
-            className="h-full w-full object-cover"
-          />
-          <div className={cn("absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent opacity-60", overlayClassName)} />
-        </motion.div>
-      </AnimatePresence>
+    <>
+      <div className={cn("relative overflow-hidden", className)}>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentSlide.id}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.6 }}
+            className="absolute inset-0 cursor-pointer"
+            onClick={() => openLightbox(currentSlide.id)}
+          >
+            <img
+              src={currentSlide.image}
+              alt={currentSlide.title}
+              className="h-full w-full object-cover"
+            />
+            <div className={cn("absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent opacity-60", overlayClassName)} />
+          </motion.div>
+        </AnimatePresence>
 
       <div className={cn("relative z-10 flex h-full flex-col justify-end", contentClassName)}>
         {children}
@@ -112,6 +126,16 @@ export function CreatorHeroSlider({
           </div>
         </>
       ) : null}
-    </div>
+      </div>
+
+      <MediaLightbox
+        items={lightboxItems}
+        selectedId={selectedId}
+        onClose={closeLightbox}
+        showThumbnails={slides.length > 1}
+        showNavigation={slides.length > 1}
+        showMetadata={true}
+      />
+    </>
   );
 }
