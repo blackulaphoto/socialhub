@@ -27,7 +27,7 @@ export type CreatorBuilderLinkItem = {
 export type CreatorBuilderMeta = {
   version: 4;
   heroVideoUrl?: string;
-  heroMediaType?: "image" | "video";
+  heroMediaType?: "image" | "video" | "slider";
   heroItemIds?: number[];
   heroSliderItemIds?: number[];
   galleryItemIds?: number[];
@@ -118,7 +118,11 @@ export function readCreatorBuilderMeta(
         return {
           version: 4,
           heroVideoUrl: typeof meta.heroVideoUrl === "string" ? meta.heroVideoUrl : "",
-          heroMediaType: meta.heroMediaType === "video" ? "video" : "image",
+          heroMediaType: meta.heroMediaType === "video"
+            ? "video"
+            : meta.heroMediaType === "slider"
+              ? "slider"
+              : "image",
           heroItemIds: Array.isArray(meta.heroItemIds) ? meta.heroItemIds.map(Number).filter(Number.isFinite) : [],
           heroSliderItemIds: Array.isArray(meta.heroSliderItemIds) ? meta.heroSliderItemIds.map(Number).filter(Number.isFinite) : [],
           galleryItemIds: Array.isArray(meta.galleryItemIds) ? meta.galleryItemIds.map(Number).filter(Number.isFinite) : [],

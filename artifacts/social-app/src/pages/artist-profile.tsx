@@ -404,21 +404,12 @@ export default function ArtistProfile({ id }: { id: string }) {
       ? "xl:max-w-sm"
       : "xl:max-w-md xl:justify-end";
   const assignedHeroSliderImages = imageGallery.filter((item) => builderMeta.heroSliderItemIds?.includes(Number(item.id)));
-  const heroSlides = [
-    ...(assignedHeroSliderImages.length
-      ? assignedHeroSliderImages.map((item, index) => ({
-          id: String(item.id || `hero-slide-${index}`),
-          image: item.url,
-          title: item.caption || artistPageName,
-          subtitle: heroTagline,
-        }))
-      : [{
-          id: "hero-banner",
-          image: artistPageBanner || "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=1600&q=80",
-          title: artistPageName,
-          subtitle: heroTagline,
-        }]),
-  ];
+  const heroSlides = assignedHeroSliderImages.map((item, index) => ({
+    id: String(item.id || `hero-slide-${index}`),
+    image: item.url,
+    title: item.caption || artistPageName,
+    subtitle: heroTagline,
+  }));
   const assignedHeroImages = imageGallery.filter((item) => builderMeta.heroItemIds?.includes(Number(item.id)));
   const assignedHeroVideos = videoGallery.filter((item) => builderMeta.heroItemIds?.includes(Number(item.id)));
   const assignedGalleryImages = imageGallery.filter((item) => builderMeta.galleryItemIds?.includes(Number(item.id)));
@@ -817,6 +808,22 @@ export default function ArtistProfile({ id }: { id: string }) {
           ) : (
             <div className="p-6 text-sm text-muted-foreground">
               No hero videos selected yet.
+            </div>
+          )
+        ) : builderMeta.heroMediaType === "slider" ? (
+          heroSlides.length ? (
+            <CreatorHeroSlider
+              slides={heroSlides}
+              autoplay={false}
+              className="min-h-[28rem]"
+              contentClassName="min-h-[28rem]"
+              overlayClassName="bg-gradient-to-t from-black/60 via-black/10 to-transparent"
+            >
+              <div className="absolute left-6 top-6 z-10 text-sm uppercase tracking-[0.22em] text-white/80">Hero slider</div>
+            </CreatorHeroSlider>
+          ) : (
+            <div className="p-6 text-sm text-muted-foreground">
+              No hero slider images selected yet.
             </div>
           )
         ) : heroMediaGalleryItems.length ? (
@@ -1254,75 +1261,75 @@ export default function ArtistProfile({ id }: { id: string }) {
   return (
     <div className={cn("w-full pb-20", fontClass)}>
       <section className={cn("relative overflow-hidden border-b border-border", heroShellClass)}>
-        <CreatorHeroSlider
-          slides={heroSlides}
-          autoplay={false}
-          className="min-h-[34rem]"
-          contentClassName="min-h-[34rem]"
-          overlayClassName={artistPageBanner ? "bg-gradient-to-t from-background/82 via-background/34 to-background/5" : "bg-gradient-to-t from-background via-background/78 to-background/18"}
-        >
-          <div className={cn("absolute inset-0 bg-gradient-to-br opacity-70", mood.shell)} />
-          <div className={cn("absolute inset-0 bg-[radial-gradient(circle_at_top_left,var(--tw-gradient-stops))]", mood.glow)} />
-          <div className={cn("absolute inset-0", artistPageBanner ? "bg-black/12 dark:bg-black/20" : "bg-black/18 dark:bg-black/28")} />
+        {artistPageBanner ? (
+          <img
+            src={artistPageBanner}
+            alt={`${artistPageName} top banner`}
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        ) : null}
+        <div className={cn("absolute inset-0 bg-gradient-to-br opacity-70", mood.shell)} />
+        <div className={cn("absolute inset-0 bg-[radial-gradient(circle_at_top_left,var(--tw-gradient-stops))]", mood.glow)} />
+        <div className={cn("absolute inset-0", artistPageBanner ? "bg-black/12 dark:bg-black/20" : "bg-black/18 dark:bg-black/28")} />
 
-          <div className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 items-end px-4 py-12 md:py-16">
-            <div className="w-full rounded-[2rem] border border-white/10 bg-black/20 p-5 shadow-[0_30px_100px_-60px_rgba(0,0,0,0.9)] backdrop-blur-sm md:p-8">
-              <div className="flex flex-col gap-8">
-                <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
-                  <div className="max-w-5xl">
-                    <div>
-                      <div className="grid gap-5 md:grid-cols-[auto_1fr] md:items-end">
-                        <Avatar className="h-28 w-28 border-4 border-background/80 shadow-2xl md:h-36 md:w-36">
-                          <AvatarImage src={artistPageAvatar || ""} />
-                          <AvatarFallback>{artistPageName.slice(0, 2).toUpperCase()}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <div className="mb-4 flex flex-wrap items-center gap-2">
-                            <Badge variant="outline" className="border-white/20 bg-black/30 capitalize text-white/90">{profile.user.profileType}</Badge>
-                            {artist.category ? (
-                              <Badge variant="secondary" className="bg-white/12 text-white">
-                                {artist.category}
-                              </Badge>
-                            ) : null}
-                            <Badge className="bg-primary text-primary-foreground">
-                              {actionLabel}
+        <div className="relative z-10 mx-auto flex min-h-[34rem] w-full max-w-7xl items-end px-4 py-12 md:py-16">
+          <div className="w-full rounded-[2rem] border border-white/10 bg-black/20 p-5 shadow-[0_30px_100px_-60px_rgba(0,0,0,0.9)] backdrop-blur-sm md:p-8">
+            <div className="flex flex-col gap-8">
+              <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+                <div className="max-w-5xl">
+                  <div>
+                    <div className="grid gap-5 md:grid-cols-[auto_1fr] md:items-end">
+                      <Avatar className="h-28 w-28 border-4 border-background/80 shadow-2xl md:h-36 md:w-36">
+                        <AvatarImage src={artistPageAvatar || ""} />
+                        <AvatarFallback>{artistPageName.slice(0, 2).toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="mb-4 flex flex-wrap items-center gap-2">
+                          <Badge variant="outline" className="border-white/20 bg-black/30 capitalize text-white/90">{profile.user.profileType}</Badge>
+                          {artist.category ? (
+                            <Badge variant="secondary" className="bg-white/12 text-white">
+                              {artist.category}
                             </Badge>
-                          </div>
-                          <h1 className={cn("text-4xl font-bold leading-none tracking-tight md:text-6xl", headingClass)}>{artistPageName}</h1>
-                          <p className={cn("mt-5 max-w-3xl text-lg font-medium leading-8 text-foreground/95 md:text-[1.35rem]", layoutTemplate === "editorial" && "max-w-2xl text-xl", layoutTemplate === "music" && "text-xl")}>{heroTagline}</p>
-                          {artist.location ? (
-                            <div className="mt-4 flex flex-wrap items-center gap-3 text-sm font-medium text-foreground/80">
-                              <span className="inline-flex items-center">
-                                <Pin className="mr-1.5 h-4 w-4" /> {artist.location}
-                              </span>
-                            </div>
                           ) : null}
-                          {artist.bio ? (
-                            <p className="mt-5 max-w-3xl whitespace-pre-wrap text-sm leading-7 text-foreground/78 md:text-base">
-                              {artist.bio}
-                            </p>
-                          ) : null}
-                          <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm font-medium text-foreground/78">
-                            <span>{artistPosts.length} posts</span>
-                            <span>{profile.user.followerCount} followers</span>
-                            <span>{profile.user.followingCount} following</span>
-                            <span>{upcomingEvents.length} upcoming events</span>
-                          </div>
-                          {heroTags.length ? (
-                            <div className="mt-5 flex flex-wrap gap-2">
-                              {heroTags.slice(0, 4).map((tag) => (
-                                <Badge key={tag} variant="secondary" className="bg-white/10 text-white">
-                                  {tag}
-                                </Badge>
-                              ))}
-                            </div>
-                          ) : null}
+                          <Badge className="bg-primary text-primary-foreground">
+                            {actionLabel}
+                          </Badge>
                         </div>
+                        <h1 className={cn("text-4xl font-bold leading-none tracking-tight md:text-6xl", headingClass)}>{artistPageName}</h1>
+                        <p className={cn("mt-5 max-w-3xl text-lg font-medium leading-8 text-foreground/95 md:text-[1.35rem]", layoutTemplate === "editorial" && "max-w-2xl text-xl", layoutTemplate === "music" && "text-xl")}>{heroTagline}</p>
+                        {artist.location ? (
+                          <div className="mt-4 flex flex-wrap items-center gap-3 text-sm font-medium text-foreground/80">
+                            <span className="inline-flex items-center">
+                              <Pin className="mr-1.5 h-4 w-4" /> {artist.location}
+                            </span>
+                          </div>
+                        ) : null}
+                        {artist.bio ? (
+                          <p className="mt-5 max-w-3xl whitespace-pre-wrap text-sm leading-7 text-foreground/78 md:text-base">
+                            {artist.bio}
+                          </p>
+                        ) : null}
+                        <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm font-medium text-foreground/78">
+                          <span>{artistPosts.length} posts</span>
+                          <span>{profile.user.followerCount} followers</span>
+                          <span>{profile.user.followingCount} following</span>
+                          <span>{upcomingEvents.length} upcoming events</span>
+                        </div>
+                        {heroTags.length ? (
+                          <div className="mt-5 flex flex-wrap gap-2">
+                            {heroTags.slice(0, 4).map((tag) => (
+                              <Badge key={tag} variant="secondary" className="bg-white/10 text-white">
+                                {tag}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   </div>
+                </div>
 
-                  <div className={cn("flex flex-wrap items-center gap-2.5 md:gap-3", heroActionsClass)}>
+                <div className={cn("flex flex-wrap items-center gap-2.5 md:gap-3", heroActionsClass)}>
                   {!currentUser?.hasArtistPage && (
                     <Link href="/settings?tab=creator">
                       <Button variant="outline" className="border-border/60 bg-background/30">
@@ -1494,28 +1501,27 @@ export default function ArtistProfile({ id }: { id: string }) {
                       )}
                     </DropdownMenuContent>
                   </DropdownMenu>
-                  </div>
                 </div>
-                {currentUser?.id !== userId ? (
-                  <div className="flex flex-wrap items-center gap-3 pt-1">
-                    <div className="inline-flex items-center rounded-full border border-border/40 bg-background/20 px-4 py-2 text-sm text-foreground/75">
-                      <HeartHandshake className="mr-2 h-4 w-4 text-primary" />
-                      {profile.user.friendCount} friends
-                    </div>
-                    {profile.canInteract ? <ProfileReactionBar userId={userId} summary={profile.profileReactions} invalidateKeys={[["profile", userId], ["/api/users", userId]]} /> : null}
-                  </div>
-                ) : null}
-                {currentUser?.id !== userId && !profile.canInteract ? (
-                  <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-                    {profile.blockState?.hasBlockedUser
-                      ? "You blocked this creator. Follow, messaging, and inquiry actions are disabled until you unblock them."
-                      : "This creator has blocked you. Social actions and inquiries are unavailable."}
-                  </div>
-                ) : null}
               </div>
+              {currentUser?.id !== userId ? (
+                <div className="flex flex-wrap items-center gap-3 pt-1">
+                  <div className="inline-flex items-center rounded-full border border-border/40 bg-background/20 px-4 py-2 text-sm text-foreground/75">
+                    <HeartHandshake className="mr-2 h-4 w-4 text-primary" />
+                    {profile.user.friendCount} friends
+                  </div>
+                  {profile.canInteract ? <ProfileReactionBar userId={userId} summary={profile.profileReactions} invalidateKeys={[["profile", userId], ["/api/users", userId]]} /> : null}
+                </div>
+              ) : null}
+              {currentUser?.id !== userId && !profile.canInteract ? (
+                <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+                  {profile.blockState?.hasBlockedUser
+                    ? "You blocked this creator. Follow, messaging, and inquiry actions are disabled until you unblock them."
+                    : "This creator has blocked you. Social actions and inquiries are unavailable."}
+                </div>
+              ) : null}
             </div>
           </div>
-        </CreatorHeroSlider>
+        </div>
       </section>
 
       <div className="mx-auto mt-10 max-w-7xl px-4 md:mt-12">

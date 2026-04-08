@@ -4,6 +4,7 @@ import { Link } from "wouter";
 import { ArrowDown, ArrowUp, Check, ChevronDown, Eye, EyeOff, ExternalLink, Loader2, Save, Video } from "lucide-react";
 import { CreatorHeroSlider } from "@/components/creator-page/creator-hero-slider";
 import { CreatorInfoCard } from "@/components/creator-page/creator-info-card";
+import { LocationInput } from "@/components/location-input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -317,21 +318,6 @@ export function CreatorPageBuilder({
 
       <div className="space-y-4 rounded-2xl border border-border/50 bg-background/20 p-4">
         <div className="space-y-1">
-          <div className="text-sm font-semibold">Hero slider</div>
-          <div className="text-sm text-muted-foreground">Choose Showcase images for the rotating top slider. If none are selected, the top banner is used as the fallback.</div>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <Button type="button" variant="outline" onClick={() => onOpenShowcase("hero-slider")}>
-            Choose Slider Images
-          </Button>
-        </div>
-        <div className="text-sm text-muted-foreground">
-          {assignedHeroSliderImages.length} selected slide{assignedHeroSliderImages.length === 1 ? "" : "s"}
-        </div>
-      </div>
-
-      <div className="space-y-4 rounded-2xl border border-border/50 bg-background/20 p-4">
-        <div className="space-y-1">
           <div className="text-sm font-semibold">Page details</div>
           <div className="text-sm text-muted-foreground">These fields define the page name and core identity shown across the creator page.</div>
         </div>
@@ -350,7 +336,12 @@ export function CreatorPageBuilder({
           </div>
           <div className="space-y-2">
             <Label>Location</Label>
-            <Input value={artist.location || ""} placeholder="Los Angeles, CA" onChange={(event) => setArtist((current) => ({ ...current, location: event.target.value }))} />
+            <LocationInput
+              value={artist.location || ""}
+              placeholder="Los Angeles, California"
+              onValueChange={(value) => setArtist((current) => ({ ...current, location: value }))}
+              onOptionSelect={(option) => setArtist((current) => ({ ...current, location: option.label }))}
+            />
           </div>
         </div>
         <div className="space-y-2">
@@ -367,21 +358,31 @@ export function CreatorPageBuilder({
         <div className="space-y-5">
           <div className="rounded-2xl border border-border/50 bg-background/10 p-4">
             <div className="text-sm font-semibold">Hero media block</div>
-            <div className="mt-1 text-sm text-muted-foreground">This sits below the top banner. Pick showcase images or videos for the hero media area.</div>
+            <div className="mt-1 text-sm text-muted-foreground">This sits below the top banner. Use either a static image, a slider, or a video in the hero media box.</div>
             <div className="mt-3 flex flex-wrap gap-3">
-              <Select value={builderMeta.heroMediaType || "image"} onValueChange={(value) => updateBuilderMeta({ ...builderMeta, heroMediaType: value as "image" | "video" })}>
+              <Select value={builderMeta.heroMediaType || "image"} onValueChange={(value) => updateBuilderMeta({ ...builderMeta, heroMediaType: value as "image" | "slider" | "video" })}>
                 <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="image">Hero image</SelectItem>
+                  <SelectItem value="slider">Hero slider</SelectItem>
                   <SelectItem value="video">Hero video</SelectItem>
                 </SelectContent>
               </Select>
-              <Button type="button" variant="outline" onClick={() => onOpenShowcase("hero")}>
-                Choose Hero Media
-              </Button>
+              {builderMeta.heroMediaType !== "slider" ? (
+                <Button type="button" variant="outline" onClick={() => onOpenShowcase("hero")}>
+                  Choose Hero Media
+                </Button>
+              ) : null}
+              {builderMeta.heroMediaType === "slider" ? (
+                <Button type="button" variant="outline" onClick={() => onOpenShowcase("hero-slider")}>
+                  Choose Slider Images
+                </Button>
+              ) : null}
             </div>
             <div className="mt-3 text-sm text-muted-foreground">
-              {builderMeta.heroMediaType === "video"
+              {builderMeta.heroMediaType === "slider"
+                ? `${assignedHeroSliderImages.length} selected slide${assignedHeroSliderImages.length === 1 ? "" : "s"}`
+                : builderMeta.heroMediaType === "video"
                 ? `${assignedHeroVideos.length} selected video${assignedHeroVideos.length === 1 ? "" : "s"}`
                 : `${assignedHeroImages.length} selected image${assignedHeroImages.length === 1 ? "" : "s"}`}
             </div>
@@ -1035,19 +1036,14 @@ export function CreatorPageBuilder({
                 onClick={() => setSelectedBlock("hero")}
                 className={cn("block w-full overflow-hidden text-left", selectedBlock === "hero" && "ring-2 ring-primary/30")}
               >
-                <CreatorHeroSlider
-                  slides={heroSlides}
-                  autoplay={false}
-                  className="min-h-[24rem]"
-                  contentClassName="min-h-[24rem]"
-                  overlayClassName="bg-gradient-to-t from-background via-background/75 to-background/10"
-                >
+                <div className="relative min-h-[24rem] overflow-hidden">
+                  <img
+                    src={artist.bannerUrl || "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=1600&q=80"}
+                    alt="Top banner preview"
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-background/20" />
                   <div className="absolute inset-0 bg-gradient-to-br from-black/45 via-black/10 to-transparent" />
-                  {builderMeta.heroVideoUrl ? (
-                    <div className="absolute right-4 top-4 rounded-full border border-white/20 bg-black/40 px-3 py-1 text-xs text-white">
-                      <Video className="mr-1 inline h-3.5 w-3.5" /> External hero video linked
-                    </div>
-                  ) : null}
                   <div className="relative z-10 flex h-full flex-col justify-end gap-6 px-6 py-6 text-white md:px-8 md:py-8">
                     <div className="grid gap-5 md:grid-cols-[auto_1fr] md:items-end">
                       <Avatar className="h-24 w-24 border-4 border-white/20 shadow-2xl md:h-28 md:w-28">
@@ -1060,7 +1056,7 @@ export function CreatorPageBuilder({
                       </div>
                     </div>
                   </div>
-                </CreatorHeroSlider>
+                </div>
               </button>
 
               <div className="space-y-4 p-4 md:p-5">
@@ -1099,6 +1095,28 @@ export function CreatorPageBuilder({
                           <BuilderVideoPlaylist items={assignedHeroVideos.map((item, index) => ({ id: String(item.id || index), title: item.caption || `Video ${index + 1}`, url: item.url, thumbnail: item.thumbnailUrl || undefined }))} />
                         </div>
                       ) : <div className="p-6 text-sm text-muted-foreground">No hero videos selected.</div>
+                    ) : builderMeta.heroMediaType === "slider" ? (
+                      assignedHeroSliderImages.length ? (
+                        <CreatorHeroSlider
+                          slides={assignedHeroSliderImages.map((item, index) => ({
+                            id: String(item.id || `hero-slide-${index}`),
+                            image: item.url,
+                            title: item.caption || heroName,
+                            subtitle: artist.tagline || "",
+                          }))}
+                          autoplay={false}
+                          className="min-h-[22rem]"
+                          contentClassName="min-h-[22rem]"
+                          overlayClassName="bg-gradient-to-t from-black/60 via-black/10 to-transparent"
+                        >
+                          <div className="absolute left-4 top-4 z-10 text-xs uppercase tracking-[0.18em] text-white/80">Hero slider</div>
+                          <div className="relative z-10 flex h-full items-end">
+                            <div className="w-full p-4 text-white">
+                              <div className="text-3xl font-semibold">{assignedHeroSliderImages[0]?.caption || "Hero slider"}</div>
+                            </div>
+                          </div>
+                        </CreatorHeroSlider>
+                      ) : <div className="p-6 text-sm text-muted-foreground">No hero slider images selected.</div>
                     ) : assignedHeroImages.length ? (
                       <div className="relative min-h-[22rem] w-full overflow-hidden bg-muted">
                         <img
