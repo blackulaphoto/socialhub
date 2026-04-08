@@ -37,6 +37,12 @@ export type CreatorBuilderMeta = {
   heroInfoPhone?: string;
   heroInfoLinks?: CreatorBuilderLinkItem[];
   sections: CreatorBuilderSection[];
+  // Featured content selections
+  featuredGalleryItemIds?: number[];
+  featuredVideoItemIds?: number[];
+  featuredAudioItemIds?: number[];
+  featuredEventId?: number;
+  featuredPostId?: number;
 };
 
 type LegacyInputs = {
@@ -141,6 +147,12 @@ export function readCreatorBuilderMeta(
               .map((item) => ({ label: item.label, url: item.url }))
             : [],
           sections,
+          // Featured content selections
+          featuredGalleryItemIds: Array.isArray(meta.featuredGalleryItemIds) ? meta.featuredGalleryItemIds.map(Number).filter(Number.isFinite) : [],
+          featuredVideoItemIds: Array.isArray(meta.featuredVideoItemIds) ? meta.featuredVideoItemIds.map(Number).filter(Number.isFinite) : [],
+          featuredAudioItemIds: Array.isArray(meta.featuredAudioItemIds) ? meta.featuredAudioItemIds.map(Number).filter(Number.isFinite) : [],
+          featuredEventId: typeof meta.featuredEventId === "number" && Number.isFinite(meta.featuredEventId) ? meta.featuredEventId : undefined,
+          featuredPostId: typeof meta.featuredPostId === "number" && Number.isFinite(meta.featuredPostId) ? meta.featuredPostId : undefined,
         };
       }
     }
@@ -159,6 +171,12 @@ export function readCreatorBuilderMeta(
     heroInfoPhone: "",
     heroInfoLinks: [],
     sections: createDefaultSections(input),
+    // Featured content selections
+    featuredGalleryItemIds: [],
+    featuredVideoItemIds: [],
+    featuredAudioItemIds: [],
+    featuredEventId: undefined,
+    featuredPostId: undefined,
   };
 }
 

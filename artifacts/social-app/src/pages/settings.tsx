@@ -553,10 +553,10 @@ export default function Settings() {
 
   const creatorPickerTarget = useMemo(() => {
     const value = new URLSearchParams(currentSearch).get("picker");
-    return value === "hero-slider" || value === "hero" || value === "gallery" || value === "video" ? value : null;
+    return value === "hero-slider" || value === "hero" || value === "gallery" || value === "video" || value === "featured-gallery" || value === "featured-video" || value === "featured-audio" ? value : null;
   }, [currentSearch]);
 
-  const openCreatorShowcase = (target: "hero-slider" | "hero" | "gallery" | "video") => {
+  const openCreatorShowcase = (target: "hero-slider" | "hero" | "gallery" | "video" | "featured-gallery" | "featured-video" | "featured-audio") => {
     setActiveTab("gallery");
     setLocation(`/settings?tab=gallery&returnTo=creator&picker=${target}`);
     if (typeof window !== "undefined") {
@@ -1371,9 +1371,13 @@ export default function Settings() {
 
   const showcasePickerType = creatorPickerTarget === "video"
     ? "video"
-    : creatorPickerTarget === "hero" && currentBuilderMeta.heroMediaType === "video"
+    : creatorPickerTarget === "featured-video"
       ? "video"
-      : "image";
+      : creatorPickerTarget === "featured-audio"
+        ? "audio"
+        : creatorPickerTarget === "hero" && currentBuilderMeta.heroMediaType === "video"
+          ? "video"
+          : "image";
 
   const pickerDestinationLabel = creatorPickerTarget === "hero-slider"
     ? "Hero Slider"
@@ -1402,7 +1406,13 @@ export default function Settings() {
     ? currentBuilderMeta.galleryItemIds || []
     : creatorPickerTarget === "video"
       ? currentBuilderMeta.videoItemIds || []
-      : currentBuilderMeta.heroItemIds || [];
+      : creatorPickerTarget === "featured-gallery"
+        ? currentBuilderMeta.featuredGalleryItemIds || []
+        : creatorPickerTarget === "featured-video"
+          ? currentBuilderMeta.featuredVideoItemIds || []
+          : creatorPickerTarget === "featured-audio"
+            ? currentBuilderMeta.featuredAudioItemIds || []
+            : currentBuilderMeta.heroItemIds || [];
 
   const togglePickerSelection = (itemId: number) => {
     if (!creatorPickerTarget) return;
@@ -1419,6 +1429,12 @@ export default function Settings() {
       updateBuilderMeta({ galleryItemIds: nextIds });
     } else if (creatorPickerTarget === "video") {
       updateBuilderMeta({ videoItemIds: nextIds });
+    } else if (creatorPickerTarget === "featured-gallery") {
+      updateBuilderMeta({ featuredGalleryItemIds: nextIds });
+    } else if (creatorPickerTarget === "featured-video") {
+      updateBuilderMeta({ featuredVideoItemIds: nextIds });
+    } else if (creatorPickerTarget === "featured-audio") {
+      updateBuilderMeta({ featuredAudioItemIds: nextIds });
     } else {
       updateBuilderMeta({ heroItemIds: nextIds });
     }

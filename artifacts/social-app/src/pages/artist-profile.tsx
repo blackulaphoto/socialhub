@@ -414,6 +414,10 @@ export default function ArtistProfile({ id }: { id: string }) {
   const assignedHeroVideos = videoGallery.filter((item) => builderMeta.heroItemIds?.includes(Number(item.id)));
   const assignedGalleryImages = imageGallery.filter((item) => builderMeta.galleryItemIds?.includes(Number(item.id)));
   const assignedVideoPlaylistItems = videoGallery.filter((item) => builderMeta.videoItemIds?.includes(Number(item.id)));
+  const assignedFeaturedGalleryImages = imageGallery.filter((item) => builderMeta.featuredGalleryItemIds?.includes(Number(item.id)));
+  const assignedFeaturedVideos = videoGallery.filter((item) => builderMeta.featuredVideoItemIds?.includes(Number(item.id)));
+  const assignedFeaturedAudio = audioGallery.filter((item) => builderMeta.featuredAudioItemIds?.includes(Number(item.id)));
+  const featuredEvent = upcomingEvents.find((event) => event.id === builderMeta.featuredEventId);
   const creatorInfoServices = serviceItems.map((service) => service.title).filter(Boolean);
   const creatorInfoBase = {
     name: artistPageName,
@@ -476,6 +480,35 @@ export default function ArtistProfile({ id }: { id: string }) {
     tags: event.lineupTags || undefined,
     linkedArtistsCount: event.artists?.length || 0,
   }));
+  const featuredGalleryItems = assignedFeaturedGalleryImages.map((item) => ({
+    id: String(item.id),
+    title: item.caption || artistPageName,
+    imageUrl: item.url,
+    mediaUrl: item.url,
+    description: item.caption || null,
+  }));
+  const featuredVideoItems = assignedFeaturedVideos.map((item) => ({
+    id: String(item.id),
+    title: item.caption || "Featured video",
+    url: item.url,
+    thumbnail: (item as { thumbnailUrl?: string | null }).thumbnailUrl || undefined,
+  }));
+  const featuredAudioTracks = assignedFeaturedAudio.map((item) => ({
+    id: String(item.id),
+    title: item.caption || "Featured track",
+    url: item.url,
+  }));
+  const featuredEventItems = featuredEvent ? [{
+    id: String(featuredEvent.id),
+    title: featuredEvent.title,
+    startsAt: featuredEvent.startsAt,
+    location: featuredEvent.location || undefined,
+    city: featuredEvent.city || undefined,
+    description: featuredEvent.description || null,
+    imageUrl: featuredEvent.imageUrl || undefined,
+    tags: featuredEvent.lineupTags || undefined,
+    linkedArtistsCount: featuredEvent.artists?.length || 0,
+  }] : [];
   const featuredType = creator?.featuredContent?.type || null;
   const featuredTitle = creator?.featuredContent?.title || creator?.featuredTitle || null;
   const featuredDescription = creator?.featuredContent?.description || creator?.featuredDescription || null;
@@ -605,10 +638,11 @@ export default function ArtistProfile({ id }: { id: string }) {
   const renderFeatured = () => {
     const featuredNode = creator?.pinnedPost ? (
       <FeedPostCard post={creator.pinnedPost} showAuthor={false} />
-    ) : effectiveFeaturedType === "video" && (featuredUrl || videoPlaylistItems.length) ? (
+    ) : effectiveFeaturedType === "video" && (featuredVideoItems.length || featuredUrl || videoPlaylistItems.length) ? (
       <BuilderVideoPlaylist
         items={[
-          ...(featuredUrl
+          ...featuredVideoItems,
+          ...(featuredUrl && !featuredVideoItems.length
             ? [{
                 id: "featured-video",
                 title: featuredTitle || "Featured video",
@@ -619,19 +653,20 @@ export default function ArtistProfile({ id }: { id: string }) {
           ...videoPlaylistItems,
         ]}
       />
-    ) : (effectiveFeaturedType === "track" || effectiveFeaturedType === "audio") && (featuredUrl || audioShowcaseTracks.length) ? (
+    ) : (effectiveFeaturedType === "track" || effectiveFeaturedType === "audio") && (featuredAudioTracks.length || featuredUrl || audioShowcaseTracks.length) ? (
       <BuilderAudioPlayer
         tracks={[
-          ...(featuredUrl
+          ...featuredAudioTracks,
+          ...(featuredUrl && !featuredAudioTracks.length
             ? [{ id: "featured-track", title: featuredTitle || "Featured track", url: featuredUrl }]
             : []),
           ...audioShowcaseTracks,
         ]}
       />
-    ) : effectiveFeaturedType === "gallery" && mediaShowcaseItems.length ? (
-      <BuilderMediaGallery items={mediaShowcaseItems} />
-    ) : effectiveFeaturedType === "event" && eventShowcaseItems.length ? (
-      <BuilderEventCarousel items={eventShowcaseItems} />
+    ) : effectiveFeaturedType === "gallery" && (featuredGalleryItems.length || mediaShowcaseItems.length) ? (
+      <BuilderMediaGallery items={featuredGalleryItems.length ? featuredGalleryItems : mediaShowcaseItems} />
+    ) : effectiveFeaturedType === "event" && (featuredEventItems.length || eventShowcaseItems.length) ? (
+      <BuilderEventCarousel items={featuredEventItems.length ? featuredEventItems : eventShowcaseItems} />
     ) : (effectiveFeaturedType === "product" || effectiveFeaturedType === "link" || effectiveFeaturedType === "store" || effectiveFeaturedType === "shop") && featuredLinkItems.length ? (
       <BuilderLinksShowcase items={featuredLinkItems} />
     ) : null;

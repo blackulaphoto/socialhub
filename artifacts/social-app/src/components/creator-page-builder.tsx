@@ -56,7 +56,7 @@ type BuilderProps = {
   saveStatus: "idle" | "saving" | "saved";
   onSave: () => void;
   onOpenPublicPage: () => void;
-  onOpenShowcase: (target: "hero-slider" | "hero" | "gallery" | "video") => void;
+  onOpenShowcase: (target: "hero-slider" | "hero" | "gallery" | "video" | "featured-gallery" | "featured-video" | "featured-audio") => void;
   onOpenEventsManager: () => void;
   onUploadImage: (file: File | null, scope: "avatar" | "banner", onComplete: (url: string) => void) => void;
   uploading: { avatar: boolean; banner: boolean };
@@ -168,6 +168,10 @@ export function CreatorPageBuilder({
   const assignedHeroVideos = videoGallery.filter((item) => builderMeta.heroItemIds?.includes(Number(item.id)));
   const assignedGalleryImages = imageGallery.filter((item) => builderMeta.galleryItemIds?.includes(Number(item.id)));
   const assignedPlaylistVideos = videoGallery.filter((item) => builderMeta.videoItemIds?.includes(Number(item.id)));
+  const assignedFeaturedGalleryImages = imageGallery.filter((item) => builderMeta.featuredGalleryItemIds?.includes(Number(item.id)));
+  const assignedFeaturedVideos = videoGallery.filter((item) => builderMeta.featuredVideoItemIds?.includes(Number(item.id)));
+  const assignedFeaturedAudio = audioGallery.filter((item) => builderMeta.featuredAudioItemIds?.includes(Number(item.id)));
+  const featuredEvent = linkedEvents.find((event) => event.id === builderMeta.featuredEventId);
   const linkItems = parseLinkItems(creator.linkItems);
   const customFields = parseCustomFields(artist.customFields);
   const visibleSections = builderMeta.sections.filter((section) => section.visible);
@@ -483,12 +487,13 @@ export function CreatorPageBuilder({
     }
 
     if (selectedBlock === "featured") {
+      const featuredType = creator.featuredType || "highlight";
       return (
         <div className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label>Featured type</Label>
-              <Select value={creator.featuredType || "highlight"} onValueChange={(value) => setCreator((current) => ({ ...current, featuredType: value }))}>
+              <Select value={featuredType} onValueChange={(value) => setCreator((current) => ({ ...current, featuredType: value }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="highlight">Highlight</SelectItem>
@@ -510,10 +515,151 @@ export function CreatorPageBuilder({
             <Label>Description</Label>
             <Textarea value={creator.featuredDescription || ""} placeholder="Explain why this belongs at the top of the page." onChange={(event) => setCreator((current) => ({ ...current, featuredDescription: event.target.value }))} />
           </div>
-          <div className="space-y-2">
-            <Label>URL</Label>
-            <Input value={creator.featuredUrl || ""} placeholder="Optional link or media URL" onChange={(event) => setCreator((current) => ({ ...current, featuredUrl: event.target.value }))} />
-          </div>
+
+          {/* Gallery type - Choose from showcase */}
+          {featuredType === "gallery" && (
+            <div className="space-y-3">
+              <Label>Gallery selection</Label>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" onClick={() => onOpenShowcase("featured-gallery")}>
+                  Choose from Showcase
+                </Button>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {assignedFeaturedGalleryImages.length} image{assignedFeaturedGalleryImages.length === 1 ? "" : "s"} selected
+              </div>
+              {assignedFeaturedGalleryImages.length > 0 && (
+                <div className="grid grid-cols-4 gap-2">
+                  {assignedFeaturedGalleryImages.slice(0, 8).map((item) => (
+                    <div key={item.id} className="relative aspect-square overflow-hidden rounded-lg border border-border">
+                      <img src={item.thumbnailUrl || item.url} alt={item.caption || ""} className="h-full w-full object-cover" />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Video type - Choose from showcase or paste URL */}
+          {featuredType === "video" && (
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label>YouTube / Vimeo URL</Label>
+                <Input value={creator.featuredUrl || ""} placeholder="https://youtube.com/watch?v=..." onChange={(event) => setCreator((current) => ({ ...current, featuredUrl: event.target.value }))} />
+              </div>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-border" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">Or</span>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" onClick={() => onOpenShowcase("featured-video")}>
+                  Choose from Showcase
+                </Button>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {assignedFeaturedVideos.length} showcase video{assignedFeaturedVideos.length === 1 ? "" : "s"} selected
+              </div>
+            </div>
+          )}
+
+          {/* Track/Audio type - Choose from showcase or paste URL */}
+          {featuredType === "track" && (
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label>Spotify / SoundCloud URL</Label>
+                <Input value={creator.featuredUrl || ""} placeholder="https://open.spotify.com/track/..." onChange={(event) => setCreator((current) => ({ ...current, featuredUrl: event.target.value }))} />
+              </div>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-border" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">Or</span>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" onClick={() => onOpenShowcase("featured-audio")}>
+                  Choose from Showcase
+                </Button>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {assignedFeaturedAudio.length} showcase track{assignedFeaturedAudio.length === 1 ? "" : "s"} selected
+              </div>
+            </div>
+          )}
+
+          {/* Event type - Select from linked events */}
+          {featuredType === "event" && (
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label>Select event</Label>
+                {linkedEvents.length > 0 ? (
+                  <Select
+                    value={builderMeta.featuredEventId ? String(builderMeta.featuredEventId) : ""}
+                    onValueChange={(value) => updateBuilderMeta({ ...builderMeta, featuredEventId: value ? Number(value) : undefined })}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Choose an event..." /></SelectTrigger>
+                    <SelectContent>
+                      {linkedEvents.map((event) => (
+                        <SelectItem key={event.id} value={String(event.id)}>
+                          {event.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
+                    No linked events yet
+                  </div>
+                )}
+              </div>
+              <Button type="button" variant="outline" onClick={onOpenEventsManager}>
+                Open Events Manager
+              </Button>
+              {featuredEvent && (
+                <div className="rounded-lg border border-border bg-muted/20 p-3">
+                  <div className="text-sm font-medium">{featuredEvent.title}</div>
+                  <div className="text-xs text-muted-foreground">{featuredEvent.city || featuredEvent.location}</div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Post type - Select from artist posts */}
+          {featuredType === "post" && (
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label>Select post</Label>
+                {artistPostsCount > 0 ? (
+                  <Select
+                    value={builderMeta.featuredPostId ? String(builderMeta.featuredPostId) : ""}
+                    onValueChange={(value) => updateBuilderMeta({ ...builderMeta, featuredPostId: value ? Number(value) : undefined })}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Choose a post..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">Latest post</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
+                    No artist posts yet
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Product/Highlight types - Keep simple URL input */}
+          {(featuredType === "product" || featuredType === "highlight") && (
+            <div className="space-y-2">
+              <Label>URL</Label>
+              <Input value={creator.featuredUrl || ""} placeholder="Optional link or media URL" onChange={(event) => setCreator((current) => ({ ...current, featuredUrl: event.target.value }))} />
+            </div>
+          )}
         </div>
       );
     }
