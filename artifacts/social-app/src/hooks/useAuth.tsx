@@ -19,9 +19,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     query: {
       queryKey: ["/api/auth/me"],
       retry: false,
-      staleTime: 60_000,
-      refetchOnWindowFocus: true,
-      refetchInterval: 60_000,
+      staleTime: 5 * 60_000, // 5 minutes - longer cache to reduce mobile refetch issues
+      refetchOnWindowFocus: false, // Disable - causes issues when switching apps/keyboards on mobile
+      refetchInterval: false, // Disable polling - prevents unnecessary requests on mobile
     }
   });
 
