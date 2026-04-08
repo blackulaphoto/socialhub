@@ -8,7 +8,6 @@ export const CREATOR_SECTION_KEYS = [
   "links",
   "events",
   "about",
-  "posts",
   "contact",
 ] as const;
 

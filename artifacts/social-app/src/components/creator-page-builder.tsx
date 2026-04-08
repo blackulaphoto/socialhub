@@ -36,7 +36,6 @@ const SECTION_LIBRARY: Array<{ key: CreatorSectionKey; label: string; descriptio
   { key: "links", label: "Links and shop", description: "External links, merch, store, and destinations." },
   { key: "events", label: "Events", description: "Upcoming appearances and linked dates." },
   { key: "about", label: "About", description: "Story, facts, tags, and supporting context." },
-  { key: "posts", label: "Posts", description: "Artist-page updates as a normal block." },
   { key: "contact", label: "Contact and CTA", description: "Primary action and conversion path." },
 ];
 
@@ -270,7 +269,6 @@ export function CreatorPageBuilder({
     links: linkItems.length,
     events: linkedEvents.length,
     about: artist.bio || customFields.length || heroTags.length,
-    posts: artistPostsCount,
     contact: creator.primaryActionLabel || artist.bookingEmail,
   };
 
@@ -739,16 +737,14 @@ export function CreatorPageBuilder({
       );
     }
 
-    if (selectedBlock === "gallery" || selectedBlock === "video" || selectedBlock === "audio" || selectedBlock === "events" || selectedBlock === "posts") {
+    if (selectedBlock === "gallery" || selectedBlock === "video" || selectedBlock === "audio" || selectedBlock === "events") {
       const summary = selectedBlock === "gallery"
         ? `${assignedGalleryImages.length} selected image${assignedGalleryImages.length === 1 ? "" : "s"}`
         : selectedBlock === "video"
           ? `${assignedPlaylistVideos.length} selected video${assignedPlaylistVideos.length === 1 ? "" : "s"}`
           : selectedBlock === "audio"
             ? `${audioGallery.length} audio item${audioGallery.length === 1 ? "" : "s"} from Showcase`
-            : selectedBlock === "events"
-              ? `${linkedEvents.length} linked event${linkedEvents.length === 1 ? "" : "s"}`
-              : `${artistPostsCount} published artist post${artistPostsCount === 1 ? "" : "s"}`;
+            : `${linkedEvents.length} linked event${linkedEvents.length === 1 ? "" : "s"}`;
       const summaryCopy = selectedBlock === "events"
         ? `${summary}. Create events from the Events page, then return here to preview them on the creator page.`
         : `${summary}. This block now pulls from explicit showcase selections rather than every showcase item of that type.`;
@@ -768,11 +764,6 @@ export function CreatorPageBuilder({
           {selectedBlock === "events" ? (
             <div className="flex flex-wrap gap-3">
               <Button type="button" variant="outline" onClick={onOpenEventsManager}>Open Events</Button>
-            </div>
-          ) : null}
-          {selectedBlock === "posts" ? (
-            <div className="rounded-2xl border border-border/50 bg-background/30 p-4 text-sm text-muted-foreground">
-              Post creation still happens on the public artist page, but posts are now a normal section block that can be shown, hidden, and reordered.
             </div>
           ) : null}
         </div>
@@ -1023,15 +1014,6 @@ export function CreatorPageBuilder({
               </>
             ) : null}
           </div>
-        </div>
-      );
-    }
-
-    if (key === "posts") {
-      return (
-        <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
-          <div className="text-sm font-medium">{artistPostsCount} artist-page post{artistPostsCount === 1 ? "" : "s"}</div>
-          <div className="mt-2 text-sm text-muted-foreground">This block surfaces artist updates and stays reorderable like every other block.</div>
         </div>
       );
     }
