@@ -1310,7 +1310,7 @@ export default function ArtistProfile({ id }: { id: string }) {
     "posts",
   ]));
   const mobileTabSectionMap = {
-    posts: ["featured", "posts"],
+    posts: ["featured", "audio", "posts"],
     gallery: ["gallery", "video", "audio", "links"],
     about: ["about"],
     events: ["events"],
