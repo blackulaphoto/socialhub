@@ -74,7 +74,7 @@ export default function Profile({ id }: { id: string }) {
   const { setActiveIdentity } = useActiveIdentity();
   const queryClient = useQueryClient();
   const isOwnProfile = currentUser?.id === userId;
-  const [activeTab, setActiveTab] = useState<"posts" | "photos" | "about">("posts");
+  const [activeTab, setActiveTab] = useState<"posts" | "photos" | "about" | "spotlight">("posts");
 
   const {
     data: profile,
@@ -374,7 +374,7 @@ export default function Profile({ id }: { id: string }) {
 
       <div className="mx-auto mt-8 grid max-w-5xl grid-cols-1 gap-6 px-4 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="space-y-6">
-          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "posts" | "photos" | "about")} className="w-full">
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "posts" | "photos" | "about" | "spotlight")} className="w-full">
             <TabsList className="h-12 w-full justify-start rounded-none border-b border-border/50 bg-transparent p-0">
               <TabsTrigger value="posts" className="h-full rounded-none border-primary px-6 font-medium data-[state=active]:border-b-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none">
                 <Grid className="mr-2 h-4 w-4" /> Posts
@@ -385,6 +385,11 @@ export default function Profile({ id }: { id: string }) {
               <TabsTrigger value="about" className="h-full rounded-none border-primary px-6 font-medium data-[state=active]:border-b-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none">
                 About
               </TabsTrigger>
+              {(user.featuredContent || creatorSettings?.featuredTitle || creatorSettings?.featuredDescription || creatorSettings?.featuredUrl) && (
+                <TabsTrigger value="spotlight" className="h-full rounded-none border-primary px-6 font-medium data-[state=active]:border-b-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+                  Spotlight
+                </TabsTrigger>
+              )}
             </TabsList>
 
             <TabsContent value="posts" className="pt-6">
@@ -479,98 +484,33 @@ export default function Profile({ id }: { id: string }) {
                 </CardContent>
               </Card>
             </TabsContent>
+            {(user.featuredContent || creatorSettings?.featuredTitle || creatorSettings?.featuredDescription || creatorSettings?.featuredUrl) && (
+              <TabsContent value="spotlight" className="pt-6">
+                <Card className="border-border/50 bg-card/50">
+                  <CardHeader>
+                    <CardTitle>Spotlight</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {creatorSettings?.featuredTitle && <div className="font-medium">{creatorSettings.featuredTitle}</div>}
+                    {creatorSettings?.featuredDescription && <div className="text-sm text-muted-foreground">{creatorSettings.featuredDescription}</div>}
+                    {user.featuredContent && (
+                      <div className="rounded-xl border border-border/50 bg-background/40 p-3 text-sm text-muted-foreground">
+                        {user.featuredContent}
+                      </div>
+                    )}
+                    {creatorSettings?.featuredUrl && (
+                      <a href={creatorSettings.featuredUrl} target="_blank" rel="noreferrer" className="inline-flex items-center text-sm text-primary hover:underline">
+                        Open featured link <ExternalLink className="ml-1 h-3.5 w-3.5" />
+                      </a>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            )}
           </Tabs>
         </div>
 
         <aside className="space-y-6">
-          {(user.featuredContent || creatorSettings?.featuredTitle || creatorSettings?.featuredDescription) && (
-            <Card className="border-border/50 bg-card/50">
-              <CardHeader>
-                <CardTitle>Featured</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {creatorSettings?.featuredTitle && <div className="font-medium">{creatorSettings.featuredTitle}</div>}
-                {creatorSettings?.featuredDescription && <div className="text-sm text-muted-foreground">{creatorSettings.featuredDescription}</div>}
-                {user.featuredContent && (
-                  <div className="rounded-xl border border-border/50 bg-background/40 p-3 text-sm text-muted-foreground">
-                    {user.featuredContent}
-                  </div>
-                )}
-                {creatorSettings?.featuredUrl && (
-                  <a href={creatorSettings.featuredUrl} target="_blank" rel="noreferrer" className="inline-flex items-center text-sm text-primary hover:underline">
-                    Open featured link <ExternalLink className="ml-1 h-3.5 w-3.5" />
-                  </a>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {(user.about || user.work || user.school || user.age || user.interests?.length || user.links?.length || artistProfile?.tags?.length || artistProfile?.bookingEmail) && (
-            <Card className="border-border/50 bg-card/50">
-              <CardHeader>
-                <CardTitle>Identity</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {user.about && (
-                  <div>
-                    <div className="mb-1 text-xs uppercase tracking-[0.18em] text-muted-foreground">About</div>
-                    <div className="whitespace-pre-wrap text-sm text-muted-foreground">{user.about}</div>
-                  </div>
-                )}
-                {(user.age || user.work || user.school) && (
-                  <div className="grid gap-3">
-                    {user.age ? (
-                      <div className="text-sm text-muted-foreground">
-                        Age: <span className="text-foreground">{user.age}</span>
-                      </div>
-                    ) : null}
-                    {user.work ? (
-                      <div className="text-sm text-muted-foreground">
-                        Work: <span className="text-foreground">{user.work}</span>
-                      </div>
-                    ) : null}
-                    {user.school ? (
-                      <div className="text-sm text-muted-foreground">
-                        School: <span className="text-foreground">{user.school}</span>
-                      </div>
-                    ) : null}
-                  </div>
-                )}
-                {artistProfile?.bookingEmail && (
-                  <div className="text-sm text-muted-foreground">
-                    Booking: <span className="text-foreground">{artistProfile.bookingEmail}</span>
-                  </div>
-                )}
-                {user.interests?.length ? (
-                  <div className="flex flex-wrap gap-2">
-                    {user.interests.map((interest) => (
-                      <Badge key={interest} variant="secondary">{interest}</Badge>
-                    ))}
-                  </div>
-                ) : null}
-                {artistProfile?.tags?.length ? (
-                  <div className="flex flex-wrap gap-2">
-                    {artistProfile.tags.map((tag) => (
-                      <Badge key={tag} variant="secondary">
-                        <Tag className="mr-1 h-3 w-3" /> {tag}
-                      </Badge>
-                    ))}
-                  </div>
-                ) : null}
-                {user.links?.length ? (
-                  <div className="space-y-2">
-                    {user.links.map((link) => (
-                      <a key={`${link.label}-${link.url}`} href={link.url} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-xl border border-border/50 bg-background/40 px-3 py-2 text-sm hover:border-primary/40">
-                        <span className="inline-flex items-center"><Link2 className="mr-2 h-4 w-4 text-primary" /> {link.label}</span>
-                        <ExternalLink className="h-4 w-4 text-muted-foreground" />
-                      </a>
-                    ))}
-                  </div>
-                ) : null}
-              </CardContent>
-            </Card>
-          )}
-
           {isOwnProfile && customFeeds?.length ? (
             <Card className="border-border/50 bg-card/50">
               <CardHeader>
