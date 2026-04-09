@@ -1682,7 +1682,6 @@ export default function ArtistProfile({ id }: { id: string }) {
             id={`artist-mobile-panel-${activeMobileTab}`}
             aria-label={`${activeMobileTab} section`}
           >
-            {activeMobileTab !== "posts" ? null : renderRecentUpdatesSpotlight()}
             {showHeroRowInActiveMobileTab ? (
               <div className="space-y-5">
                 <div className="space-y-2 px-1">
@@ -1701,6 +1700,7 @@ export default function ArtistProfile({ id }: { id: string }) {
             {activeMobileTab === "gallery"
               ? renderCreatorGalleryTab()
               : mobileVisibleSections.map((key) => renderSectionBlock(key))}
+            {activeMobileTab !== "posts" ? null : renderRecentUpdatesSpotlight()}
           </div>
           <div className="hidden space-y-8 md:space-y-10 md:block">
             {visibleSections.map((key) => renderSectionBlock(key))}
