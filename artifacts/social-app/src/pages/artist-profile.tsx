@@ -997,37 +997,6 @@ export default function ArtistProfile({ id }: { id: string }) {
     );
   };
 
-  const renderRecentUpdatesSpotlight = () => {
-    if (!artistPosts.length) {
-      return null;
-    }
-
-    return (
-      <section className="space-y-4 rounded-[2rem] border border-primary/20 bg-primary/[0.045] p-4 shadow-[0_18px_60px_-42px_rgba(139,92,246,0.65)] md:p-6">
-        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm uppercase tracking-[0.22em] text-muted-foreground">
-              <Radio className="h-4 w-4 text-primary" /> Recent Updates
-            </div>
-            <h2 className="text-2xl font-bold tracking-tight md:text-[2rem]">Latest from {artistPageName}</h2>
-            <p className="text-sm text-muted-foreground">
-              New artist-page posts publish into the main feed with the creator identity and stay collected here.
-            </p>
-          </div>
-          <a href="#artist-section-posts">
-            <Button variant="outline" className="border-border/60 bg-background/40">
-              Jump to all updates
-            </Button>
-          </a>
-        </div>
-        <div className="space-y-4">
-          {artistPosts.slice(0, 2).map((post) => (
-            <FeedPostCard key={`spotlight-${post.id}`} post={post} showAuthor={false} />
-          ))}
-        </div>
-      </section>
-    );
-  };
 
   const renderLinks = () => {
     // Hide Links section if no links exist
@@ -1754,7 +1723,6 @@ export default function ArtistProfile({ id }: { id: string }) {
             ) : (
               mobileVisibleSections.map((key) => renderSectionBlock(key))
             )}
-            {activeMobileTab !== "posts" ? null : renderRecentUpdatesSpotlight()}
           </div>
           <div className="hidden space-y-8 md:space-y-10 md:block">
             {requestedMobileTab === "gallery" ? renderCreatorGalleryTab() : null}
