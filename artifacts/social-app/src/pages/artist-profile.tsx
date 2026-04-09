@@ -1028,7 +1028,7 @@ export default function ArtistProfile({ id }: { id: string }) {
       <div className="space-y-2">
         <div className="flex items-center gap-2">
           <Radio className="h-5 w-5 text-primary" />
-          <h2 className="text-2xl font-bold tracking-tight md:text-[2rem]">Posts and Updates</h2>
+          <h2 className="text-2xl font-bold tracking-tight text-primary md:text-[2rem]">Posts and Updates</h2>
         </div>
         <p className="text-sm text-muted-foreground">Artist-page announcements, drops, and public updates.</p>
       </div>
