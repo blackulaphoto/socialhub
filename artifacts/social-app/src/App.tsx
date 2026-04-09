@@ -17,6 +17,7 @@ import Profile from "@/pages/profile";
 import ArtistProfile from "@/pages/artist-profile";
 import Discover from "@/pages/discover";
 import Search from "@/pages/search";
+import Topic from "@/pages/topic";
 import Messages from "@/pages/messages";
 import Settings from "@/pages/settings";
 import Admin from "@/pages/admin";
@@ -113,6 +114,9 @@ function Router() {
       </Route>
       <Route path="/search">
         <AppLayout><Search /></AppLayout>
+      </Route>
+      <Route path="/topics/:tag">
+        {params => <AppLayout><Topic tag={params.tag} /></AppLayout>}
       </Route>
       <Route path="/groups">
         <AppLayout><Groups /></AppLayout>

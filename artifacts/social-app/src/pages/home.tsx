@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Image as ImageIcon,
@@ -46,6 +46,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { LoadMoreSentinel } from "@/components/load-more-sentinel";
 import { useActiveIdentity } from "@/hooks/useActiveIdentity";
 import { LocationInput } from "@/components/location-input";
+import { getTopicPath } from "@/lib/topics";
 
 const POST_DRAFT_KEY = "socialhub:post-draft";
 
@@ -60,7 +61,24 @@ function activeFeedLabel(mode: string, selectedCustomFeedName?: string | null) {
   return FEED_MODES.find((feed) => feed.value === mode)?.label || "Feed";
 }
 
+function getSuggestedCreatorReason(
+  artist: { location?: string | null; category: string; tags?: string[]; tagline?: string | null },
+  city: string,
+) {
+  if (city.trim() && artist.location?.toLowerCase().includes(city.trim().toLowerCase())) return `Near ${city.trim()}`;
+  if (artist.tags?.[0]) return `Tagged for ${artist.tags[0]}`;
+  if (artist.location?.trim()) return artist.location.trim();
+  if (artist.tagline?.trim()) return "Strong public page signal";
+  return artist.category;
+}
+
+function extractTopicTags(content: string) {
+  const matches = content.match(/#[a-z0-9_]{2,32}/gi) || [];
+  return [...new Set(matches.map((tag) => tag.toLowerCase()))];
+}
+
 export default function Home() {
+  const [location] = useLocation();
   const { user } = useAuth();
   const { activeIdentity, canUseArtistIdentity, setActiveIdentity } = useActiveIdentity();
   const { toast } = useToast();
@@ -139,6 +157,18 @@ export default function Home() {
       }>>;
     },
   });
+  const { data: trendingTopics } = useQuery({
+    queryKey: ["trending-topics"],
+    queryFn: async () => {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/trending-topics`, {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw new Error("Could not load trending topics");
+      }
+      return response.json() as Promise<{ topics: Array<{ tag: string; count: number }> }>;
+    },
+  });
 
   const { data: customFeeds } = useGetCustomFeeds({
     query: {
@@ -154,6 +184,7 @@ export default function Home() {
         setShowLinkField(false);
         setIsPostDialogOpen(false);
         queryClient.invalidateQueries({ queryKey: ["feed"] });
+        queryClient.invalidateQueries({ queryKey: ["trending-topics"] });
         queryClient.invalidateQueries({ queryKey: ["/api/users", user?.id, "posts"] });
         queryClient.invalidateQueries({ queryKey: ["/api/users", user?.id, "posts", "artist"] });
         toast({ title: "Post published", description: "Your update is now live in the feed." });
@@ -209,7 +240,24 @@ export default function Home() {
     () => data?.pages.flatMap((page) => page.posts) || [],
     [data],
   );
+  const fallbackTrendingTopics = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const post of feedPosts.slice(0, 40)) {
+      for (const tag of extractTopicTags(post.content || "")) {
+        counts.set(tag, (counts.get(tag) ?? 0) + 1);
+      }
+    }
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([tag, count]) => ({ tag, count }));
+  }, [feedPosts]);
+  const resolvedTrendingTopics = trendingTopics?.topics?.length ? trendingTopics.topics : fallbackTrendingTopics;
   const followingCount = followingPreview?.length || 0;
+  const currentPostingIdentity = canUseArtistIdentity && activeIdentity === "artist" ? "Artist Page" : "Personal";
+  const postingIdentityHelper = canUseArtistIdentity && activeIdentity === "artist"
+    ? "Posts publish into the main feed with your artist-page identity and also stay on your artist page."
+    : "Posts publish into the main feed as your personal profile.";
 
   const handlePostImageUpload = async (file: File | null) => {
     if (!file) return;
@@ -300,10 +348,13 @@ export default function Home() {
   }, [draftLoaded, postForm, user?.id]);
 
   useEffect(() => {
-    if (canUseArtistIdentity && activeIdentity === "artist") {
-      setActiveIdentity("personal");
-    }
-  }, [activeIdentity, canUseArtistIdentity, setActiveIdentity]);
+    if (typeof window === "undefined" || location !== "/") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("compose") !== "1") return;
+    setIsPostDialogOpen(true);
+    setShowLinkField(params.get("with") === "link");
+    window.history.replaceState({}, "", window.location.pathname);
+  }, [location]);
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 p-4 md:py-8">
@@ -437,7 +488,9 @@ export default function Home() {
                 <DialogContent className="max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>Create Post</DialogTitle>
-                    <DialogDescription>Start with the update. Add media after.</DialogDescription>
+                    <DialogDescription>
+                      Choose whether this publishes as Personal or Artist Page. Artist-page posts still appear in the main feed and stay attached to your creator page.
+                    </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4">
                     <div className="space-y-2">
@@ -525,6 +578,9 @@ export default function Home() {
                           Artist Page
                         </Button>
                       </div>
+                      <p className="text-xs text-muted-foreground">
+                        {postingIdentityHelper}
+                      </p>
                     </div>
                     <input
                       ref={fileInputRef}
@@ -590,6 +646,12 @@ export default function Home() {
               <div className="mt-1 text-sm text-muted-foreground">
                 What&apos;s happening? Share a release, drop, collab, or update...
               </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Badge variant="secondary">{currentPostingIdentity}</Badge>
+                <span className="text-xs text-muted-foreground">
+                  {canUseArtistIdentity ? "Switch identity before posting if you want this update to represent your artist page." : "Posts publish from your personal profile."}
+                </span>
+              </div>
             </button>
             <div className="hidden items-center gap-1 sm:flex">
               <Button
@@ -625,10 +687,10 @@ export default function Home() {
         <Card className="overflow-hidden border-border/50 bg-card/60 md:hidden">
           <CardContent className="space-y-4 p-4">
             <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-base font-semibold">Suggested Creators</h2>
-                <div className="mt-1 text-xs text-muted-foreground">Discover people to follow without leaving the feed.</div>
-              </div>
+                <div>
+                  <h2 className="text-base font-semibold">Suggested Creators</h2>
+                  <div className="mt-1 text-xs text-muted-foreground">Pulled forward from discovery so the feed never dead-ends.</div>
+                </div>
               <Link href="/discover">
                 <Button variant="ghost" size="sm" className="shrink-0">See all</Button>
               </Link>
@@ -653,6 +715,9 @@ export default function Home() {
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-sm font-semibold">{artistName}</div>
                           <div className="mt-1 text-xs text-muted-foreground">{artist.category}</div>
+                          <Badge variant="outline" className="mt-2 text-[10px] uppercase tracking-[0.18em]">
+                            {getSuggestedCreatorReason(artist, city)}
+                          </Badge>
                           {artist.location ? <div className="mt-1 text-xs text-muted-foreground">{artist.location}</div> : null}
                           {artistDescriptor ? <div className="mt-2 line-clamp-2 text-xs text-muted-foreground">{artistDescriptor}</div> : null}
                         </div>
@@ -720,12 +785,36 @@ export default function Home() {
 
       <div className="flex flex-col gap-6 lg:flex-row">
         <div className="hidden space-y-4 md:block lg:w-80">
+          <Card className="border-border/50 bg-card/50">
+            <CardContent className="space-y-4 p-4">
+              <div>
+                <h2 className="font-semibold">Trending Topics</h2>
+                <div className="mt-1 text-xs text-muted-foreground">Recent hashtags gaining traction across public posts.</div>
+              </div>
+              {resolvedTrendingTopics.length ? (
+                <div className="flex flex-wrap gap-2">
+                  {resolvedTrendingTopics.map((topic) => (
+                    <Link key={topic.tag} href={getTopicPath(topic.tag)}>
+                      <Badge variant="outline" className="cursor-pointer px-3 py-1 text-[11px] uppercase tracking-[0.18em]">
+                        {topic.tag}
+                        <span className="ml-2 text-muted-foreground">{topic.count}</span>
+                      </Badge>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-border/50 bg-background/30 p-4 text-sm text-muted-foreground">
+                  Trending topics will appear as more public posts use hashtags.
+                </div>
+              )}
+            </CardContent>
+          </Card>
           {!isLoading && (
             <Card className="border-border/50 bg-card/50">
               <CardContent className="space-y-4 p-4">
                 <div>
                   <h2 className="font-semibold">Suggested Creators</h2>
-                  <div className="mt-1 text-xs text-muted-foreground">Based on your interests and location.</div>
+                  <div className="mt-1 text-xs text-muted-foreground">Promoted from discovery so the feed can always branch into someone new.</div>
                 </div>
                 {suggestedCreators?.artists?.length ? (
                   <div className="space-y-3">
@@ -742,6 +831,11 @@ export default function Home() {
                       <div className="min-w-0 flex-1">
                         <div className="truncate font-medium">{artist.displayName || artist.user.username}</div>
                         <div className="text-xs text-muted-foreground">{[artist.category, artist.location].filter(Boolean).join(" · ")}</div>
+                        <div className="mt-2">
+                          <Badge variant="outline" className="text-[10px] uppercase tracking-[0.18em]">
+                            {getSuggestedCreatorReason(artist, city)}
+                          </Badge>
+                        </div>
                         {artist.tagline ? <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">{artist.tagline}</div> : null}
                       </div>
                     </Link>

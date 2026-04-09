@@ -30,6 +30,7 @@ import {
 
 const SECTION_LIBRARY: Array<{ key: CreatorSectionKey; label: string; description: string }> = [
   { key: "featured", label: "Featured content", description: "Lead with one thing people should notice first." },
+  { key: "posts", label: "Posts and updates", description: "Recent creator posts and announcements." },
   { key: "gallery", label: "Media gallery", description: "Image-driven showcase items." },
   { key: "video", label: "Video playlist", description: "Video embeds and reels." },
   { key: "audio", label: "Audio player", description: "Tracks, playlists, and audio releases." },
@@ -263,6 +264,7 @@ export function CreatorPageBuilder({
 
   const previewCards = {
     featured: creator.featuredTitle || creator.featuredDescription || creator.featuredUrl,
+    posts: artistPostsCount,
     gallery: assignedGalleryImages.length,
     video: assignedPlaylistVideos.length || (featuredMode === "video" && creator.featuredUrl?.trim()),
     audio: audioGallery.length || (featuredMode === "track" && creator.featuredUrl?.trim()),
@@ -950,6 +952,18 @@ export function CreatorPageBuilder({
               Open featured link <ExternalLink className="ml-2 h-4 w-4" />
             </a>
           ) : null}
+        </div>
+      );
+    }
+
+    if (key === "posts") {
+      return (
+        <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
+          <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Posts and updates</div>
+          <div className="mt-2 text-2xl font-semibold">{artistPostsCount} published post{artistPostsCount === 1 ? "" : "s"}</div>
+          <div className="mt-2 text-sm text-muted-foreground">
+            Artist-page posts appear in the creator feed area and stay associated with this page.
+          </div>
         </div>
       );
     }

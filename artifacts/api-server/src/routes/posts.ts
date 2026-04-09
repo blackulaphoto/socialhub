@@ -19,6 +19,7 @@ import { requireAuth } from "../middlewares/auth.js";
 import {
   canUsersInteract,
   canViewPost,
+  extractHashtags,
   enrichPost,
   formatUser,
   getPostsForUserIds,
@@ -103,6 +104,42 @@ router.get("/feed", async (req, res) => {
     hasMore: page.hasMore,
     mode,
   });
+});
+
+router.get("/trending-topics", async (_req, res) => {
+  const recentPosts = await db.select({
+    id: postsTable.id,
+    content: postsTable.content,
+    createdAt: postsTable.createdAt,
+  }).from(postsTable)
+    .where(eq(postsTable.visibility, "public"))
+    .orderBy(desc(postsTable.createdAt))
+    .limit(160);
+
+  const counts = new Map<string, { tag: string; count: number; latestAt: number }>();
+  for (const post of recentPosts) {
+    const tags = extractHashtags(post.content);
+    for (const tag of tags) {
+      const current = counts.get(tag);
+      const latestAt = new Date(post.createdAt).getTime();
+      if (!current) {
+        counts.set(tag, { tag, count: 1, latestAt });
+        continue;
+      }
+      current.count += 1;
+      current.latestAt = Math.max(current.latestAt, latestAt);
+    }
+  }
+
+  const topics = [...counts.values()]
+    .sort((a, b) => b.count - a.count || b.latestAt - a.latestAt)
+    .slice(0, 8)
+    .map((item) => ({
+      tag: item.tag,
+      count: item.count,
+    }));
+
+  res.json({ topics });
 });
 
 router.post("/posts", requireAuth, async (req, res) => {

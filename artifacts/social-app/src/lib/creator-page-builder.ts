@@ -2,6 +2,7 @@ export const CREATOR_BUILDER_META_KEY = "__builder";
 
 export const CREATOR_SECTION_KEYS = [
   "featured",
+  "posts",
   "gallery",
   "video",
   "audio",
@@ -57,7 +58,7 @@ type LegacyInputs = {
 
 function createDefaultSections(input: LegacyInputs): CreatorBuilderSection[] {
   const enabledModules = input.enabledModules || [];
-  const moduleOrder = input.moduleOrder?.length ? input.moduleOrder : ["featured", "about", "media", "posts", "events", "contact"];
+  const moduleOrder = input.moduleOrder?.length ? input.moduleOrder : ["featured", "posts", "media", "about", "events", "contact"];
   const visibleByKey: Record<CreatorSectionKey, boolean> = {
     featured: enabledModules.includes("featured"),
     gallery: enabledModules.includes("media"),

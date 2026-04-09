@@ -2,7 +2,7 @@ import { Link } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useFollowUser, useUnfollowUser } from "@workspace/api-client-react";
 import { useState } from "react";
-import { MapPin, Mic2, Palette, Search, Sparkles, Users } from "lucide-react";
+import { ArrowRight, MapPin, Mic2, Palette, Search, Sparkles, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -15,6 +15,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { FriendActionButton } from "@/components/friend-action-button";
 import { LocationInput } from "@/components/location-input";
+import { getTopicPath } from "@/lib/topics";
 
 type FriendshipState = {
   id?: number | null;
@@ -51,6 +52,13 @@ type DiscoverPerson = {
   mutualFriendCount?: number;
   friendship?: FriendshipState;
 };
+
+function getCreatorSuggestionReason(artist: DiscoverArtist) {
+  if (artist.location?.trim()) return `Active in ${artist.location.trim()}`;
+  if (artist.tags?.[0]) return `Matches the ${artist.tags[0]} scene`;
+  if (artist.tagline?.trim()) return "Strong public page signal";
+  return "Suggested from creator discovery activity";
+}
 
 export default function Discover() {
   const { user } = useAuth();
@@ -100,6 +108,16 @@ export default function Discover() {
       return response.json() as Promise<{ users: DiscoverPerson[]; total: number }>;
     },
   });
+  const { data: trendingTopics } = useQuery({
+    queryKey: ["trending-topics"],
+    queryFn: async () => {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/trending-topics`, {
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Could not load trending topics");
+      return response.json() as Promise<{ topics: Array<{ tag: string; count: number }> }>;
+    },
+  });
 
   const follow = useFollowUser({
     mutation: {
@@ -133,10 +151,39 @@ export default function Discover() {
 
   return (
     <div className="max-w-6xl mx-auto p-4 md:py-8 w-full space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight mb-2">Discover</h1>
-        <p className="text-muted-foreground">Artists you may like and people you may want to know nearby.</p>
-      </div>
+      <section className="relative overflow-hidden rounded-[2rem] border border-border/60 bg-[linear-gradient(135deg,rgba(255,255,255,0.97),rgba(248,250,252,0.94),rgba(224,242,254,0.9))] p-6 shadow-[0_28px_80px_-60px_rgba(15,23,42,0.6)] dark:bg-[linear-gradient(135deg,rgba(15,23,42,0.96),rgba(17,24,39,0.94),rgba(22,78,99,0.88))] md:p-8">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.18),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(14,165,233,0.16),transparent_30%)]" />
+        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-3xl">
+            <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-primary">
+              <Sparkles className="h-3.5 w-3.5" />
+              Discovery Surface
+            </div>
+            <h1 className="mt-4 text-3xl font-bold tracking-tight md:text-4xl">Find creators with enough context to decide fast.</h1>
+            <p className="mt-3 max-w-2xl text-sm text-muted-foreground md:text-base">
+              Browse by city, medium, and tags, then jump directly into the public page. This should feel like scouting a scene, not digging through a directory.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3 text-sm md:min-w-[20rem]">
+            <div className="rounded-2xl border border-border/50 bg-background/70 p-4">
+              <div className="text-muted-foreground">Creator results</div>
+              <div className="mt-1 text-lg font-semibold">{artistDirectory?.total ?? creatorCards.length}</div>
+            </div>
+            <div className="rounded-2xl border border-border/50 bg-background/70 p-4">
+              <div className="text-muted-foreground">Suggested people</div>
+              <div className="mt-1 text-lg font-semibold">{suggestedPeople?.users?.length ?? 0}</div>
+            </div>
+            <div className="rounded-2xl border border-border/50 bg-background/70 p-4">
+              <div className="text-muted-foreground">Current city filter</div>
+              <div className="mt-1 text-lg font-semibold">{location.trim() || "Any city"}</div>
+            </div>
+            <div className="rounded-2xl border border-border/50 bg-background/70 p-4">
+              <div className="text-muted-foreground">Category</div>
+              <div className="mt-1 text-lg font-semibold">{category === "all" ? "All creators" : category}</div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {!user?.hasArtistPage && (
         <Card className="overflow-hidden border-border/50 bg-card/40">
@@ -200,10 +247,47 @@ export default function Discover() {
         </CardContent>
       </Card>
 
+      <Card className="border-border/50 bg-card/40">
+        <CardContent className="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="text-sm font-semibold">Trending Topics</div>
+            <div className="mt-1 text-sm text-muted-foreground">Use current hashtag momentum as another way into the graph.</div>
+          </div>
+          {trendingTopics?.topics?.length ? (
+            <div className="grid w-full gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {trendingTopics.topics.map((topic) => (
+                <div key={topic.tag} className="rounded-2xl border border-border/60 bg-background/70 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold">{topic.tag}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">{topic.count} recent public posts</div>
+                    </div>
+                    <Badge variant="outline">Live topic</Badge>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button type="button" size="sm" variant="outline" onClick={() => setTags(topic.tag.slice(1))}>
+                      Filter here
+                    </Button>
+                    <Link href={getTopicPath(topic.tag, "artists")}>
+                      <Button size="sm" variant="ghost">Creators</Button>
+                    </Link>
+                    <Link href={getTopicPath(topic.tag, "events")}>
+                      <Button size="sm" variant="ghost">Events</Button>
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm text-muted-foreground">Trending topics will appear here as public posts adopt hashtags.</div>
+          )}
+        </CardContent>
+      </Card>
+
       <section className="space-y-4">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold">{filtersActive ? "Browse creators" : "Artists you may like"}</h2>
+            <h2 className="text-xl font-bold">{filtersActive ? "Browse creators" : "Featured creators for your graph"}</h2>
             <p className="text-sm text-muted-foreground">
               {filtersActive ? "Filtered creator pages based on your current browse settings." : "Suggested from your interests, city, and recent activity."}
             </p>
@@ -222,8 +306,8 @@ export default function Discover() {
         ) : creatorCards.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
             {creatorCards.map((artist) => (
-              <Card key={artist.id} className="overflow-hidden border-border/50 bg-card/60">
-                <div className="h-44 bg-muted relative overflow-hidden">
+              <Card key={artist.id} className="overflow-hidden border-border/50 bg-card/75 shadow-[0_16px_40px_-30px_rgba(15,23,42,0.5)]">
+                <div className="relative h-48 overflow-hidden bg-muted">
                   {artist.gallery && artist.gallery[0] ? (
                     <img
                       src={artist.gallery[0].url}
@@ -237,6 +321,13 @@ export default function Discover() {
                       <Mic2 className="w-12 h-12 text-muted-foreground/50" />
                     </div>
                   )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+                  <div className="absolute left-4 top-4 inline-flex items-center rounded-full border border-white/15 bg-black/45 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/85">
+                    Why it matches
+                  </div>
+                  <div className="absolute bottom-4 left-4 right-4 text-sm font-medium text-white">
+                    {getCreatorSuggestionReason(artist)}
+                  </div>
                 </div>
                 <CardContent className="space-y-4 p-5">
                   <div className="flex items-start gap-3">
@@ -251,6 +342,11 @@ export default function Discover() {
                     </div>
                   </div>
                   {artist.tagline ? <p className="line-clamp-2 text-sm text-muted-foreground">{artist.tagline}</p> : null}
+                  <div className="rounded-2xl border border-border/50 bg-background/40 px-3 py-2 text-xs text-muted-foreground">
+                    {artist.tags?.length
+                      ? `Signals: ${artist.tags.slice(0, 3).join(", ")}`
+                      : "Signals: public creator page, category, and location context"}
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     {artist.tags?.slice(0, 4).map((tag) => <Badge key={tag} variant="secondary">{tag}</Badge>)}
                   </div>
@@ -262,6 +358,12 @@ export default function Discover() {
                     >
                       {artist.isFollowing ? "Following" : "Follow"}
                     </Button>
+                    <Link href={`/artists/${artist.userId}`} className="ml-auto">
+                      <Button variant="ghost" size="sm">
+                        Open
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </Link>
                   </div>
                 </CardContent>
               </Card>

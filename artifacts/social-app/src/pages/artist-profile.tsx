@@ -117,7 +117,7 @@ const FONT_PRESET_CLASSES: Record<string, string> = {
   mono: "font-mono",
 };
 
-const DEFAULT_MODULE_ORDER = ["featured", "about", "media", "posts", "events", "contact"];
+const DEFAULT_MODULE_ORDER = ["featured", "posts", "media", "about", "events", "contact"];
 const BACKGROUND_STYLE_CLASSES: Record<string, string> = {
   "soft-glow": "",
   spotlight: "before:absolute before:inset-0 before:bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.14),transparent_45%)] before:pointer-events-none after:absolute after:inset-0 after:bg-[radial-gradient(circle_at_70%_30%,rgba(255,255,255,0.08),transparent_35%)] after:pointer-events-none",
@@ -957,6 +957,38 @@ export default function ArtistProfile({ id }: { id: string }) {
     );
   };
 
+  const renderRecentUpdatesSpotlight = () => {
+    if (!artistPosts.length) {
+      return null;
+    }
+
+    return (
+      <section className="space-y-4 rounded-[2rem] border border-primary/20 bg-primary/[0.045] p-4 shadow-[0_18px_60px_-42px_rgba(139,92,246,0.65)] md:p-6">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-sm uppercase tracking-[0.22em] text-muted-foreground">
+              <Radio className="h-4 w-4 text-primary" /> Recent Updates
+            </div>
+            <h2 className="text-2xl font-bold tracking-tight md:text-[2rem]">Latest from {artistPageName}</h2>
+            <p className="text-sm text-muted-foreground">
+              New artist-page posts publish into the main feed with the creator identity and stay collected here.
+            </p>
+          </div>
+          <a href="#artist-section-posts">
+            <Button variant="outline" className="border-border/60 bg-background/40">
+              Jump to all updates
+            </Button>
+          </a>
+        </div>
+        <div className="space-y-4">
+          {artistPosts.slice(0, 2).map((post) => (
+            <FeedPostCard key={`spotlight-${post.id}`} post={post} showAuthor={false} />
+          ))}
+        </div>
+      </section>
+    );
+  };
+
   const renderLinks = () => {
     // Hide Links section if no links exist
     if (allShowcaseLinks.length === 0) {
@@ -983,7 +1015,7 @@ export default function ArtistProfile({ id }: { id: string }) {
   };
 
   const renderPosts = () => (
-    <div className="space-y-5">
+    <div id="artist-section-posts" className="space-y-5">
       <div className="space-y-2">
         <div className="flex items-center gap-2">
           <Radio className="h-5 w-5 text-primary" />
@@ -997,7 +1029,7 @@ export default function ArtistProfile({ id }: { id: string }) {
           <div>
             <h3 className="text-lg font-semibold">Post as your artist page</h3>
             <div className="mt-1 text-sm text-muted-foreground">
-              These posts stay on the creator page and publish with your artist-page identity.
+              These posts publish into the main feed with your artist-page identity and stay collected on this creator page.
             </div>
           </div>
           <div className="space-y-4">
@@ -1250,9 +1282,13 @@ export default function ArtistProfile({ id }: { id: string }) {
     { key: "events", label: "Events" },
     { key: "contact", label: "Contact" },
   ];
-  const mobileHeaderTabs = mobileHeaderTabsSource.filter((item) =>
-    mobileTabSectionMap[item.key].some((sectionKey) => visibleSections.includes(sectionKey)),
-  );
+  const hasCreatorGallery = groupedCreatorGalleryImages.some((group) => group.items.length > 0);
+  const mobileHeaderTabs = mobileHeaderTabsSource.filter((item) => {
+    if (item.key === "gallery") {
+      return hasCreatorGallery || mobileTabSectionMap[item.key].some((sectionKey) => visibleSections.includes(sectionKey));
+    }
+    return mobileTabSectionMap[item.key].some((sectionKey) => visibleSections.includes(sectionKey));
+  });
 
   const renderCreatorGalleryTab = () => (
     <div className="space-y-6">
@@ -1596,6 +1632,9 @@ export default function ArtistProfile({ id }: { id: string }) {
           <div id="artist-section-overview" className="hidden md:block">
             {renderHeroRow()}
           </div>
+          <div className="hidden md:block">
+            {renderRecentUpdatesSpotlight()}
+          </div>
           <div className="space-y-4 md:hidden">
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-2xl border border-border/50 bg-background/35 p-4">
@@ -1616,12 +1655,15 @@ export default function ArtistProfile({ id }: { id: string }) {
               </div>
             </div>
             {mobileHeaderTabs.length ? (
-              <div className="overflow-x-auto border-b border-border/50">
+              <div className="overflow-x-auto border-b border-border/50" role="tablist" aria-label="Artist page sections">
                 <div className="flex min-w-max items-center gap-1">
                   {mobileHeaderTabs.map((tab) => (
                     <button
                       key={tab.key}
                       type="button"
+                      role="tab"
+                      aria-selected={activeMobileTab === tab.key}
+                      aria-controls={`artist-mobile-panel-${tab.key}`}
                       onClick={() => setMobileTabOverride(tab.key)}
                       className={cn(
                         "border-b-2 px-4 py-3 text-sm font-medium transition-colors",
@@ -1637,7 +1679,13 @@ export default function ArtistProfile({ id }: { id: string }) {
               </div>
             ) : null}
           </div>
-          <div className="space-y-8 md:hidden">
+          <div
+            className="space-y-8 md:hidden"
+            role="tabpanel"
+            id={`artist-mobile-panel-${activeMobileTab}`}
+            aria-label={`${activeMobileTab} section`}
+          >
+            {activeMobileTab !== "posts" ? null : renderRecentUpdatesSpotlight()}
             {showHeroRowInActiveMobileTab ? (
               <div className="space-y-5">
                 <div className="space-y-2 px-1">

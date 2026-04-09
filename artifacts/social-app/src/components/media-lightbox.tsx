@@ -82,6 +82,7 @@ export function MediaLightbox({
       window.addEventListener("keydown", handleKeyDown);
       return () => window.removeEventListener("keydown", handleKeyDown);
     }
+    return undefined;
   }, [currentItem, selectedId, goToPrevious, goToNext, onClose]);
 
   if (!currentItem) return null;

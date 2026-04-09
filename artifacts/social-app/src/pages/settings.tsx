@@ -43,7 +43,7 @@ import { formatCityRegion, parseCityRegion } from "@/lib/locations";
 import { groupItemsByFolder, readMediaFolderState, writeMediaFolderState } from "@/lib/media-folders";
 import { uploadImage, uploadMedia } from "@/lib/upload-image";
 import { cn } from "@/lib/utils";
-import { ArrowDown, ArrowUp, Check, Eye, EyeOff, Image as ImageIcon, Loader2, Mic2, Plus, Trash2, UploadCloud, Video } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, CheckCircle2, Eye, EyeOff, Image as ImageIcon, Loader2, Mic2, Plus, Rocket, Trash2, UploadCloud, Video } from "lucide-react";
 
 const ACTION_OPTIONS = [
   "Book Me",
@@ -382,10 +382,11 @@ export default function Settings() {
   const [detailDraft, setDetailDraft] = useState({ label: "", value: "" });
   const [isCreatingArtistPage, setIsCreatingArtistPage] = useState(false);
   const [creatorSetupStage, setCreatorSetupStage] = useState<"starter" | "advanced">("starter");
+  const [showCreatorLaunchNotice, setShowCreatorLaunchNotice] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
   const [pageModules, setPageModules] = useState<{ enabledModules: string[]; moduleOrder: string[] }>({
-    enabledModules: ["featured", "about", "media", "posts", "events", "contact"],
-    moduleOrder: ["featured", "about", "media", "posts", "events", "contact"],
+    enabledModules: ["featured", "posts", "media", "about", "events", "contact"],
+    moduleOrder: ["featured", "posts", "media", "about", "events", "contact"],
   });
   const [showcaseCategory, setShowcaseCategory] = useState<"photos" | "videos" | "audio">("photos");
   const [gallery, setGallery] = useState<{ type: GalleryItemRequestType; url: string; caption: string }>({
@@ -459,6 +460,7 @@ export default function Settings() {
     hydratedProfileUserId.current = profile.user.id;
     setIsCreatingArtistPage(false);
     setCreatorSetupStage("starter");
+    setShowCreatorLaunchNotice(false);
     setBasic({
       avatarUrl: profile.user.avatarUrl || "",
       bio: profile.user.bio || "",
@@ -519,12 +521,12 @@ export default function Settings() {
       touring: profile.artistProfile?.touring ? "true" : "false",
       acceptsCollaborations: profile.artistProfile?.acceptsCollaborations === false ? "false" : "true",
       pinnedPostId: profile.creatorSettings?.pinnedPost?.id ? String(profile.creatorSettings.pinnedPost.id) : "",
-      enabledModules: (profile.creatorSettings?.enabledModules || ["featured", "about", "media", "posts", "events", "contact"]).join(","),
-      moduleOrder: (profile.creatorSettings?.moduleOrder || ["featured", "about", "media", "posts", "events", "contact"]).join(","),
+      enabledModules: (profile.creatorSettings?.enabledModules || ["featured", "posts", "media", "about", "events", "contact"]).join(","),
+      moduleOrder: (profile.creatorSettings?.moduleOrder || ["featured", "posts", "media", "about", "events", "contact"]).join(","),
     });
     setPageModules({
-      enabledModules: profile.creatorSettings?.enabledModules?.length ? profile.creatorSettings.enabledModules : ["featured", "about", "media", "posts", "events", "contact"],
-      moduleOrder: profile.creatorSettings?.moduleOrder?.length ? profile.creatorSettings.moduleOrder : ["featured", "about", "media", "posts", "events", "contact"],
+      enabledModules: profile.creatorSettings?.enabledModules?.length ? profile.creatorSettings.enabledModules : ["featured", "posts", "media", "about", "events", "contact"],
+      moduleOrder: profile.creatorSettings?.moduleOrder?.length ? profile.creatorSettings.moduleOrder : ["featured", "posts", "media", "about", "events", "contact"],
     });
   }, [profile]);
 
@@ -1450,6 +1452,7 @@ export default function Settings() {
 
   const saveBuilderProgress = async (sectionLabel?: string) => {
     if (!user) return;
+    const creatingStarterPage = isStarterCreatorSetup;
     setSaveState((current) => ({ ...current, artistPage: "saving" }));
     try {
       await saveBasic.mutateAsync({
@@ -1462,6 +1465,13 @@ export default function Settings() {
       });
       await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
       setActiveTab("creator");
+      if (creatingStarterPage) {
+        setCreatorSetupStage("advanced");
+        setShowCreatorLaunchNotice(true);
+        setIsCreatingArtistPage(false);
+        setActiveBuilderSection("featured");
+        setSelectedBuilderBlock("featured");
+      }
       markSaved("artistPage");
       toast({
         title: sectionLabel ? `${sectionLabel} saved` : "Page builder saved",
@@ -1540,6 +1550,15 @@ export default function Settings() {
     Boolean(artist.bookingEmail?.trim()),
   ];
   const identityCompletedCount = identityChecklist.filter(Boolean).length;
+  const starterChecklistItems = [
+    { label: "Page name", done: Boolean(artist.displayName?.trim()) },
+    { label: "Category", done: Boolean(artist.category?.trim()) },
+    { label: "Location", done: Boolean(artist.location?.trim()) },
+    { label: "Tagline", done: Boolean(artist.tagline?.trim()) },
+    { label: "Contact email", done: Boolean(artist.bookingEmail?.trim()) },
+  ];
+  const starterMissingItems = starterChecklistItems.filter((item) => !item.done);
+  const starterCanLaunch = starterMissingItems.length === 0;
   const featuredSelectionLabel = creator.pinnedPostId
     ? "Pinned artist post"
     : creator.featuredType === "video"
@@ -1588,6 +1607,12 @@ export default function Settings() {
   const currentMoodDescription = MOOD_DESCRIPTIONS[creator.moodPreset || "sleek"] || MOOD_DESCRIPTIONS.sleek;
   const currentLayoutDescription = LAYOUT_DESCRIPTIONS[creator.layoutTemplate || "portfolio"] || LAYOUT_DESCRIPTIONS.portfolio;
   const currentFontDescription = FONT_DESCRIPTIONS[creator.fontPreset || "modern"] || FONT_DESCRIPTIONS.modern;
+  const creatorLaunchMetrics = [
+    { label: "Core profile", value: `${identityCompletedCount}/${identityChecklist.length}` },
+    { label: "Showcase media", value: String(showcaseItemCount) },
+    { label: "Live events", value: String(linkedEvents.length) },
+    { label: "CTA", value: creator.primaryActionLabel?.trim() ? "Ready" : "Needed" },
+  ];
   const builderSectionSummaries = {
     identity: `${identityCompletedCount}/${identityChecklist.length} core fields ready`,
     featured: hasFeaturedSelection ? `${featuredSelectionLabel} selected` : "No lead feature yet",
@@ -1989,6 +2014,112 @@ export default function Settings() {
 
         {showCreatorTools && (
           <TabsContent value="creator">
+            <div className="mb-6 space-y-4">
+              <section className="relative overflow-hidden rounded-[2rem] border border-border/60 bg-[linear-gradient(135deg,rgba(15,23,42,0.98),rgba(30,41,59,0.94),rgba(88,28,135,0.88))] p-6 text-white shadow-[0_30px_90px_-60px_rgba(15,23,42,0.9)]">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.18),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.18),transparent_30%)]" />
+                <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+                  <div className="max-w-3xl space-y-3">
+                    <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/80">
+                      <Rocket className="h-3.5 w-3.5" />
+                      {isStarterCreatorSetup ? "Quick Launch" : "Creator Page Control Room"}
+                    </div>
+                    <div>
+                      <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">
+                        {isStarterCreatorSetup ? "Launch the page with the essentials, then refine it in passes." : "Tune the public page like a live product surface."}
+                      </h2>
+                      <p className="mt-3 max-w-2xl text-sm text-white/72 md:text-base">
+                        {isStarterCreatorSetup
+                          ? "Start with identity, contact, and discoverability. Once the page exists, the builder opens the heavier featured, media, event, and styling controls."
+                          : "The first pass is done. Now tighten what leads the page, what proves credibility, and where visitors should convert."}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge className="border border-white/15 bg-white/10 text-white hover:bg-white/10">{selectedArchetype.label}</Badge>
+                      <Badge className="border border-white/15 bg-white/10 text-white hover:bg-white/10">{artist.category || "General Creator"}</Badge>
+                      <Badge className="border border-white/15 bg-white/10 text-white hover:bg-white/10">{creator.primaryActionLabel || "Contact Me"}</Badge>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-sm sm:min-w-[20rem]">
+                    {creatorLaunchMetrics.map((metric) => (
+                      <div key={metric.label} className="rounded-2xl border border-white/12 bg-white/10 p-4 backdrop-blur">
+                        <div className="text-white/60">{metric.label}</div>
+                        <div className="mt-1 text-lg font-semibold">{metric.value}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+
+              {isStarterCreatorSetup ? (
+                <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+                  <Card className="border-border/60 bg-card/70 shadow-sm">
+                    <CardHeader>
+                      <CardTitle>Starter Checklist</CardTitle>
+                      <CardDescription>These are the only things required to make the first publish feel credible.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid gap-3 sm:grid-cols-2">
+                      {starterChecklistItems.map((item) => (
+                        <div key={item.label} className={cn("rounded-2xl border px-4 py-3 text-sm", item.done ? "border-emerald-500/30 bg-emerald-500/10 text-foreground" : "border-border/50 bg-background/40 text-muted-foreground")}>
+                          <div className="flex items-center gap-2">
+                            <CheckCircle2 className={cn("h-4 w-4", item.done ? "text-emerald-500" : "text-muted-foreground/60")} />
+                            <span className="font-medium">{item.label}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-border/60 bg-card/70 shadow-sm">
+                    <CardHeader>
+                      <CardTitle>What Happens After Launch</CardTitle>
+                      <CardDescription>The builder gets deeper only after the page exists.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="rounded-2xl border border-border/50 bg-background/40 p-4 text-sm text-muted-foreground">
+                        {starterCanLaunch
+                          ? "The page is ready to launch. Save once, then jump directly into featured work, media, and CTA refinement."
+                          : `Still missing: ${starterMissingItems.map((item) => item.label.toLowerCase()).join(", ")}.`}
+                      </div>
+                      <div className="grid gap-3">
+                        {[
+                          "Pick the archetype that matches how the page should convert.",
+                          "Use a direct tagline and tags so discovery has something concrete to work with.",
+                          "Add contact email now; save featured content, media, and styling for the second pass.",
+                        ].map((tip) => (
+                          <div key={tip} className="rounded-2xl border border-border/50 bg-background/30 px-4 py-3 text-sm text-muted-foreground">
+                            {tip}
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              ) : null}
+
+              {showCreatorLaunchNotice ? (
+                <Card className="border-emerald-500/25 bg-emerald-500/10 shadow-sm">
+                  <CardContent className="flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <div className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                        <CheckCircle2 className="h-4 w-4" />
+                        Artist page created
+                      </div>
+                      <p className="mt-1 text-sm text-emerald-900/80 dark:text-emerald-100/80">
+                        The first pass is done. Next, lead with a stronger featured section, add showcase media, and tighten the conversion path.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" variant="outline" onClick={() => setLocation(`/artists/${user.id}`)}>
+                        View Public Page
+                      </Button>
+                      <Button type="button" onClick={() => setShowCreatorLaunchNotice(false)}>
+                        Keep Refining
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : null}
+            </div>
             <CreatorPageBuilder
               userId={user.id}
               username={user.username}

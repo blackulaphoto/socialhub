@@ -361,6 +361,19 @@ export async function enrichPost(post: typeof postsTable.$inferSelect, currentUs
   return enrichPostInternal(post, currentUserId, 0);
 }
 
+export function extractHashtags(content: string | null | undefined) {
+  if (!content) return [];
+  const matches = content.match(/#[a-z0-9_]{2,32}/gi) || [];
+  const seen = new Set<string>();
+  return matches
+    .map((tag) => tag.toLowerCase())
+    .filter((tag) => {
+      if (seen.has(tag)) return false;
+      seen.add(tag);
+      return true;
+    });
+}
+
 export async function canViewPost(post: typeof postsTable.$inferSelect, currentUserId?: number) {
   const visibility = POST_VISIBILITIES.has(post.visibility) ? post.visibility : "public";
   if (currentUserId === post.userId) return true;
@@ -610,6 +623,7 @@ async function enrichPostsBatch(posts: PostRecord[], currentUserId?: number, dep
     return {
       ...post,
       actorSurface: post.actorSurface ?? "personal",
+      hashtags: extractHashtags(post.content),
       likeCount: likeCountsByPostId.get(post.id) ?? 0,
       isLiked: likedPostIds.has(post.id),
       reactionCounts,

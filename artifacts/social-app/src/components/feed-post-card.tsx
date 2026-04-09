@@ -43,6 +43,7 @@ import { ReportDialog } from "@/components/report-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { extractFirstSupportedUrl, stripEmbeddedMarkup } from "@/lib/embeds";
+import { getTopicPath } from "@/lib/topics";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -51,6 +52,7 @@ type FeedPost = {
   userId: number;
   actorSurface?: "personal" | "artist";
   content: string;
+  hashtags?: string[];
   imageUrl?: string | null;
   visibility?: "public" | "friends" | "private";
   repostOfPostId?: number | null;
@@ -97,6 +99,11 @@ type FeedPost = {
     profileType?: string;
   } | null;
 };
+
+function extractPostHashtags(content: string) {
+  const matches = content.match(/#[a-z0-9_]{2,32}/gi) || [];
+  return [...new Set(matches.map((tag) => tag.toLowerCase()))];
+}
 
 export function FeedPostCard({
   post,
@@ -364,6 +371,7 @@ export function FeedPostCard({
   const comments = commentsData || post.comments || [];
   const fallbackLink = !post.media?.length ? extractFirstSupportedUrl(post.content) : null;
   const cleanedContent = stripEmbeddedMarkup(post.content);
+  const hashtags = post.hashtags?.length ? post.hashtags : extractPostHashtags(post.content);
   const visibilityLabel = post.visibility === "friends" ? "Friends" : post.visibility === "private" ? "Private" : "Public";
   const VisibilityIcon = post.visibility === "friends" ? UsersRound : post.visibility === "private" ? Lock : Globe2;
   const surfaceLabel = post.actorSurface === "artist" ? "Artist Page" : "Personal";
@@ -508,9 +516,31 @@ export function FeedPostCard({
               </div>
             </div>
             <div className="whitespace-pre-wrap text-muted-foreground">{post.originalPost.content}</div>
+            {(post.originalPost.hashtags?.length ? post.originalPost.hashtags : extractPostHashtags(post.originalPost.content)).length ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {(post.originalPost.hashtags?.length ? post.originalPost.hashtags : extractPostHashtags(post.originalPost.content)).map((tag) => (
+                  <Link key={`${post.originalPost?.id}-${tag}`} href={getTopicPath(tag)}>
+                    <Badge variant="outline" className="cursor-pointer text-[11px] uppercase tracking-[0.16em]">
+                      {tag}
+                    </Badge>
+                  </Link>
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : null}
         {cleanedContent ? <p className="whitespace-pre-wrap text-sm leading-6">{cleanedContent}</p> : null}
+        {hashtags.length ? (
+          <div className="flex flex-wrap gap-2">
+            {hashtags.map((tag) => (
+              <Link key={`${post.id}-${tag}`} href={getTopicPath(tag)}>
+                <Badge variant="outline" className="cursor-pointer text-[11px] uppercase tracking-[0.16em]">
+                  {tag}
+                </Badge>
+              </Link>
+            ))}
+          </div>
+        ) : null}
         {imageMedia.length > 0 || otherMedia.length > 0 ? (
           <div className="-mx-4 space-y-4 md:-mx-6">
             {imageMedia.map((item) => (
