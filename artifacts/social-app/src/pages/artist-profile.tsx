@@ -1746,9 +1746,14 @@ export default function ArtistProfile({ id }: { id: string }) {
                 {renderHeroRow()}
               </div>
             ) : null}
-            {activeMobileTab === "gallery"
-              ? renderCreatorGalleryTab()
-              : mobileVisibleSections.map((key) => renderSectionBlock(key))}
+            {activeMobileTab === "gallery" ? (
+              <>
+                {renderCreatorGalleryTab()}
+                {mobileVisibleSections.map((key) => renderSectionBlock(key))}
+              </>
+            ) : (
+              mobileVisibleSections.map((key) => renderSectionBlock(key))
+            )}
             {activeMobileTab !== "posts" ? null : renderRecentUpdatesSpotlight()}
           </div>
           <div className="hidden space-y-8 md:space-y-10 md:block">
