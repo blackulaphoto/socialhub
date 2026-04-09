@@ -250,7 +250,7 @@ export default function Profile({ id }: { id: string }) {
                   )}
                 </div>
 
-                <div className="flex flex-wrap gap-3">
+                <div className="relative z-10 flex flex-wrap gap-3">
                   {isOwnProfile ? (
                     <>
                       <Link href="/settings">
@@ -293,11 +293,7 @@ export default function Profile({ id }: { id: string }) {
                             <Compass className="mr-2 h-4 w-4" /> Creator Page
                           </Button>
                         </Link>
-                      ) : (
-                        <Link href="/messages">
-                          <Button variant="secondary">Inbox</Button>
-                        </Link>
-                      )}
+                      ) : null}
                     </>
                   )}
                   {artistProfile?.category && (
@@ -307,11 +303,18 @@ export default function Profile({ id }: { id: string }) {
                       </Button>
                     </Link>
                   )}
-                  <Link href={`/profile/${user.id}?tab=photos`}>
-                    <Button variant="outline">
-                      <Camera className="mr-2 h-4 w-4" /> Photos
-                    </Button>
-                  </Link>
+                  {isOwnProfile ? (
+                    <>
+                      <Link href="/messages">
+                        <Button variant="secondary">Inbox</Button>
+                      </Link>
+                      <Link href={`/profile/${user.id}?tab=photos`}>
+                        <Button variant="outline">
+                          <Camera className="mr-2 h-4 w-4" /> Photos
+                        </Button>
+                      </Link>
+                    </>
+                  ) : null}
                 </div>
               </div>
 
