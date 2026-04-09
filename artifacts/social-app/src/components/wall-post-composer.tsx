@@ -107,7 +107,7 @@ export function WallPostComposer({ targetUserId, targetUserName, onSuccess }: Wa
   if (!user) return null;
 
   return (
-    <Card className="border-border/70 bg-card/90 shadow-sm">
+    <Card className="border border-primary/45 bg-white text-slate-900 shadow-[0_0_0_2px_rgba(139,92,246,0.2)] ring-1 ring-primary/25 dark:bg-white dark:text-slate-900">
       <CardContent className="p-4 md:p-5">
         <Dialog open={isOpen} onOpenChange={(open) => {
           setIsOpen(open);
@@ -116,7 +116,7 @@ export function WallPostComposer({ targetUserId, targetUserName, onSuccess }: Wa
           <DialogTrigger asChild>
             <button
               type="button"
-              className="w-full rounded-2xl border border-slate-300/85 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.95))] px-4 py-4 text-left shadow-sm transition-colors hover:border-primary/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 dark:border-slate-700/80 dark:bg-[linear-gradient(180deg,rgba(17,24,39,0.96),rgba(15,23,42,0.94))]"
+              className="w-full rounded-2xl border border-primary/40 bg-white px-4 py-4 text-left shadow-[0_0_0_1px_rgba(139,92,246,0.14)] transition-colors hover:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 dark:bg-white"
             >
               <div className="flex items-center gap-3">
                 <Avatar className="h-10 w-10">
