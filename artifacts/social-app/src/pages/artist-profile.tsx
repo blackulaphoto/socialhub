@@ -1260,13 +1260,13 @@ export default function ArtistProfile({ id }: { id: string }) {
     contact: renderContact(),
   };
 
-  // Posts section is always visible, even though it's not in the builder
-  const visibleSections = [
+  // Posts should always exist, but only once in the final section order.
+  const visibleSections = Array.from(new Set([
     ...builderMeta.sections
       .filter((section) => section.visible && sections[section.key])
       .map((section) => section.key),
-    "posts", // Always include posts section
-  ];
+    "posts",
+  ]));
   const mobileTabSectionMap = {
     posts: ["featured", "posts"],
     gallery: ["gallery", "video", "audio", "links"],
@@ -1631,9 +1631,6 @@ export default function ArtistProfile({ id }: { id: string }) {
         <div className="space-y-8 md:space-y-10">
           <div id="artist-section-overview" className="hidden md:block">
             {renderHeroRow()}
-          </div>
-          <div className="hidden md:block">
-            {renderRecentUpdatesSpotlight()}
           </div>
           <div className="space-y-4 md:hidden">
             <div className="grid grid-cols-2 gap-3">

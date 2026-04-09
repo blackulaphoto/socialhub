@@ -131,15 +131,15 @@ export function AppSidebar() {
               <p className="mt-1 text-xs text-muted-foreground">Creator pages, local scenes, and direct activity.</p>
             </div>
           </div>
-          <div className="mt-4 flex gap-2">
-            <Link href="/?compose=1" className="flex-1">
-              <Button className="h-9 w-full rounded-full">
+          <div className="mt-4 grid gap-2">
+            <Link href="/?compose=1" className="w-full">
+              <Button className="h-9 w-full justify-start rounded-full px-4">
                 <Plus className="mr-2 h-4 w-4" />
                 Create
               </Button>
             </Link>
-            <Link href={user?.hasArtistPage ? `/artists/${user?.id}` : "/settings?tab=creator"} className="flex-1">
-              <Button variant="outline" className="h-9 w-full rounded-full">
+            <Link href={user?.hasArtistPage ? `/artists/${user?.id}` : "/settings?tab=creator"} className="w-full">
+              <Button variant="outline" className="h-9 w-full justify-start rounded-full px-4">
                 <Palette className="mr-2 h-4 w-4" />
                 {user?.hasArtistPage ? "Artist Page" : "Start Page"}
               </Button>

@@ -54,9 +54,6 @@ export default function Login() {
           <CardDescription className="text-muted-foreground text-base">
             Enter the underground. Discover the scene.
           </CardDescription>
-          <div className="rounded-2xl border border-border/50 bg-background/50 px-4 py-3 text-left text-sm text-muted-foreground">
-            Demo admin: <span className="text-foreground">admin@socialhub.local</span> / <span className="text-foreground">admin123</span>
-          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
