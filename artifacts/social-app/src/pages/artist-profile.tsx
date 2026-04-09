@@ -399,10 +399,19 @@ export default function ArtistProfile({ id }: { id: string }) {
     hasAudio: (artist.gallery || []).some((item) => item.type === "audio"),
   });
   const saved = savedIds.includes(userId);
-  const gallery = artist.gallery || [];
-  const imageGallery = gallery.filter((item) => item.type === "image");
-  const videoGallery = gallery.filter((item) => item.type === "video");
-  const audioGallery = gallery.filter((item) => item.type === "audio");
+  const getGalleryEffectiveType = (item: { type?: string | null; url?: string | null }) => {
+    const inferred = getEmbedDescriptor(item.url);
+    if (inferred?.kind === "audio") return "audio";
+    if (inferred?.kind === "video") return "video";
+    return item.type || "image";
+  };
+  const gallery = (artist.gallery || []).map((item) => ({
+    ...item,
+    effectiveType: getGalleryEffectiveType(item),
+  }));
+  const imageGallery = gallery.filter((item) => item.effectiveType === "image");
+  const videoGallery = gallery.filter((item) => item.effectiveType === "video");
+  const audioGallery = gallery.filter((item) => item.effectiveType === "audio");
   const capabilityFlags = [
     artist.openForCommissions ? "Open for commissions" : null,
     artist.touring ? "Touring" : null,

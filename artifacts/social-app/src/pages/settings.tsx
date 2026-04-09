@@ -1374,10 +1374,19 @@ export default function Settings() {
     pinnedPostId: creator.pinnedPostId ? Number(creator.pinnedPostId) : null,
   });
 
-  const showcaseItems = profile?.artistProfile?.gallery || [];
-  const showcaseImages = showcaseItems.filter((item) => item.type === "image");
-  const showcaseVideos = showcaseItems.filter((item) => item.type === "video");
-  const showcaseAudio = showcaseItems.filter((item) => item.type === "audio");
+  const getShowcaseEffectiveType = (item: { type?: string | null; url?: string | null }) => {
+    const inferred = getEmbedDescriptor(item.url);
+    if (inferred?.kind === "audio") return "audio";
+    if (inferred?.kind === "video") return "video";
+    return item.type || "image";
+  };
+  const showcaseItems = (profile?.artistProfile?.gallery || []).map((item) => ({
+    ...item,
+    effectiveType: getShowcaseEffectiveType(item),
+  }));
+  const showcaseImages = showcaseItems.filter((item) => item.effectiveType === "image");
+  const showcaseVideos = showcaseItems.filter((item) => item.effectiveType === "video");
+  const showcaseAudio = showcaseItems.filter((item) => item.effectiveType === "audio");
   const groupedProfilePhotos = groupItemsByFolder(userPhotos || [], (item) => String(item.id || item.imageUrl), profileFolderState.assignments);
   const groupedShowcaseImages = groupItemsByFolder(showcaseImages, (item) => String(item.id), showcaseFolderState.assignments);
   const groupedShowcaseVideos = groupItemsByFolder(showcaseVideos, (item) => String(item.id), showcaseFolderState.assignments);
@@ -1715,8 +1724,8 @@ export default function Settings() {
       url: item.url,
       thumbnail: (item as { thumbnailUrl?: string | null }).thumbnailUrl || undefined,
     }));
-  const showcaseAudioTracks = (profile.artistProfile?.gallery || [])
-    .filter((item) => item.type === "audio")
+  const showcaseAudioTracks = showcaseItems
+    .filter((item) => item.effectiveType === "audio")
     .filter((item) => (currentBuilderMeta.audioItemIds?.length ? currentBuilderMeta.audioItemIds.includes(Number(item.id)) : true))
     .slice(0, 5)
     .map((item, index) => ({
@@ -4059,8 +4068,9 @@ export default function Settings() {
                             <div key={`${group.label}-${folderGroup.folder}`} className="space-y-3">
                               <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{folderGroup.folder}</div>
                               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                {folderGroup.items.map((item) => {
-                  const matchesPickerType = !creatorPickerTarget || item.type === showcasePickerType;
+                {folderGroup.items.map((item) => {
+                  const effectiveType = (item as typeof item & { effectiveType?: string }).effectiveType || item.type;
+                  const matchesPickerType = !creatorPickerTarget || effectiveType === showcasePickerType;
                   const isSelected = pickerSelectedIds.includes(item.id);
                   return (
                   <Card
@@ -4078,10 +4088,10 @@ export default function Settings() {
                     }}
                   >
                     <MediaEmbed
-                      type={item.type}
+                      type={effectiveType}
                       url={item.url}
                       title={item.caption}
-                      className={item.type === "image" ? "h-48 w-full object-cover" : item.type === "video" ? "aspect-video w-full border-0" : "h-40 w-full border-0"}
+                      className={effectiveType === "image" ? "h-48 w-full object-cover" : effectiveType === "video" ? "aspect-video w-full border-0" : "h-40 w-full border-0"}
                     />
                     <CardContent className="space-y-3 p-4">
                       {creatorPickerTarget && matchesPickerType && isSelected && (
