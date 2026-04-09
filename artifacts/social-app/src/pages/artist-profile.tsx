@@ -1306,7 +1306,7 @@ export default function ArtistProfile({ id }: { id: string }) {
     .map((section) => section.key);
   const visibleSections = Array.from(new Set([
     ...baseVisibleSections,
-    ...(assignedAudioItems.length && sections.audio ? ["audio"] : []),
+    ...(assignedAudioItems.length ? ["audio"] : []),
     "posts",
   ]));
   const mobileTabSectionMap = {

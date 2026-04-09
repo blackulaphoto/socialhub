@@ -694,7 +694,10 @@ router.get("/:userId/artist-posts", async (req, res) => {
   const limit = Math.min(Math.max(Number(req.query.limit) || 12, 1), 30);
 
   const conditions = or(
-    eq(postsTable.userId, userId),
+    and(
+      eq(postsTable.userId, userId),
+      eq(postsTable.actorSurface, "artist")
+    ),
     and(
       eq(postsTable.wallPostTargetUserId, userId),
       eq(postsTable.wallPostStatus, "approved")
