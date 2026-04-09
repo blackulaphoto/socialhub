@@ -1034,7 +1034,7 @@ export default function ArtistProfile({ id }: { id: string }) {
       </div>
 
       {isOwnArtistPage && (
-        <section className="space-y-4 rounded-[1.75rem] border border-primary/50 bg-white p-5 text-slate-900 shadow-[0_0_0_2px_rgba(139,92,246,0.22)] ring-1 ring-primary/30 dark:bg-white dark:text-slate-900">
+        <section className="space-y-4 rounded-[1.75rem] border border-primary/50 bg-background/35 p-5 shadow-[0_0_0_2px_rgba(139,92,246,0.22)] ring-1 ring-primary/30">
           <div>
             <h3 className="text-lg font-semibold text-primary">Post as your artist page</h3>
             <div className="mt-1 text-sm text-muted-foreground">
@@ -1046,18 +1046,20 @@ export default function ArtistProfile({ id }: { id: string }) {
               placeholder="Share a release, set update, gallery drop, booking note, or artist-page announcement..."
               value={artistPostForm.content}
               onChange={(e) => setArtistPostForm((current) => ({ ...current, content: e.target.value }))}
-              className="min-h-32"
+              className="min-h-32 border-primary/40 bg-white text-slate-900 placeholder:text-slate-500 shadow-[0_0_0_1px_rgba(139,92,246,0.16)] focus-visible:ring-2 focus-visible:ring-primary/40"
             />
             <div className="grid gap-3 md:grid-cols-2">
               <Input
                 placeholder="Paste a video, article, or music link"
                 value={artistPostForm.linkUrl}
                 onChange={(e) => setArtistPostForm((current) => ({ ...current, linkUrl: e.target.value }))}
+                className="border-primary/40 bg-white text-slate-900 placeholder:text-slate-500 shadow-[0_0_0_1px_rgba(139,92,246,0.12)] focus-visible:ring-2 focus-visible:ring-primary/40"
               />
               <Input
                 placeholder="Visibility: public, friends, or private"
                 value={artistPostForm.visibility}
                 readOnly
+                className="border-primary/40 bg-white text-slate-900 placeholder:text-slate-500 shadow-[0_0_0_1px_rgba(139,92,246,0.12)] focus-visible:ring-2 focus-visible:ring-primary/40"
               />
             </div>
             <div className="flex flex-wrap items-center gap-3">

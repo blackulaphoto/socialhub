@@ -107,7 +107,7 @@ export function WallPostComposer({ targetUserId, targetUserName, onSuccess }: Wa
   if (!user) return null;
 
   return (
-    <Card className="border border-primary/45 bg-white text-slate-900 shadow-[0_0_0_2px_rgba(139,92,246,0.2)] ring-1 ring-primary/25 dark:bg-white dark:text-slate-900">
+    <Card className="border border-primary/45 bg-card/90 shadow-[0_0_0_2px_rgba(139,92,246,0.2)] ring-1 ring-primary/25">
       <CardContent className="p-4 md:p-5">
         <Dialog open={isOpen} onOpenChange={(open) => {
           setIsOpen(open);
@@ -116,7 +116,7 @@ export function WallPostComposer({ targetUserId, targetUserName, onSuccess }: Wa
           <DialogTrigger asChild>
             <button
               type="button"
-              className="w-full rounded-2xl border border-primary/40 bg-white px-4 py-4 text-left shadow-[0_0_0_1px_rgba(139,92,246,0.14)] transition-colors hover:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 dark:bg-white"
+              className="w-full rounded-2xl border border-primary/40 bg-white px-4 py-4 text-left text-slate-900 shadow-[0_0_0_1px_rgba(139,92,246,0.14)] transition-colors hover:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
             >
               <div className="flex items-center gap-3">
                 <Avatar className="h-10 w-10">
@@ -140,12 +140,12 @@ export function WallPostComposer({ targetUserId, targetUserName, onSuccess }: Wa
             <div className="space-y-4">
               <div className="space-y-2">
                 <div className="text-sm font-medium">Your message</div>
-                <Textarea
-                  placeholder={`Write something for ${targetUserName}...`}
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  className="min-h-32 rounded-2xl border border-border bg-background px-4 py-4 text-base shadow-sm focus-visible:ring-2 focus-visible:ring-primary/25"
-                />
+              <Textarea
+                placeholder={`Write something for ${targetUserName}...`}
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                className="min-h-32 rounded-2xl border border-primary/40 bg-white px-4 py-4 text-base text-slate-900 placeholder:text-slate-500 shadow-[0_0_0_1px_rgba(139,92,246,0.14)] focus-visible:ring-2 focus-visible:ring-primary/40"
+              />
               </div>
 
               <div className="space-y-3 rounded-2xl border border-border/60 bg-background/40 p-4">
@@ -215,6 +215,7 @@ export function WallPostComposer({ targetUserId, targetUserName, onSuccess }: Wa
                       placeholder="Paste a video, article, audio, or link"
                       value={linkUrl}
                       onChange={(e) => setLinkUrl(e.target.value)}
+                      className="border-primary/40 bg-white text-slate-900 placeholder:text-slate-500 shadow-[0_0_0_1px_rgba(139,92,246,0.12)] focus-visible:ring-2 focus-visible:ring-primary/40"
                     />
                     <div className="flex justify-end">
                       <Button variant="ghost" size="sm" onClick={() => setShowLinkField(false)}>Done</Button>
