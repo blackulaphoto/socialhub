@@ -53,6 +53,16 @@ test.describe("Artist page current workflows", () => {
     await expect(page.getByRole("button", { name: /Gallery/i }).first()).toBeVisible();
   });
 
+  test("artist page gallery button opens the gallery section", async ({ page }) => {
+    await loginAsAdmin(page);
+    await page.goto("/artists/1");
+
+    await page.getByRole("button", { name: "Gallery" }).first().click();
+
+    await expect(page).toHaveURL(/\/artists\/1\?view=gallery$/);
+    await expect(page.getByRole("heading", { name: "Creator Gallery" }).first()).toBeVisible();
+  });
+
   test("artist identity carries into the feed composer with explicit publishing guidance", async ({ page }) => {
     await loginAsAdmin(page);
     await page.goto("/artists/1");
@@ -123,6 +133,22 @@ test.describe("Artist page current workflows", () => {
     await expect(page.getByText("Starter Checklist")).toBeVisible();
   });
 
+  test("onboarding profile step collects expanded identity details", async ({ page }) => {
+    const timestamp = Date.now();
+    const username = `profilebuilder${timestamp}`;
+
+    await page.goto("/register");
+    await page.getByLabel("Username").fill(username);
+    await page.getByLabel("Email").fill(`${username}@example.com`);
+    await page.getByLabel("Password").fill("password123");
+    await page.getByRole("button", { name: "Create Account" }).click();
+
+    await expect(page).toHaveURL(/\/onboarding/);
+    await expect(page.getByRole("spinbutton", { name: "Age" })).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "Work" })).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "School" })).toBeVisible();
+  });
+
   test("artist page loads on mobile with stats and tabs", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await loginAsAdmin(page);
@@ -145,7 +171,7 @@ test.describe("Artist page current workflows", () => {
     await page.getByRole("tablist", { name: "Artist page sections" }).getByRole("tab", { name: "Gallery" }).click();
 
     await expect(page.getByRole("tab", { name: "Gallery", selected: true })).toBeVisible();
-    await expect(page.getByText("Creator Gallery")).toBeVisible();
-    await expect(page.getByText(/All creator images in one full gallery/i)).toBeVisible();
+    await expect(page.locator("#artist-mobile-panel-gallery").getByRole("heading", { name: "Creator Gallery" })).toBeVisible();
+    await expect(page.locator("#artist-mobile-panel-gallery").getByText(/All creator images in one full gallery/i)).toBeVisible();
   });
 });

@@ -32,6 +32,7 @@ export type CreatorBuilderMeta = {
   heroSliderItemIds?: number[];
   galleryItemIds?: number[];
   videoItemIds?: number[];
+  audioItemIds?: number[];
   heroInfoTitle?: string;
   heroInfoDescription?: string;
   heroInfoPhone?: string;
@@ -133,6 +134,7 @@ export function readCreatorBuilderMeta(
           heroSliderItemIds: Array.isArray(meta.heroSliderItemIds) ? meta.heroSliderItemIds.map(Number).filter(Number.isFinite) : [],
           galleryItemIds: Array.isArray(meta.galleryItemIds) ? meta.galleryItemIds.map(Number).filter(Number.isFinite) : [],
           videoItemIds: Array.isArray(meta.videoItemIds) ? meta.videoItemIds.map(Number).filter(Number.isFinite) : [],
+          audioItemIds: Array.isArray(meta.audioItemIds) ? meta.audioItemIds.map(Number).filter(Number.isFinite) : [],
           heroInfoTitle: typeof meta.heroInfoTitle === "string" ? meta.heroInfoTitle : "",
           heroInfoDescription: typeof meta.heroInfoDescription === "string" ? meta.heroInfoDescription : "",
           heroInfoPhone: typeof meta.heroInfoPhone === "string" ? meta.heroInfoPhone : "",
@@ -166,6 +168,7 @@ export function readCreatorBuilderMeta(
     heroSliderItemIds: [],
     galleryItemIds: [],
     videoItemIds: [],
+    audioItemIds: [],
     heroInfoTitle: "",
     heroInfoDescription: "",
     heroInfoPhone: "",

@@ -555,10 +555,10 @@ export default function Settings() {
 
   const creatorPickerTarget = useMemo(() => {
     const value = new URLSearchParams(currentSearch).get("picker");
-    return value === "hero-slider" || value === "hero" || value === "gallery" || value === "video" || value === "featured-gallery" || value === "featured-video" || value === "featured-audio" ? value : null;
+    return value === "hero-slider" || value === "hero" || value === "gallery" || value === "video" || value === "audio" || value === "featured-gallery" || value === "featured-video" || value === "featured-audio" ? value : null;
   }, [currentSearch]);
 
-  const openCreatorShowcase = (target: "hero-slider" | "hero" | "gallery" | "video" | "featured-gallery" | "featured-video" | "featured-audio") => {
+  const openCreatorShowcase = (target: "hero-slider" | "hero" | "gallery" | "video" | "audio" | "featured-gallery" | "featured-video" | "featured-audio") => {
     setActiveTab("gallery");
     setLocation(`/settings?tab=gallery&returnTo=creator&picker=${target}`);
     if (typeof window !== "undefined") {
@@ -769,6 +769,8 @@ export default function Settings() {
           updateBuilderMeta({ heroSliderItemIds: Array.from(new Set([...(currentBuilderMeta.heroSliderItemIds || []), ...addedIds])) });
         } else if (creatorPickerTarget === "gallery" && gallery.type === GalleryItemRequestType.image) {
           updateBuilderMeta({ galleryItemIds: Array.from(new Set([...(currentBuilderMeta.galleryItemIds || []), ...addedIds])) });
+        } else if (creatorPickerTarget === "featured-gallery" && gallery.type === GalleryItemRequestType.image) {
+          updateBuilderMeta({ featuredGalleryItemIds: Array.from(new Set([...(currentBuilderMeta.featuredGalleryItemIds || []), ...addedIds])) });
         } else if (creatorPickerTarget === "hero" && gallery.type === GalleryItemRequestType.image) {
           updateBuilderMeta({
             heroMediaType: "image",
@@ -776,6 +778,12 @@ export default function Settings() {
           });
         } else if (creatorPickerTarget === "video" && gallery.type === GalleryItemRequestType.video) {
           updateBuilderMeta({ videoItemIds: Array.from(new Set([...(currentBuilderMeta.videoItemIds || []), ...addedIds])) });
+        } else if (creatorPickerTarget === "featured-video" && gallery.type === GalleryItemRequestType.video) {
+          updateBuilderMeta({ featuredVideoItemIds: Array.from(new Set([...(currentBuilderMeta.featuredVideoItemIds || []), ...addedIds])) });
+        } else if (creatorPickerTarget === "audio" && gallery.type === GalleryItemRequestType.audio) {
+          updateBuilderMeta({ audioItemIds: Array.from(new Set([...(currentBuilderMeta.audioItemIds || []), ...addedIds])) });
+        } else if (creatorPickerTarget === "featured-audio" && gallery.type === GalleryItemRequestType.audio) {
+          updateBuilderMeta({ featuredAudioItemIds: Array.from(new Set([...(currentBuilderMeta.featuredAudioItemIds || []), ...addedIds])) });
         } else if (creatorPickerTarget === "hero" && gallery.type === GalleryItemRequestType.video) {
           updateBuilderMeta({ heroMediaType: "video", heroItemIds: Array.from(new Set([...(currentBuilderMeta.heroItemIds || []), ...addedIds])) });
         }
@@ -800,16 +808,52 @@ export default function Settings() {
 
   const addSingleShowcaseItem = async () => {
     if (!user || !gallery.url.trim()) return;
-    const created = await addGalleryItem.mutateAsync({ userId: user.id, data: gallery });
+    const inferredEmbed = getEmbedDescriptor(gallery.url.trim());
+    const normalizedType = creatorPickerTarget && showcasePickerType === "audio"
+      ? GalleryItemRequestType.audio
+      : creatorPickerTarget && showcasePickerType === "video"
+        ? GalleryItemRequestType.video
+        : creatorPickerTarget && showcasePickerType === "image"
+          ? GalleryItemRequestType.image
+          : inferredEmbed?.kind === "audio"
+            ? GalleryItemRequestType.audio
+            : inferredEmbed?.kind === "video"
+              ? GalleryItemRequestType.video
+              : gallery.type;
+    const created = await addGalleryItem.mutateAsync({
+      userId: user.id,
+      data: {
+        ...gallery,
+        type: normalizedType,
+      },
+    });
     if (creatorPickerTarget && typeof created?.id === "number") {
-      if (creatorPickerTarget === "hero-slider" && gallery.type === GalleryItemRequestType.image) {
+      if (creatorPickerTarget === "hero-slider" && normalizedType === GalleryItemRequestType.image) {
         updateBuilderMeta({ heroSliderItemIds: Array.from(new Set([...(currentBuilderMeta.heroSliderItemIds || []), created.id])) });
       }
-      if (creatorPickerTarget === "video" && gallery.type === GalleryItemRequestType.video) {
+      if (creatorPickerTarget === "gallery" && normalizedType === GalleryItemRequestType.image) {
+        updateBuilderMeta({ galleryItemIds: Array.from(new Set([...(currentBuilderMeta.galleryItemIds || []), created.id])) });
+      }
+      if (creatorPickerTarget === "featured-gallery" && normalizedType === GalleryItemRequestType.image) {
+        updateBuilderMeta({ featuredGalleryItemIds: Array.from(new Set([...(currentBuilderMeta.featuredGalleryItemIds || []), created.id])) });
+      }
+      if (creatorPickerTarget === "video" && normalizedType === GalleryItemRequestType.video) {
         updateBuilderMeta({ videoItemIds: Array.from(new Set([...(currentBuilderMeta.videoItemIds || []), created.id])) });
       }
-      if (creatorPickerTarget === "hero" && gallery.type === GalleryItemRequestType.video) {
+      if (creatorPickerTarget === "featured-video" && normalizedType === GalleryItemRequestType.video) {
+        updateBuilderMeta({ featuredVideoItemIds: Array.from(new Set([...(currentBuilderMeta.featuredVideoItemIds || []), created.id])) });
+      }
+      if (creatorPickerTarget === "audio" && normalizedType === GalleryItemRequestType.audio) {
+        updateBuilderMeta({ audioItemIds: Array.from(new Set([...(currentBuilderMeta.audioItemIds || []), created.id])) });
+      }
+      if (creatorPickerTarget === "featured-audio" && normalizedType === GalleryItemRequestType.audio) {
+        updateBuilderMeta({ featuredAudioItemIds: Array.from(new Set([...(currentBuilderMeta.featuredAudioItemIds || []), created.id])) });
+      }
+      if (creatorPickerTarget === "hero" && normalizedType === GalleryItemRequestType.video) {
         updateBuilderMeta({ heroMediaType: "video", heroItemIds: [created.id] });
+      }
+      if (creatorPickerTarget === "hero" && normalizedType === GalleryItemRequestType.image) {
+        updateBuilderMeta({ heroMediaType: "image", heroItemIds: [created.id] });
       }
     }
   };
@@ -1375,11 +1419,13 @@ export default function Settings() {
     ? "video"
     : creatorPickerTarget === "featured-video"
       ? "video"
-      : creatorPickerTarget === "featured-audio"
+      : creatorPickerTarget === "audio"
         ? "audio"
-        : creatorPickerTarget === "hero" && currentBuilderMeta.heroMediaType === "video"
-          ? "video"
-          : "image";
+        : creatorPickerTarget === "featured-audio"
+          ? "audio"
+          : creatorPickerTarget === "hero" && currentBuilderMeta.heroMediaType === "video"
+            ? "video"
+            : "image";
 
   const pickerDestinationLabel = creatorPickerTarget === "hero-slider"
     ? "Hero Slider"
@@ -1389,13 +1435,20 @@ export default function Settings() {
         ? "Media Gallery"
         : creatorPickerTarget === "video"
           ? "Video Playlist"
-          : null;
+          : creatorPickerTarget === "audio"
+            ? "Audio Player"
+            : creatorPickerTarget === "featured-audio"
+              ? "Featured Audio"
+              : null;
 
   useEffect(() => {
     if (!creatorPickerTarget) return;
     if (showcasePickerType === "video") {
       setShowcaseCategory("videos");
       setGallery((current) => ({ ...current, type: GalleryItemRequestType.video }));
+    } else if (showcasePickerType === "audio") {
+      setShowcaseCategory("audio");
+      setGallery((current) => ({ ...current, type: GalleryItemRequestType.audio }));
     } else {
       setShowcaseCategory("photos");
       setGallery((current) => ({ ...current, type: GalleryItemRequestType.image }));
@@ -1405,9 +1458,11 @@ export default function Settings() {
   const pickerSelectedIds = creatorPickerTarget === "hero-slider"
     ? currentBuilderMeta.heroSliderItemIds || []
     : creatorPickerTarget === "gallery"
-    ? currentBuilderMeta.galleryItemIds || []
-    : creatorPickerTarget === "video"
-      ? currentBuilderMeta.videoItemIds || []
+      ? currentBuilderMeta.galleryItemIds || []
+      : creatorPickerTarget === "video"
+        ? currentBuilderMeta.videoItemIds || []
+        : creatorPickerTarget === "audio"
+          ? currentBuilderMeta.audioItemIds || []
       : creatorPickerTarget === "featured-gallery"
         ? currentBuilderMeta.featuredGalleryItemIds || []
         : creatorPickerTarget === "featured-video"
@@ -1431,6 +1486,8 @@ export default function Settings() {
       updateBuilderMeta({ galleryItemIds: nextIds });
     } else if (creatorPickerTarget === "video") {
       updateBuilderMeta({ videoItemIds: nextIds });
+    } else if (creatorPickerTarget === "audio") {
+      updateBuilderMeta({ audioItemIds: nextIds });
     } else if (creatorPickerTarget === "featured-gallery") {
       updateBuilderMeta({ featuredGalleryItemIds: nextIds });
     } else if (creatorPickerTarget === "featured-video") {
@@ -1649,6 +1706,7 @@ export default function Settings() {
     }));
   const showcaseAudioTracks = (profile.artistProfile?.gallery || [])
     .filter((item) => item.type === "audio")
+    .filter((item) => (currentBuilderMeta.audioItemIds?.length ? currentBuilderMeta.audioItemIds.includes(Number(item.id)) : true))
     .slice(0, 5)
     .map((item, index) => ({
       id: String(item.id || `audio-${index}`),
@@ -3730,8 +3788,8 @@ export default function Settings() {
           <TabsContent value="gallery">
             {/* Sticky Picker Header */}
             {creatorPickerTarget && (() => {
-              const pickerType = creatorPickerTarget === "video" ? "video" : "image";
-              const pickerLabel = pickerType === "video" ? "Videos" : "Images";
+              const pickerType = showcasePickerType;
+              const pickerLabel = pickerType === "video" ? "Videos" : pickerType === "audio" ? "Audio" : "Images";
               const destinationLabel = pickerDestinationLabel || "Page Section";
 
               return (
@@ -3757,6 +3815,10 @@ export default function Settings() {
                         <Video className="h-3.5 w-3.5" />
                         Videos only
                       </Badge>
+                      <Badge variant={showcasePickerType === "audio" ? "default" : "secondary"} className="gap-2 px-3 py-1 text-xs uppercase tracking-[0.18em]">
+                        <Mic2 className="h-3.5 w-3.5" />
+                        Audio only
+                      </Badge>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <Button type="button" onClick={applyShowcaseSelection} disabled={pickerSelectedIds.length === 0}>
@@ -3774,10 +3836,10 @@ export default function Settings() {
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               <Card className="border-border/50 bg-card/50">
                 <CardHeader>
-                  <CardTitle>{creatorPickerTarget ? `Add ${showcasePickerType === "video" ? "Videos" : "Images"} to ${pickerDestinationLabel}` : "Creator Showcase"}</CardTitle>
+                  <CardTitle>{creatorPickerTarget ? `Add ${showcasePickerType === "video" ? "Videos" : showcasePickerType === "audio" ? "Audio" : "Images"} to ${pickerDestinationLabel}` : "Creator Showcase"}</CardTitle>
                   <CardDescription>
                     {creatorPickerTarget
-                      ? `You are in picker mode for ${pickerDestinationLabel}. Select existing ${showcasePickerType === "video" ? "videos" : "images"} or upload new ones and they will be assigned to that section.`
+                      ? `You are in picker mode for ${pickerDestinationLabel}. Select existing ${showcasePickerType === "video" ? "videos" : showcasePickerType === "audio" ? "audio items" : "images"} or upload new ones and they will be assigned to that section.`
                       : "This is separate from your personal photo gallery. Use it for portfolio media, videos, tracks, and polished showcase items on your creator page."}
                   </CardDescription>
                 </CardHeader>
@@ -3788,7 +3850,7 @@ export default function Settings() {
                         Destination: {pickerDestinationLabel}
                       </Badge>
                       <Badge variant="outline" className="px-3 py-1 text-xs uppercase tracking-[0.18em]">
-                        Media type: {showcasePickerType === "video" ? "Video" : "Image"}
+                        Media type: {showcasePickerType === "video" ? "Video" : showcasePickerType === "audio" ? "Audio" : "Image"}
                       </Badge>
                     </div>
                   ) : (
@@ -3803,7 +3865,7 @@ export default function Settings() {
                   )}
                   <div className="space-y-2">
                     <Input
-                      placeholder={showcasePickerType === "video" || gallery.type === GalleryItemRequestType.video ? "Video URL" : gallery.type === GalleryItemRequestType.audio ? "Audio URL" : "Image URL"}
+                      placeholder={showcasePickerType === "video" || gallery.type === GalleryItemRequestType.video ? "Video URL" : showcasePickerType === "audio" || gallery.type === GalleryItemRequestType.audio ? "Audio URL" : "Image URL"}
                       value={gallery.url}
                       onChange={(e) => setGallery({ ...gallery, url: e.target.value })}
                     />
@@ -3913,6 +3975,14 @@ export default function Settings() {
                               updateBuilderMeta({ galleryItemIds: allMatchingIds });
                             } else if (creatorPickerTarget === "video") {
                               updateBuilderMeta({ videoItemIds: allMatchingIds });
+                            } else if (creatorPickerTarget === "audio") {
+                              updateBuilderMeta({ audioItemIds: allMatchingIds });
+                            } else if (creatorPickerTarget === "featured-gallery") {
+                              updateBuilderMeta({ featuredGalleryItemIds: allMatchingIds });
+                            } else if (creatorPickerTarget === "featured-video") {
+                              updateBuilderMeta({ featuredVideoItemIds: allMatchingIds });
+                            } else if (creatorPickerTarget === "featured-audio") {
+                              updateBuilderMeta({ featuredAudioItemIds: allMatchingIds });
                             } else if (creatorPickerTarget === "hero") {
                               updateBuilderMeta({ heroItemIds: showcasePickerType === "video" ? allMatchingIds.slice(0, 1) : allMatchingIds });
                             }
@@ -3931,6 +4001,14 @@ export default function Settings() {
                               updateBuilderMeta({ galleryItemIds: [] });
                             } else if (creatorPickerTarget === "video") {
                               updateBuilderMeta({ videoItemIds: [] });
+                            } else if (creatorPickerTarget === "audio") {
+                              updateBuilderMeta({ audioItemIds: [] });
+                            } else if (creatorPickerTarget === "featured-gallery") {
+                              updateBuilderMeta({ featuredGalleryItemIds: [] });
+                            } else if (creatorPickerTarget === "featured-video") {
+                              updateBuilderMeta({ featuredVideoItemIds: [] });
+                            } else if (creatorPickerTarget === "featured-audio") {
+                              updateBuilderMeta({ featuredAudioItemIds: [] });
                             } else if (creatorPickerTarget === "hero") {
                               updateBuilderMeta({ heroItemIds: [] });
                             }
@@ -4037,7 +4115,7 @@ export default function Settings() {
                                 onCheckedChange={() => togglePickerSelection(item.id)}
                                 onClick={(event) => event.stopPropagation()}
                               />
-                                  <span>Use in {creatorPickerTarget === "hero-slider" ? "hero slider" : creatorPickerTarget === "hero" ? "hero" : creatorPickerTarget === "gallery" ? "gallery" : "playlist"}</span>
+                                  <span>Use in {creatorPickerTarget === "hero-slider" ? "hero slider" : creatorPickerTarget === "hero" ? "hero" : creatorPickerTarget === "gallery" ? "gallery" : creatorPickerTarget === "audio" ? "audio player" : "playlist"}</span>
                                 </div>
                               </div>
                         ) : (

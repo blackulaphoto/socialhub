@@ -44,6 +44,9 @@ export default function Onboarding() {
     bio: "",
     city: "",
     location: "",
+    age: "",
+    work: "",
+    school: "",
     about: "",
     interests: "",
   });
@@ -69,6 +72,9 @@ export default function Onboarding() {
       bio: profile.user.bio || "",
       city: profile.user.city || "",
       location: profile.user.location || "",
+      age: profile.user.age ? String(profile.user.age) : "",
+      work: profile.user.work || "",
+      school: profile.user.school || "",
       about: profile.user.about || "",
       interests: (profile.user.interests || []).join(", "),
     });
@@ -124,6 +130,9 @@ export default function Onboarding() {
         bio: profileForm.bio || undefined,
         city: profileForm.city || undefined,
         location: profileForm.location || undefined,
+        age: profileForm.age ? Number(profileForm.age) : undefined,
+        work: profileForm.work || undefined,
+        school: profileForm.school || undefined,
         about: profileForm.about || undefined,
         interests: profileForm.interests.split(",").map((item) => item.trim()).filter(Boolean),
         onboardingCompleted: false,
@@ -168,6 +177,9 @@ export default function Onboarding() {
         bio: profileForm.bio || undefined,
         city: profileForm.city || undefined,
         location: profileForm.location || undefined,
+        age: profileForm.age ? Number(profileForm.age) : undefined,
+        work: profileForm.work || undefined,
+        school: profileForm.school || undefined,
         about: profileForm.about || undefined,
         interests: profileForm.interests.split(",").map((item) => item.trim()).filter(Boolean),
         onboardingCompleted: true,
@@ -196,7 +208,7 @@ export default function Onboarding() {
           <Card className="border-border/50 bg-card/60">
             <CardHeader>
               <CardTitle>Set up your profile</CardTitle>
-              <CardDescription>Start with the basics people need to understand who you are and what you are into.</CardDescription>
+              <CardDescription>Start with the basics people need to understand who you are, where you are based, and what part of the scene you are in.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="grid gap-4 md:grid-cols-2">
@@ -210,6 +222,36 @@ export default function Onboarding() {
                       setProfileForm((current) => ({ ...current, city: parsed.city, location: parsed.region }));
                     }}
                     onOptionSelect={(option) => setProfileForm((current) => ({ ...current, city: option.city, location: option.region }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="onboarding-age">Age</Label>
+                  <Input
+                    id="onboarding-age"
+                    type="number"
+                    min="13"
+                    max="120"
+                    value={profileForm.age}
+                    onChange={(e) => setProfileForm((current) => ({ ...current, age: e.target.value }))}
+                    placeholder="32"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="onboarding-work">Work</Label>
+                  <Input
+                    id="onboarding-work"
+                    value={profileForm.work}
+                    onChange={(e) => setProfileForm((current) => ({ ...current, work: e.target.value }))}
+                    placeholder="Photographer, promoter, developer, producer"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="onboarding-school">School</Label>
+                  <Input
+                    id="onboarding-school"
+                    value={profileForm.school}
+                    onChange={(e) => setProfileForm((current) => ({ ...current, school: e.target.value }))}
+                    placeholder="School, training, or creative program"
                   />
                 </div>
               </div>

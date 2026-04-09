@@ -56,7 +56,7 @@ type BuilderProps = {
   saveStatus: "idle" | "saving" | "saved";
   onSave: () => void;
   onOpenPublicPage: () => void;
-  onOpenShowcase: (target: "hero-slider" | "hero" | "gallery" | "video" | "featured-gallery" | "featured-video" | "featured-audio") => void;
+  onOpenShowcase: (target: "hero-slider" | "hero" | "gallery" | "video" | "audio" | "featured-gallery" | "featured-video" | "featured-audio") => void;
   onOpenEventsManager: () => void;
   onUploadImage: (file: File | null, scope: "avatar" | "banner", onComplete: (url: string) => void) => void;
   uploading: { avatar: boolean; banner: boolean };
@@ -168,6 +168,7 @@ export function CreatorPageBuilder({
   const assignedHeroVideos = videoGallery.filter((item) => builderMeta.heroItemIds?.includes(Number(item.id)));
   const assignedGalleryImages = imageGallery.filter((item) => builderMeta.galleryItemIds?.includes(Number(item.id)));
   const assignedPlaylistVideos = videoGallery.filter((item) => builderMeta.videoItemIds?.includes(Number(item.id)));
+  const assignedAudioTracks = audioGallery.filter((item) => builderMeta.audioItemIds?.includes(Number(item.id)));
   const assignedFeaturedGalleryImages = imageGallery.filter((item) => builderMeta.featuredGalleryItemIds?.includes(Number(item.id)));
   const assignedFeaturedVideos = videoGallery.filter((item) => builderMeta.featuredVideoItemIds?.includes(Number(item.id)));
   const assignedFeaturedAudio = audioGallery.filter((item) => builderMeta.featuredAudioItemIds?.includes(Number(item.id)));
@@ -745,7 +746,7 @@ export function CreatorPageBuilder({
         : selectedBlock === "video"
           ? `${assignedPlaylistVideos.length} selected video${assignedPlaylistVideos.length === 1 ? "" : "s"}`
           : selectedBlock === "audio"
-            ? `${audioGallery.length} audio item${audioGallery.length === 1 ? "" : "s"} from Showcase`
+            ? `${assignedAudioTracks.length} selected audio item${assignedAudioTracks.length === 1 ? "" : "s"}`
             : `${linkedEvents.length} linked event${linkedEvents.length === 1 ? "" : "s"}`;
       const summaryCopy = selectedBlock === "events"
         ? `${summary}. Create events from the Events page, then return here to preview them on the creator page.`
@@ -760,7 +761,7 @@ export function CreatorPageBuilder({
             <div className="flex flex-wrap gap-3">
               {selectedBlock === "gallery" ? <Button type="button" variant="outline" onClick={() => onOpenShowcase("gallery")}>Select Gallery Images</Button> : null}
               {selectedBlock === "video" ? <Button type="button" variant="outline" onClick={() => onOpenShowcase("video")}>Select Playlist Videos</Button> : null}
-              {selectedBlock === "audio" ? <Button type="button" variant="outline" onClick={() => onOpenShowcase("gallery")}>Open Showcase</Button> : null}
+              {selectedBlock === "audio" ? <Button type="button" variant="outline" onClick={() => onOpenShowcase("audio")}>Select Audio Tracks</Button> : null}
             </div>
           ) : null}
           {selectedBlock === "events" ? (
@@ -981,8 +982,8 @@ export function CreatorPageBuilder({
     }
 
     if (key === "audio") {
-      return audioGallery.length ? (
-        <BuilderAudioPlayer tracks={audioGallery.map((item, index) => ({ id: String(item.id || index), title: item.caption || `Track ${index + 1}`, url: item.url }))} />
+      return assignedAudioTracks.length ? (
+        <BuilderAudioPlayer tracks={assignedAudioTracks.map((item, index) => ({ id: String(item.id || index), title: item.caption || `Track ${index + 1}`, url: item.url }))} />
       ) : <div className="text-sm text-muted-foreground">No audio items yet.</div>;
     }
 

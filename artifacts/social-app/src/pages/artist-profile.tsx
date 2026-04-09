@@ -198,6 +198,9 @@ export default function ArtistProfile({ id }: { id: string }) {
   const [open, setOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [isUploadingArtistImage, setIsUploadingArtistImage] = useState(false);
+  const [requestedGalleryView, setRequestedGalleryView] = useState(() => (
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("view") === "gallery"
+  ));
   const [mobileTabOverride, setMobileTabOverride] = useState<"posts" | "gallery" | "about" | "events" | "contact" | null>(null);
   const [artistPostForm, setArtistPostForm] = useState({
     content: "",
@@ -280,6 +283,31 @@ export default function ArtistProfile({ id }: { id: string }) {
       setActiveIdentity("artist");
     }
   }, [isOwnArtistPage, setActiveIdentity]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const syncRequestedView = () => {
+      setRequestedGalleryView(new URLSearchParams(window.location.search).get("view") === "gallery");
+    };
+    syncRequestedView();
+    window.addEventListener("popstate", syncRequestedView);
+    return () => window.removeEventListener("popstate", syncRequestedView);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!requestedGalleryView) return;
+    if (window.innerWidth < 768) return;
+
+    const target = document.getElementById("artist-creator-gallery") || document.getElementById("artist-section-gallery");
+    if (!target) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [requestedGalleryView, profile?.artistProfile?.id]);
 
   const follow = useFollowUser();
   const unfollow = useUnfollowUser();
@@ -420,6 +448,9 @@ export default function ArtistProfile({ id }: { id: string }) {
   const assignedHeroVideos = videoGallery.filter((item) => builderMeta.heroItemIds?.includes(Number(item.id)));
   const assignedGalleryImages = imageGallery.filter((item) => builderMeta.galleryItemIds?.includes(Number(item.id)));
   const assignedVideoPlaylistItems = videoGallery.filter((item) => builderMeta.videoItemIds?.includes(Number(item.id)));
+  const assignedAudioItems = builderMeta.audioItemIds?.length
+    ? audioGallery.filter((item) => builderMeta.audioItemIds?.includes(Number(item.id)))
+    : audioGallery;
   const assignedFeaturedGalleryImages = imageGallery.filter((item) => builderMeta.featuredGalleryItemIds?.includes(Number(item.id)));
   const assignedFeaturedVideos = videoGallery.filter((item) => builderMeta.featuredVideoItemIds?.includes(Number(item.id)));
   const assignedFeaturedAudio = audioGallery.filter((item) => builderMeta.featuredAudioItemIds?.includes(Number(item.id)));
@@ -470,7 +501,7 @@ export default function ArtistProfile({ id }: { id: string }) {
     mediaUrl: item.url,
     description: item.caption || null,
   }));
-  const audioShowcaseTracks = audioGallery.map((item) => ({
+  const audioShowcaseTracks = assignedAudioItems.map((item) => ({
     id: String(item.id),
     title: item.caption || "Audio release",
     url: item.url,
@@ -944,11 +975,11 @@ export default function ArtistProfile({ id }: { id: string }) {
         </section>
       )}
 
-      {audioGallery.length > 0 && (
+      {assignedAudioItems.length > 0 && (
         <section className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">Audio</h3>
-            <span className="text-xs text-muted-foreground">{audioGallery.length} items</span>
+            <span className="text-xs text-muted-foreground">{assignedAudioItems.length} items</span>
           </div>
           <BuilderAudioPlayer tracks={audioShowcaseTracks} />
         </section>
@@ -1242,7 +1273,7 @@ export default function ArtistProfile({ id }: { id: string }) {
         <BuilderVideoPlaylist items={videoPlaylistItems} />
       </div>
     ) : null,
-    audio: audioGallery.length ? (
+    audio: assignedAudioItems.length ? (
       <div className="space-y-5">
         <div className="space-y-2">
           <div className="flex items-center gap-2">
@@ -1291,7 +1322,7 @@ export default function ArtistProfile({ id }: { id: string }) {
   });
 
   const renderCreatorGalleryTab = () => (
-    <div className="space-y-6">
+    <div id="artist-creator-gallery" className="space-y-6">
       <div className="space-y-2">
         <div className="flex items-center gap-2">
           <ImageIcon className="h-5 w-5 text-primary" />
@@ -1316,10 +1347,7 @@ export default function ArtistProfile({ id }: { id: string }) {
       />
     </div>
   );
-  const requestedMobileView = typeof window !== "undefined"
-    ? new URLSearchParams(window.location.search).get("view")
-    : null;
-  const requestedMobileTab: MobileHeaderTabKey | null = requestedMobileView === "gallery" ? "gallery" : null;
+  const requestedMobileTab: MobileHeaderTabKey | null = requestedGalleryView ? "gallery" : null;
   const firstVisibleMobileTab: MobileHeaderTabKey = mobileHeaderTabs[0]?.key || "posts";
   const activeMobileTab: MobileHeaderTabKey = mobileTabOverride && mobileHeaderTabs.some((tab) => tab.key === mobileTabOverride)
     ? mobileTabOverride
@@ -1537,7 +1565,14 @@ export default function ArtistProfile({ id }: { id: string }) {
                       </Button>
                     </Link>
                   ) : null}
-                  <Button variant="outline" className="border-border/60 bg-background/30" onClick={() => setLocation(`/artists/${userId}?view=gallery`)}>
+                  <Button
+                    variant="outline"
+                    className="border-border/60 bg-background/30"
+                    onClick={() => {
+                      setRequestedGalleryView(true);
+                      setLocation(`/artists/${userId}?view=gallery`);
+                    }}
+                  >
                     <ImageIcon className="mr-2 h-4 w-4" /> Gallery
                   </Button>
                   {!isOwnArtistPage ? (
@@ -1661,7 +1696,10 @@ export default function ArtistProfile({ id }: { id: string }) {
                       role="tab"
                       aria-selected={activeMobileTab === tab.key}
                       aria-controls={`artist-mobile-panel-${tab.key}`}
-                      onClick={() => setMobileTabOverride(tab.key)}
+                      onClick={() => {
+                        setMobileTabOverride(tab.key);
+                        setRequestedGalleryView(tab.key === "gallery");
+                      }}
                       className={cn(
                         "border-b-2 px-4 py-3 text-sm font-medium transition-colors",
                         activeMobileTab === tab.key
@@ -1703,6 +1741,7 @@ export default function ArtistProfile({ id }: { id: string }) {
             {activeMobileTab !== "posts" ? null : renderRecentUpdatesSpotlight()}
           </div>
           <div className="hidden space-y-8 md:space-y-10 md:block">
+            {requestedMobileTab === "gallery" ? renderCreatorGalleryTab() : null}
             {visibleSections.map((key) => renderSectionBlock(key))}
           </div>
         </div>
