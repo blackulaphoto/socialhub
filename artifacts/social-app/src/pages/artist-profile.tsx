@@ -994,26 +994,10 @@ export default function ArtistProfile({ id }: { id: string }) {
 
       {isOwnArtistPage && (
         <section className="space-y-4 rounded-[1.75rem] border border-border/50 bg-background/35 p-5">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h3 className="text-lg font-semibold">Post as your artist page</h3>
-              <div className="mt-1 text-sm text-muted-foreground">
-                These posts stay on the creator page and publish with your artist-page identity.
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant={activeIdentity === "artist" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setActiveIdentity("artist")}
-              >
-                Use Artist Page
-              </Button>
-              <Link href={`/profile/${userId}`}>
-                <Button variant="ghost" size="sm" onClick={() => setActiveIdentity("personal")}>
-                  Personal Profile
-                </Button>
-              </Link>
+          <div>
+            <h3 className="text-lg font-semibold">Post as your artist page</h3>
+            <div className="mt-1 text-sm text-muted-foreground">
+              These posts stay on the creator page and publish with your artist-page identity.
             </div>
           </div>
           <div className="space-y-4">
@@ -1396,19 +1380,36 @@ export default function ArtistProfile({ id }: { id: string }) {
                 </div>
 
                 <div className={cn("flex flex-wrap items-center gap-2.5 md:gap-3", heroActionsClass)}>
-                  {!currentUser?.hasArtistPage && (
-                    <Link href="/settings?tab=creator">
-                      <Button variant="outline" className="border-border/60 bg-background/30">
-                        <Palette className="mr-2 h-4 w-4" /> Create Your Artist Page
-                      </Button>
-                    </Link>
+                  {isOwnArtistPage ? (
+                    <>
+                      <Link href="/settings?tab=creator">
+                        <Button variant="outline" className="border-border/60 bg-background/30">
+                          <Palette className="mr-2 h-4 w-4" /> Edit Artist Page
+                        </Button>
+                      </Link>
+                      <Link href={`/profile/${userId}`}>
+                        <Button variant="outline" className="border-border/60 bg-background/30" onClick={() => setActiveIdentity("personal")}>
+                          <MessageSquare className="mr-2 h-4 w-4" /> Switch To Personal
+                        </Button>
+                      </Link>
+                    </>
+                  ) : (
+                    <>
+                      {!currentUser?.hasArtistPage && (
+                        <Link href="/settings?tab=creator">
+                          <Button variant="outline" className="border-border/60 bg-background/30">
+                            <Palette className="mr-2 h-4 w-4" /> Create Your Artist Page
+                          </Button>
+                        </Link>
+                      )}
+                      {primaryActionKind === "follow" ? (
+                        <Button onClick={handleFollowToggle} disabled={!profile.canInteract} className="min-w-[8rem]">
+                          {profile.isFollowing ? "Following" : "Follow"}
+                        </Button>
+                      ) : null}
+                    </>
                   )}
-                  {primaryActionKind === "follow" ? (
-                    <Button onClick={handleFollowToggle} disabled={!profile.canInteract} className="min-w-[8rem]">
-                      {profile.isFollowing ? "Following" : "Follow"}
-                    </Button>
-                  ) : null}
-                  {primaryActionKind === "contact" ? (
+                  {!isOwnArtistPage && primaryActionKind === "contact" ? (
                     creator?.primaryActionUrl && (actionType === "shop" || actionType === "store") ? (
                       <a href={creator.primaryActionUrl} target="_blank" rel="noreferrer">
                         <Button className="min-w-[8rem]">
