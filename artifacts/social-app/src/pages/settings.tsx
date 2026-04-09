@@ -1094,8 +1094,19 @@ export default function Settings() {
     setCreator((current) => {
       const { rawSectionConfigs, meta } = readBuilderMetaFromCreatorState(current);
       const nextMeta = typeof patch === "function" ? patch(meta) : { ...meta, ...patch };
-      const nextConfigs = writeCreatorBuilderMeta(rawSectionConfigs, nextMeta);
-      const legacyModuleState = deriveLegacyModuleState(nextMeta.sections);
+      const nextSections = nextMeta.sections.map((section) => {
+        if (section.key === "audio") {
+          const hasAudioSelection = (nextMeta.audioItemIds?.length || 0) > 0 || (nextMeta.featuredAudioItemIds?.length || 0) > 0;
+          return hasAudioSelection && !section.visible ? { ...section, visible: true } : section;
+        }
+        return section;
+      });
+    const nextMetaWithSections = {
+      ...nextMeta,
+      sections: nextSections,
+    };
+    const nextConfigs = writeCreatorBuilderMeta(rawSectionConfigs, nextMetaWithSections);
+    const legacyModuleState = deriveLegacyModuleState(nextMetaWithSections.sections);
       return {
         ...current,
         enabledModules: legacyModuleState.enabledModules.join(","),

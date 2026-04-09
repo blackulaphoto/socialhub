@@ -1292,10 +1292,12 @@ export default function ArtistProfile({ id }: { id: string }) {
   };
 
   // Posts should always exist, but only once in the final section order.
+  const baseVisibleSections = builderMeta.sections
+    .filter((section) => section.visible && sections[section.key])
+    .map((section) => section.key);
   const visibleSections = Array.from(new Set([
-    ...builderMeta.sections
-      .filter((section) => section.visible && sections[section.key])
-      .map((section) => section.key),
+    ...baseVisibleSections,
+    ...(assignedAudioItems.length && sections.audio ? ["audio"] : []),
     "posts",
   ]));
   const mobileTabSectionMap = {
