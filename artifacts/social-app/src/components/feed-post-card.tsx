@@ -407,7 +407,7 @@ export function FeedPostCard({
   }));
 
   return (
-    <Card id={`post-${post.id}`} data-testid={`post-card-${post.id}`} className="overflow-hidden border-primary/25 bg-card/60 shadow-[0_0_0_1px_rgba(139,92,246,0.12)]">
+    <Card id={`post-${post.id}`} data-testid={`post-card-${post.id}`} className="overflow-hidden border-primary/45 bg-card/70 shadow-[0_0_0_2px_rgba(139,92,246,0.18)] ring-1 ring-primary/20">
       {showHeaderIdentity ? (
         <CardHeader className="flex flex-row items-start gap-3 space-y-0 pb-3">
           <Link href={authorHref}>

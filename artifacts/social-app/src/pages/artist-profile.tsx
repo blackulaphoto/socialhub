@@ -1034,9 +1034,9 @@ export default function ArtistProfile({ id }: { id: string }) {
       </div>
 
       {isOwnArtistPage && (
-        <section className="space-y-4 rounded-[1.75rem] border border-border/50 bg-background/35 p-5">
+        <section className="space-y-4 rounded-[1.75rem] border border-primary/45 bg-background/35 p-5 shadow-[0_0_0_2px_rgba(139,92,246,0.18)] ring-1 ring-primary/20">
           <div>
-            <h3 className="text-lg font-semibold">Post as your artist page</h3>
+            <h3 className="text-lg font-semibold text-primary">Post as your artist page</h3>
             <div className="mt-1 text-sm text-muted-foreground">
               These posts publish into the main feed with your artist-page identity and stay collected on this creator page.
             </div>
