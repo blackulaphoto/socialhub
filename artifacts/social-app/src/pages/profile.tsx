@@ -27,6 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FeedPostCard } from "@/components/feed-post-card";
+import { MediaEmbed } from "@/components/media-embed";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
@@ -40,6 +41,7 @@ import { useActiveIdentity } from "@/hooks/useActiveIdentity";
 import { groupItemsByFolder, readMediaFolderState } from "@/lib/media-folders";
 import { MosaicLightboxGallery } from "@/components/mosaic-lightbox-gallery";
 import { cn } from "@/lib/utils";
+import { getEmbedDescriptor } from "@/lib/embeds";
 
 function formatPlace(parts: Array<string | null | undefined>) {
   const normalized = parts
@@ -94,7 +96,7 @@ export default function Profile({ id }: { id: string }) {
   useEffect(() => {
     const rawSearch = typeof window !== "undefined" ? window.location.search : "";
     const tab = new URLSearchParams(rawSearch).get("tab");
-    if (tab === "photos" || tab === "about" || tab === "posts") {
+    if (tab === "photos" || tab === "about" || tab === "posts" || tab === "spotlight") {
       setActiveTab(tab);
     } else {
       setActiveTab("posts");
@@ -213,6 +215,11 @@ export default function Profile({ id }: { id: string }) {
   const accent = user.accentColor || "#8b5cf6";
   const locationLine = formatPlace([user.city, user.location]);
   const profileTheme = PROFILE_THEME_STYLES[user.themeName || "nocturne"] || PROFILE_THEME_STYLES.nocturne;
+  const spotlightEmbed = creatorSettings?.featuredUrl ? getEmbedDescriptor(creatorSettings.featuredUrl) : null;
+  const hasSpotlightContent = Boolean(
+    creatorSettings?.pinnedPost || (spotlightEmbed && spotlightEmbed.kind !== "link"),
+  );
+
   return (
     <div className="w-full pb-14">
       <section
@@ -385,7 +392,7 @@ export default function Profile({ id }: { id: string }) {
               <TabsTrigger value="about" className="h-full rounded-none border-primary px-6 font-medium data-[state=active]:border-b-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none">
                 About
               </TabsTrigger>
-              {(user.featuredContent || creatorSettings?.featuredTitle || creatorSettings?.featuredDescription || creatorSettings?.featuredUrl) && (
+              {hasSpotlightContent && (
                 <TabsTrigger value="spotlight" className="h-full rounded-none border-primary px-6 font-medium data-[state=active]:border-b-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none">
                   Spotlight
                 </TabsTrigger>
@@ -484,25 +491,31 @@ export default function Profile({ id }: { id: string }) {
                 </CardContent>
               </Card>
             </TabsContent>
-            {(user.featuredContent || creatorSettings?.featuredTitle || creatorSettings?.featuredDescription || creatorSettings?.featuredUrl) && (
+            {hasSpotlightContent && (
               <TabsContent value="spotlight" className="pt-6">
                 <Card className="border-border/50 bg-card/50">
                   <CardHeader>
                     <CardTitle>Spotlight</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    {creatorSettings?.featuredTitle && <div className="font-medium">{creatorSettings.featuredTitle}</div>}
-                    {creatorSettings?.featuredDescription && <div className="text-sm text-muted-foreground">{creatorSettings.featuredDescription}</div>}
-                    {user.featuredContent && (
-                      <div className="rounded-xl border border-border/50 bg-background/40 p-3 text-sm text-muted-foreground">
-                        {user.featuredContent}
-                      </div>
-                    )}
-                    {creatorSettings?.featuredUrl && (
-                      <a href={creatorSettings.featuredUrl} target="_blank" rel="noreferrer" className="inline-flex items-center text-sm text-primary hover:underline">
-                        Open featured link <ExternalLink className="ml-1 h-3.5 w-3.5" />
-                      </a>
-                    )}
+                    {creatorSettings?.pinnedPost ? (
+                      <FeedPostCard post={creatorSettings.pinnedPost} showAuthor={false} />
+                    ) : spotlightEmbed ? (
+                      <>
+                        {creatorSettings?.featuredTitle && <div className="font-medium">{creatorSettings.featuredTitle}</div>}
+                        {creatorSettings?.featuredDescription && <div className="text-sm text-muted-foreground">{creatorSettings.featuredDescription}</div>}
+                        {creatorSettings?.featuredUrl && (
+                          <div className="rounded-2xl border border-border/50 bg-background/40 p-3">
+                            <MediaEmbed url={creatorSettings.featuredUrl} title={creatorSettings.featuredTitle || "Featured media"} className="w-full" />
+                          </div>
+                        )}
+                        {creatorSettings?.featuredUrl && (
+                          <a href={creatorSettings.featuredUrl} target="_blank" rel="noreferrer" className="inline-flex items-center text-sm text-primary hover:underline">
+                            Open featured link <ExternalLink className="ml-1 h-3.5 w-3.5" />
+                          </a>
+                        )}
+                      </>
+                    ) : null}
                   </CardContent>
                 </Card>
               </TabsContent>
