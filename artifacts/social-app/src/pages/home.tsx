@@ -740,15 +740,15 @@ export default function Home() {
             <button
               type="button"
               data-testid="open-post-composer"
-              className="flex-1 rounded-2xl border border-slate-300/85 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.95))] px-4 py-4 text-left shadow-[0_12px_26px_rgba(15,23,42,0.10)] transition-colors hover:border-primary/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 dark:border-slate-700/80 dark:bg-[linear-gradient(180deg,rgba(17,24,39,0.96),rgba(15,23,42,0.94))] dark:shadow-[0_14px_30px_rgba(2,6,23,0.42)]"
+              className="flex-1 rounded-2xl border border-primary/40 bg-white px-4 py-4 text-left text-slate-900 shadow-[0_0_0_1px_rgba(139,92,246,0.16)] transition-colors hover:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
             >
-              <div className="text-sm font-medium text-foreground">Create a post</div>
-              <div className="mt-1 text-sm text-muted-foreground">
+              <div className="text-sm font-medium text-slate-900">Create a post</div>
+              <div className="mt-1 text-sm text-slate-600">
                 What&apos;s happening? Share a release, drop, collab, or update...
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <Badge variant="secondary">{currentPostingIdentity}</Badge>
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs text-slate-500">
                   {canUseArtistIdentity ? "Switch identity before posting if you want this update to represent your artist page." : "Posts publish from your personal profile."}
                 </span>
               </div>
