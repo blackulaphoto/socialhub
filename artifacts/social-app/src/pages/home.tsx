@@ -630,59 +630,6 @@ export default function Home() {
         </CardContent>
       </Card>
 
-      <Card className="cursor-pointer border-border/70 bg-card/90 shadow-[0_10px_30px_rgba(15,23,42,0.08)] transition-colors hover:border-primary/35" onClick={openPostDialog}>
-        <CardContent className="p-4 md:p-5">
-          <div className="flex items-center gap-3">
-            <Avatar className="h-10 w-10 md:h-11 md:w-11">
-              <AvatarImage src={user?.avatarUrl || ""} />
-              <AvatarFallback>{user?.username?.slice(0, 2).toUpperCase()}</AvatarFallback>
-            </Avatar>
-            <button
-              type="button"
-              data-testid="open-post-composer"
-              className="flex-1 rounded-2xl border border-slate-300/85 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.95))] px-4 py-4 text-left shadow-[0_12px_26px_rgba(15,23,42,0.10)] transition-colors hover:border-primary/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 dark:border-slate-700/80 dark:bg-[linear-gradient(180deg,rgba(17,24,39,0.96),rgba(15,23,42,0.94))] dark:shadow-[0_14px_30px_rgba(2,6,23,0.42)]"
-            >
-              <div className="text-sm font-medium text-foreground">Create a post</div>
-              <div className="mt-1 text-sm text-muted-foreground">
-                What&apos;s happening? Share a release, drop, collab, or update...
-              </div>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <Badge variant="secondary">{currentPostingIdentity}</Badge>
-                <span className="text-xs text-muted-foreground">
-                  {canUseArtistIdentity ? "Switch identity before posting if you want this update to represent your artist page." : "Posts publish from your personal profile."}
-                </span>
-              </div>
-            </button>
-            <div className="hidden items-center gap-1 sm:flex">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="rounded-full"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  openPostDialogWithImage();
-                }}
-              >
-                <ImageIcon className="h-5 w-5 text-primary" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="rounded-full"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  openPostDialogWithLink();
-                }}
-              >
-                <Link2 className="h-5 w-5 text-primary" />
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {!isLoading && (
         <Card className="overflow-hidden border-border/50 bg-card/60 md:hidden">
           <CardContent className="space-y-4 p-4">
@@ -778,6 +725,59 @@ export default function Home() {
                   <div className="mt-1 font-semibold">{feedPosts.length || 0}</div>
                 </div>
               </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="cursor-pointer border-border/70 bg-card/90 shadow-[0_10px_30px_rgba(15,23,42,0.08)] transition-colors hover:border-primary/35" onClick={openPostDialog}>
+        <CardContent className="p-4 md:p-5">
+          <div className="flex items-center gap-3">
+            <Avatar className="h-10 w-10 md:h-11 md:w-11">
+              <AvatarImage src={user?.avatarUrl || ""} />
+              <AvatarFallback>{user?.username?.slice(0, 2).toUpperCase()}</AvatarFallback>
+            </Avatar>
+            <button
+              type="button"
+              data-testid="open-post-composer"
+              className="flex-1 rounded-2xl border border-slate-300/85 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.95))] px-4 py-4 text-left shadow-[0_12px_26px_rgba(15,23,42,0.10)] transition-colors hover:border-primary/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 dark:border-slate-700/80 dark:bg-[linear-gradient(180deg,rgba(17,24,39,0.96),rgba(15,23,42,0.94))] dark:shadow-[0_14px_30px_rgba(2,6,23,0.42)]"
+            >
+              <div className="text-sm font-medium text-foreground">Create a post</div>
+              <div className="mt-1 text-sm text-muted-foreground">
+                What&apos;s happening? Share a release, drop, collab, or update...
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Badge variant="secondary">{currentPostingIdentity}</Badge>
+                <span className="text-xs text-muted-foreground">
+                  {canUseArtistIdentity ? "Switch identity before posting if you want this update to represent your artist page." : "Posts publish from your personal profile."}
+                </span>
+              </div>
+            </button>
+            <div className="hidden items-center gap-1 sm:flex">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="rounded-full"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  openPostDialogWithImage();
+                }}
+              >
+                <ImageIcon className="h-5 w-5 text-primary" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="rounded-full"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  openPostDialogWithLink();
+                }}
+              >
+                <Link2 className="h-5 w-5 text-primary" />
+              </Button>
             </div>
           </div>
         </CardContent>
