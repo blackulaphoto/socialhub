@@ -258,6 +258,7 @@ export default function Home() {
   const postingIdentityHelper = canUseArtistIdentity && activeIdentity === "artist"
     ? "Posts publish into the main feed with your artist-page identity and also stay on your artist page."
     : "Posts publish into the main feed as your personal profile.";
+  const shouldNudgeDiscovery = followingCount === 0 && !selectedCustomFeed;
 
   const handlePostImageUpload = async (file: File | null) => {
     if (!file) return;
@@ -355,6 +356,13 @@ export default function Home() {
     setShowLinkField(params.get("with") === "link");
     window.history.replaceState({}, "", window.location.pathname);
   }, [location]);
+
+  useEffect(() => {
+    if (!shouldNudgeDiscovery) return;
+    if (mode === "following") {
+      setMode("discovery");
+    }
+  }, [mode, shouldNudgeDiscovery]);
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 p-4 md:py-8">
@@ -950,6 +958,89 @@ export default function Home() {
         </div>
 
         <div className="flex-1 space-y-5">
+          {shouldNudgeDiscovery && (
+            <Card className="border-primary/30 bg-primary/5">
+              <CardContent className="space-y-5 p-5">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.22em] text-primary/80">Start here</div>
+                  <div className="mt-2 text-lg font-semibold text-foreground">Build your feed fast</div>
+                  <div className="mt-1 text-sm text-muted-foreground">Follow creators or people you may know to unlock a living feed.</div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-3 rounded-2xl border border-border/50 bg-background/60 p-4">
+                    <div className="text-sm font-semibold">Follow creators</div>
+                    {suggestedCreators?.artists?.length ? (
+                      <div className="space-y-3">
+                        {suggestedCreators.artists.slice(0, 3).map((artist) => (
+                          <div key={`follow-${artist.userId}`} className="flex items-center gap-3">
+                            <Link href={`/artists/${artist.userId}`} className="flex items-center gap-3 min-w-0">
+                              <Avatar className="h-10 w-10">
+                                <AvatarImage src={artist.avatarUrl || artist.user.avatarUrl || ""} />
+                                <AvatarFallback>{(artist.displayName || artist.user.username).slice(0, 2).toUpperCase()}</AvatarFallback>
+                              </Avatar>
+                              <div className="min-w-0">
+                                <div className="truncate text-sm font-medium">{artist.displayName || artist.user.username}</div>
+                                <div className="text-xs text-muted-foreground">{getSuggestedCreatorReason(artist, city)}</div>
+                              </div>
+                            </Link>
+                            <Button
+                              size="sm"
+                              className="ml-auto"
+                              variant={artist.isFollowing ? "outline" : "default"}
+                              onClick={() => {
+                                if (artist.isFollowing) {
+                                  unfollowCreator.mutate({ userId: artist.userId });
+                                } else {
+                                  followCreator.mutate({ userId: artist.userId });
+                                }
+                              }}
+                              disabled={followCreator.isPending || unfollowCreator.isPending}
+                            >
+                              {artist.isFollowing ? "Following" : "Follow"}
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-border/50 bg-card/40 p-4 text-sm text-muted-foreground">
+                        Creator picks are warming up. Check Discover to browse public pages.
+                      </div>
+                    )}
+                    <Link href="/discover">
+                      <Button variant="ghost" size="sm" className="w-full">Browse creators</Button>
+                    </Link>
+                  </div>
+                  <div className="space-y-3 rounded-2xl border border-border/50 bg-background/60 p-4">
+                    <div className="text-sm font-semibold">People you may know</div>
+                    {suggestedCreators?.artists?.length ? (
+                      <div className="flex flex-wrap gap-3">
+                        {suggestedCreators.artists.slice(0, 6).map((artist) => (
+                          <Link
+                            key={`know-${artist.userId}`}
+                            href={`/profile/${artist.userId}`}
+                            className="flex flex-col items-center gap-2 rounded-xl border border-border/40 bg-card/60 p-2 text-center hover:border-primary/40"
+                          >
+                            <Avatar className="h-12 w-12">
+                              <AvatarImage src={artist.avatarUrl || artist.user.avatarUrl || ""} />
+                              <AvatarFallback>{(artist.displayName || artist.user.username).slice(0, 2).toUpperCase()}</AvatarFallback>
+                            </Avatar>
+                            <div className="text-[11px] font-medium truncate max-w-[72px]">{artist.displayName || artist.user.username}</div>
+                          </Link>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-border/50 bg-card/40 p-4 text-sm text-muted-foreground">
+                        We&apos;ll populate this as more creators join.
+                      </div>
+                    )}
+                    <Link href="/discover">
+                      <Button variant="ghost" size="sm" className="w-full">Find people</Button>
+                    </Link>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
           <Card className="border-border/50 bg-card/40">
             <CardHeader className="pb-3">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">

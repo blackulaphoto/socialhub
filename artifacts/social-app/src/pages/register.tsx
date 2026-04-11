@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQueryClient } from "@tanstack/react-query";
-import { Compass } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { consumeReturnTo, navigateAfterAuth } from "@/lib/auth-redirect";
 
@@ -43,14 +42,15 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-background p-4 relative overflow-hidden">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,_var(--tw-gradient-stops))] from-primary/20 via-background to-background pointer-events-none" />
+    <div
+      className="min-h-screen w-full flex items-center justify-center bg-background p-4 relative overflow-hidden"
+      style={{ backgroundImage: "url(/auth-bg-2.png)", backgroundSize: "cover", backgroundPosition: "center" }}
+    >
+      <div className="absolute inset-0 bg-slate-950/70" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,_var(--tw-gradient-stops))] from-primary/25 via-transparent to-transparent pointer-events-none" />
       
-      <Card className="w-full max-w-md relative z-10 border-border/50 bg-card/50 backdrop-blur-xl shadow-2xl">
+      <Card className="w-full max-w-md relative z-10 border-border/60 bg-background/80 backdrop-blur-2xl shadow-2xl">
         <CardHeader className="space-y-3 text-center pb-6">
-          <div className="mx-auto bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mb-2">
-            <Compass className="w-8 h-8 text-primary" />
-          </div>
           <CardTitle className="text-3xl font-bold tracking-tight">Join ArtistHub</CardTitle>
           <CardDescription className="text-muted-foreground text-base">
             Create your personal account first. You can add a linked artist page later from settings.
