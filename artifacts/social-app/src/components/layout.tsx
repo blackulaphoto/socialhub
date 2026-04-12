@@ -15,6 +15,7 @@ import {
   Settings,
   ShieldAlert,
   Sun,
+  TrendingUp,
   User as UserIcon,
   Users,
 } from "lucide-react";
@@ -64,6 +65,7 @@ function getPageMeta(location: string) {
   if (location.startsWith("/events")) return { title: "Events", subtitle: "Local happenings, appearances, and lineups." };
   if (location.startsWith("/search")) return { title: "Search", subtitle: "Find people, creators, tags, and cities." };
   if (location.startsWith("/settings")) return { title: "Settings", subtitle: "Profile, creator page, and showcase controls." };
+  if (location.startsWith("/insights")) return { title: "Insights", subtitle: "Track page views, followers, and inquiries." };
   if (location.startsWith("/admin")) return { title: "Admin", subtitle: "Moderation and platform operations." };
   if (location.startsWith("/profile")) return { title: "Profile", subtitle: "Identity, posts, and public presence." };
   return { title: "ArtistHub", subtitle: "Creative social networking." };
@@ -103,6 +105,7 @@ export function AppSidebar() {
     { title: "Messages", url: "/messages", icon: MessageSquare },
     { title: "Profile", url: `/profile/${user?.id}`, icon: UserIcon },
     { title: user?.hasArtistPage ? "Artist Page" : "Create Artist Page", url: user?.hasArtistPage ? `/artists/${user?.id}` : "/settings?tab=creator", icon: Palette },
+    ...(user?.hasArtistPage ? [{ title: "Insights", url: "/insights", icon: TrendingUp }] : []),
     { title: "Settings", url: "/settings", icon: Settings },
   ];
 
