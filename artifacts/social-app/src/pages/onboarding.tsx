@@ -21,6 +21,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { formatCityRegion, parseCityRegion } from "@/lib/locations";
 import { Palette, Sparkles } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const CREATOR_TYPES = [
   "Musician / Band / DJ",
@@ -40,6 +41,7 @@ export default function Onboarding() {
   const { toast } = useToast();
   const [step, setStep] = useState<"profile" | "artist" | "finish">("profile");
   const [wantsArtistPage, setWantsArtistPage] = useState(false);
+  const [showProfileDetails, setShowProfileDetails] = useState(false);
   const [profileForm, setProfileForm] = useState({
     bio: "",
     city: "",
@@ -208,64 +210,131 @@ export default function Onboarding() {
           <Card className="border-border/50 bg-card/60">
             <CardHeader>
               <CardTitle>Set up your profile</CardTitle>
-              <CardDescription>Start with the basics people need to understand who you are, where you are based, and what part of the scene you are in.</CardDescription>
+              <CardDescription>Start with a few quick details. Everything here is optional and can be changed later.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>City / state</Label>
-                  <LocationInput
-                    value={formatCityRegion(profileForm.city, profileForm.location)}
-                    placeholder="Los Angeles, California"
-                    onValueChange={(value) => {
-                      const parsed = parseCityRegion(value);
-                      setProfileForm((current) => ({ ...current, city: parsed.city, location: parsed.region }));
-                    }}
-                    onOptionSelect={(option) => setProfileForm((current) => ({ ...current, city: option.city, location: option.region }))}
-                  />
+              <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+                <div className="space-y-5">
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">City / state <span className="text-xs text-muted-foreground">Optional</span></Label>
+                    <LocationInput
+                      value={formatCityRegion(profileForm.city, profileForm.location)}
+                      placeholder="Los Angeles, California"
+                      onValueChange={(value) => {
+                        const parsed = parseCityRegion(value);
+                        setProfileForm((current) => ({ ...current, city: parsed.city, location: parsed.region }));
+                      }}
+                      onOptionSelect={(option) => setProfileForm((current) => ({ ...current, city: option.city, location: option.region }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">Short bio <span className="text-xs text-muted-foreground">Optional</span></Label>
+                    <Textarea value={profileForm.bio} onChange={(e) => setProfileForm((current) => ({ ...current, bio: e.target.value }))} placeholder="A quick one-line intro." />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">Interests <span className="text-xs text-muted-foreground">Optional</span></Label>
+                    <Input value={profileForm.interests} onChange={(e) => setProfileForm((current) => ({ ...current, interests: e.target.value }))} placeholder="techno, galleries, film, fashion, nightlife" />
+                  </div>
+                  <div className="rounded-2xl border border-border/50 bg-background/30 px-4 py-4">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-medium">More details</div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowProfileDetails((current) => !current)}
+                      >
+                        {showProfileDetails ? "Hide optional fields" : "Add more details"}
+                      </Button>
+                    </div>
+                    {showProfileDetails ? (
+                      <div className="mt-4 grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="onboarding-age" className="flex items-center gap-2">Age <span className="text-xs text-muted-foreground">Optional</span></Label>
+                          <Input
+                            id="onboarding-age"
+                            type="number"
+                            min="13"
+                            max="120"
+                            value={profileForm.age}
+                            onChange={(e) => setProfileForm((current) => ({ ...current, age: e.target.value }))}
+                            placeholder="32"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="onboarding-work" className="flex items-center gap-2">Work <span className="text-xs text-muted-foreground">Optional</span></Label>
+                          <Input
+                            id="onboarding-work"
+                            value={profileForm.work}
+                            onChange={(e) => setProfileForm((current) => ({ ...current, work: e.target.value }))}
+                            placeholder="Photographer, promoter, developer, producer"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="onboarding-school" className="flex items-center gap-2">School <span className="text-xs text-muted-foreground">Optional</span></Label>
+                          <Input
+                            id="onboarding-school"
+                            value={profileForm.school}
+                            onChange={(e) => setProfileForm((current) => ({ ...current, school: e.target.value }))}
+                            placeholder="School, training, or creative program"
+                          />
+                        </div>
+                        <div className="space-y-2 md:col-span-2">
+                          <Label className="flex items-center gap-2">About you <span className="text-xs text-muted-foreground">Optional</span></Label>
+                          <Textarea value={profileForm.about} onChange={(e) => setProfileForm((current) => ({ ...current, about: e.target.value }))} placeholder="What do you do, what are you into, what kind of people should find you here?" />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-3 text-xs text-muted-foreground">
+                        Add age, work, school, and a longer bio anytime.
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="onboarding-age">Age</Label>
-                  <Input
-                    id="onboarding-age"
-                    type="number"
-                    min="13"
-                    max="120"
-                    value={profileForm.age}
-                    onChange={(e) => setProfileForm((current) => ({ ...current, age: e.target.value }))}
-                    placeholder="32"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="onboarding-work">Work</Label>
-                  <Input
-                    id="onboarding-work"
-                    value={profileForm.work}
-                    onChange={(e) => setProfileForm((current) => ({ ...current, work: e.target.value }))}
-                    placeholder="Photographer, promoter, developer, producer"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="onboarding-school">School</Label>
-                  <Input
-                    id="onboarding-school"
-                    value={profileForm.school}
-                    onChange={(e) => setProfileForm((current) => ({ ...current, school: e.target.value }))}
-                    placeholder="School, training, or creative program"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Short bio</Label>
-                <Textarea value={profileForm.bio} onChange={(e) => setProfileForm((current) => ({ ...current, bio: e.target.value }))} placeholder="A quick one-line intro." />
-              </div>
-              <div className="space-y-2">
-                <Label>About you</Label>
-                <Textarea value={profileForm.about} onChange={(e) => setProfileForm((current) => ({ ...current, about: e.target.value }))} placeholder="What do you do, what are you into, what kind of people should find you here?" />
-              </div>
-              <div className="space-y-2">
-                <Label>Interests</Label>
-                <Input value={profileForm.interests} onChange={(e) => setProfileForm((current) => ({ ...current, interests: e.target.value }))} placeholder="techno, galleries, film, fashion, nightlife" />
+                <Card className="border-border/60 bg-background/60">
+                  <CardHeader>
+                    <CardTitle className="text-base">Live preview</CardTitle>
+                    <CardDescription>See how your profile intro will look.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-12 w-12">
+                        <AvatarImage src={profile.user.avatarUrl || ""} />
+                        <AvatarFallback>{profile.user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="text-sm font-semibold">{profile.user.username}</div>
+                        <div className="text-xs text-muted-foreground">{formatCityRegion(profileForm.city, profileForm.location) || "Add your city"}</div>
+                      </div>
+                    </div>
+                    <div className="rounded-2xl border border-border/50 bg-card/60 p-4">
+                      <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Bio</div>
+                      <div className="mt-2 text-sm text-foreground">{profileForm.bio.trim() || "Share a short line about yourself."}</div>
+                    </div>
+                    <div className="rounded-2xl border border-border/50 bg-card/60 p-4">
+                      <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">About</div>
+                      <div className="mt-2 text-sm text-muted-foreground">{profileForm.about.trim() || "Add a longer story, links to your work, or what you’re into."}</div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {(profileForm.interests || "")
+                        .split(",")
+                        .map((item) => item.trim())
+                        .filter(Boolean)
+                        .slice(0, 6)
+                        .map((interest) => (
+                          <Badge key={interest} variant="secondary">{interest}</Badge>
+                        ))}
+                      {!profileForm.interests.trim() ? <Badge variant="outline">Add interests</Badge> : null}
+                    </div>
+                    {(profileForm.work || profileForm.school || profileForm.age) ? (
+                      <div className="grid gap-2 text-xs text-muted-foreground">
+                        {profileForm.work ? <div>Work: {profileForm.work}</div> : null}
+                        {profileForm.school ? <div>School: {profileForm.school}</div> : null}
+                        {profileForm.age ? <div>Age: {profileForm.age}</div> : null}
+                      </div>
+                    ) : null}
+                  </CardContent>
+                </Card>
               </div>
               <div className={`rounded-3xl border px-5 py-5 transition-colors ${wantsArtistPage ? "border-primary bg-primary/10" : "border-border/50 bg-background/30"}`}>
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
