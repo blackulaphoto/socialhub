@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
-import { ArrowDown, ArrowUp, Check, ChevronDown, Eye, EyeOff, ExternalLink, Loader2, Save, Video } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, ExternalLink, Loader2, Save, Video } from "lucide-react";
 import { CreatorHeroSlider } from "@/components/creator-page/creator-hero-slider";
 import { CreatorInfoCard } from "@/components/creator-page/creator-info-card";
 import { LocationInput } from "@/components/location-input";
@@ -146,6 +146,7 @@ export function CreatorPageBuilder({
 }: BuilderProps) {
   const [selectedBlock, setSelectedBlock] = useState<"hero" | "hero-details" | CreatorSectionKey>("hero");
   const [showMobileBlockMenu, setShowMobileBlockMenu] = useState(false);
+  const horizontalBlockMenuRef = useRef<HTMLDivElement | null>(null);
   const sectionConfigs = useMemo(() => parseSectionConfigs(creator.sectionConfigs), [creator.sectionConfigs]);
   const builderMeta = useMemo(
     () => readCreatorBuilderMeta(sectionConfigs, {
@@ -260,6 +261,16 @@ export function CreatorPageBuilder({
     updateBuilderMeta({
       ...builderMeta,
       sections: moveItem(builderMeta.sections, index, targetIndex),
+    });
+  };
+
+  const scrollHorizontalBlockMenu = (direction: "left" | "right") => {
+    const container = horizontalBlockMenuRef.current;
+    if (!container) return;
+    const distance = Math.max(container.clientWidth * 0.75, 280);
+    container.scrollBy({
+      left: direction === "left" ? -distance : distance,
+      behavior: "smooth",
     });
   };
 
@@ -857,7 +868,18 @@ export function CreatorPageBuilder({
 
   const renderHorizontalBlockMenu = () => (
     <div className="space-y-4">
-      <div className="overflow-x-auto pb-1">
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Swipe or use arrows</div>
+        <div className="flex items-center gap-2">
+          <Button type="button" size="icon" variant="outline" className="h-9 w-9 shrink-0 rounded-full" onClick={() => scrollHorizontalBlockMenu("left")} aria-label="Scroll block picker left">
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Button type="button" size="icon" variant="outline" className="h-9 w-9 shrink-0 rounded-full" onClick={() => scrollHorizontalBlockMenu("right")} aria-label="Scroll block picker right">
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+      <div ref={horizontalBlockMenuRef} className="overflow-x-auto pb-1">
         <div className="flex min-w-max gap-3">
           <button
             type="button"
