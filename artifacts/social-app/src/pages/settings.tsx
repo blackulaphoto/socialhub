@@ -1814,7 +1814,7 @@ export default function Settings() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-6xl p-4 md:py-8">
+    <div className="mx-auto w-full max-w-[1180px] p-4 md:py-8 2xl:max-w-[1240px]">
       <div className="mb-8">
         <h1 className="text-3xl font-bold">Settings</h1>
         <p className="text-muted-foreground">Tune your profile identity, creator page, and showcase presentation.</p>

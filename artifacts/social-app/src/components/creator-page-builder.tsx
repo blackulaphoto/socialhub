@@ -1065,7 +1065,7 @@ export function CreatorPageBuilder({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto w-full max-w-[1160px] space-y-6 2xl:max-w-[1200px]">
       <Card className="border-border/50 bg-card/70 shadow-sm">
         <CardContent className="flex flex-col gap-4 p-5 md:p-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -1113,7 +1113,7 @@ export function CreatorPageBuilder({
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_1.08fr]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,0.98fr)_minmax(0,1.02fr)]">
         <Card className={cn("border-border/50 bg-card/50 md:hidden", creatorBuilderView === "preview" && "hidden")}>
           <CardHeader className="pb-3">
             <button type="button" onClick={() => setShowMobileBlockMenu((current) => !current)} className="flex w-full items-center justify-between text-left">
