@@ -18,6 +18,7 @@ import {
   Share2,
   Sparkles,
   Tag,
+  Users,
   Video,
 } from "lucide-react";
 import {
@@ -118,6 +119,7 @@ const FONT_PRESET_CLASSES: Record<string, string> = {
 };
 
 const DEFAULT_MODULE_ORDER = ["featured", "posts", "media", "about", "events", "contact"];
+const FRIEND_PLACEHOLDER_COUNT = 10;
 const BACKGROUND_STYLE_CLASSES: Record<string, string> = {
   "soft-glow": "",
   spotlight: "before:absolute before:inset-0 before:bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.14),transparent_45%)] before:pointer-events-none after:absolute after:inset-0 after:bg-[radial-gradient(circle_at_70%_30%,rgba(255,255,255,0.08),transparent_35%)] after:pointer-events-none",
@@ -503,6 +505,16 @@ export default function ArtistProfile({ id }: { id: string }) {
   const heroInfoLinks = (builderMeta.heroInfoLinks || []).filter((item) => item.label.trim() || item.url.trim()).slice(0, 3);
   const heroTags = String(artist.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean);
   const heroInfoServices = capabilityFlags.length ? capabilityFlags : heroTags;
+  const friendPlaceholderImages = [
+    artistPageAvatar,
+    ...imageGallery.slice(0, 9).map((item) => item.url),
+  ].filter(Boolean) as string[];
+  const friendPlacementCards = Array.from({ length: FRIEND_PLACEHOLDER_COUNT }, (_, index) => ({
+    id: `friend-slot-${index}`,
+    name: index < profile.user.friendCount ? `Friend ${index + 1}` : `Open spot ${index + 1}`,
+    subtitle: index < profile.user.friendCount ? "In network" : "Future collaborator",
+    imageUrl: friendPlaceholderImages[index % friendPlaceholderImages.length] || null,
+  }));
   const heroMediaGalleryItems = assignedHeroImages.map((item) => ({
     id: String(item.id),
     title: item.caption || artistPageName,
@@ -871,24 +883,56 @@ export default function ArtistProfile({ id }: { id: string }) {
 
   const renderHeroRow = () => (
     <section className="grid gap-5 lg:grid-cols-[minmax(260px,1fr)_minmax(0,1.5fr)] lg:items-stretch">
-      <div className="rounded-[2rem] border border-border/45 bg-background/28">
-        <CreatorInfoCard
-          creator={{
-            name: heroInfoTitle,
-            title: artist.category || artist.tagline || "Creator",
-            bio: heroInfoDescription,
-            availabilityText: artist.availabilityStatus || undefined,
-            turnaround: turnaroundInfo || undefined,
-            location: artist.location || undefined,
-            price: pricingSummary || undefined,
-            phone: heroInfoPhone || undefined,
-            email: artist.bookingEmail || undefined,
-            links: heroInfoLinks,
-            services: heroInfoServices,
-          }}
-          className="min-h-[28rem] rounded-[2rem] border-0 bg-transparent shadow-none"
-          showImage={false}
-        />
+      <div className="flex h-full flex-col gap-5">
+        <div className="rounded-[2rem] border border-border/45 bg-background/28">
+          <CreatorInfoCard
+            creator={{
+              name: heroInfoTitle,
+              title: artist.category || artist.tagline || "Creator",
+              bio: heroInfoDescription,
+              availabilityText: artist.availabilityStatus || undefined,
+              turnaround: turnaroundInfo || undefined,
+              location: artist.location || undefined,
+              price: pricingSummary || undefined,
+              phone: heroInfoPhone || undefined,
+              email: artist.bookingEmail || undefined,
+              links: heroInfoLinks,
+              services: heroInfoServices,
+            }}
+            className="min-h-[28rem] rounded-[2rem] border-0 bg-transparent shadow-none"
+            showImage={false}
+          />
+        </div>
+        <div className="rounded-[2rem] border border-border/45 bg-background/28 p-5 md:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-muted-foreground">
+                <Users className="h-4 w-4 text-primary" /> Friends
+              </div>
+              <h3 className="text-xl font-semibold tracking-tight">Community preview</h3>
+              <p className="text-sm text-muted-foreground">
+                Ten slots reserved for friends, mutuals, and future collaborators.
+              </p>
+            </div>
+            <Badge variant="secondary" className="w-fit shrink-0">
+              {FRIEND_PLACEHOLDER_COUNT} spots
+            </Badge>
+          </div>
+          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {friendPlacementCards.map((friend, index) => (
+              <div key={friend.id} className="flex items-center gap-3 rounded-2xl border border-border/50 bg-background/40 p-3">
+                <Avatar className="h-11 w-11 border border-border/50">
+                  <AvatarImage src={friend.imageUrl || ""} />
+                  <AvatarFallback>{String(index + 1).padStart(2, "0")}</AvatarFallback>
+                </Avatar>
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium">{friend.name}</div>
+                  <div className="truncate text-xs uppercase tracking-[0.14em] text-muted-foreground">{friend.subtitle}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-[2rem] border border-border/45 bg-background/28">
