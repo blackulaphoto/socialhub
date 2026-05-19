@@ -17,21 +17,23 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { formatCityRegion, parseCityRegion } from "@/lib/locations";
 import { Palette, Sparkles } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const CREATOR_TYPES = [
-  "Musician / Band / DJ",
   "Model",
   "Photographer",
-  "Designer",
-  "Painter",
-  "Jewelry Maker",
-  "Visual Artist",
-  "General Creator",
+  "Makeup Artist",
+  "Stylist",
+  "Retoucher",
+  "Set Designer",
+  "Creative Director",
+  "Wardrobe Stylist",
+  "Hair Artist",
+  "Production Team",
+  "Creative Professional",
 ];
 
 export default function Onboarding() {
@@ -40,7 +42,6 @@ export default function Onboarding() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [step, setStep] = useState<"profile" | "artist" | "finish">("profile");
-  const [wantsArtistPage, setWantsArtistPage] = useState(false);
   const [showProfileDetails, setShowProfileDetails] = useState(false);
   const [profileForm, setProfileForm] = useState({
     bio: "",
@@ -53,7 +54,7 @@ export default function Onboarding() {
     interests: "",
   });
   const [artistForm, setArtistForm] = useState({
-    category: "General Creator",
+    category: "Creative Professional",
     location: "",
     tagline: "",
     tags: "",
@@ -81,14 +82,13 @@ export default function Onboarding() {
       interests: (profile.user.interests || []).join(", "),
     });
     setArtistForm({
-      category: profile.artistProfile?.category || "General Creator",
+      category: profile.artistProfile?.category || "Creative Professional",
       location: profile.artistProfile?.location || profile.user.location || "",
       tagline: profile.artistProfile?.tagline || "",
       tags: profile.artistProfile?.tags?.join(", ") || "",
       bio: profile.artistProfile?.bio || profile.user.about || profile.user.bio || "",
       bookingEmail: profile.artistProfile?.bookingEmail || "",
     });
-    setWantsArtistPage(!!profile.artistProfile);
     if (profile.user.onboardingCompleted) {
       setLocation("/");
       return;
@@ -138,10 +138,10 @@ export default function Onboarding() {
         about: profileForm.about || undefined,
         interests: profileForm.interests.split(",").map((item) => item.trim()).filter(Boolean),
         onboardingCompleted: false,
-        onboardingStep: wantsArtistPage ? "artist" : "finish",
+        onboardingStep: "artist",
       },
     }, {
-      onSuccess: () => setStep(wantsArtistPage ? "artist" : "finish"),
+      onSuccess: () => setStep("artist"),
       onError: () => toast({ title: "Could not save profile step", variant: "destructive" }),
     });
   };
@@ -168,7 +168,7 @@ export default function Onboarding() {
         });
         setStep("finish");
       },
-      onError: () => toast({ title: "Could not create artist page", variant: "destructive" }),
+      onError: () => toast({ title: "Could not save creator profile", variant: "destructive" }),
     });
   };
 
@@ -202,7 +202,7 @@ export default function Onboarding() {
       <div className="mx-auto flex max-w-4xl flex-col gap-6">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant={step === "profile" ? "default" : "secondary"}>1. Your profile</Badge>
-          <Badge variant={step === "artist" ? "default" : "secondary"}>2. Artist page</Badge>
+          <Badge variant={step === "artist" ? "default" : "secondary"}>2. Creator profile</Badge>
           <Badge variant={step === "finish" ? "default" : "secondary"}>3. Finish</Badge>
         </div>
 
@@ -267,7 +267,7 @@ export default function Onboarding() {
                             id="onboarding-work"
                             value={profileForm.work}
                             onChange={(e) => setProfileForm((current) => ({ ...current, work: e.target.value }))}
-                            placeholder="Photographer, promoter, developer, producer"
+                            placeholder="Photographer, makeup artist, stylist, retoucher"
                           />
                         </div>
                         <div className="space-y-2">
@@ -336,27 +336,23 @@ export default function Onboarding() {
                   </CardContent>
                 </Card>
               </div>
-              <div className={`rounded-3xl border px-5 py-5 transition-colors ${wantsArtistPage ? "border-primary bg-primary/10" : "border-border/50 bg-background/30"}`}>
+              <div className="rounded-3xl border border-primary/20 bg-primary/10 px-5 py-5 transition-colors">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                   <div className="space-y-2">
                     <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[10px] uppercase tracking-[0.24em] text-primary">
                       <Sparkles className="h-3.5 w-3.5" />
-                      Recommended Next Step
+                      Included In Setup
                     </div>
-                    <div className="text-lg font-semibold">Create a linked artist page too</div>
+                    <div className="text-lg font-semibold">Your creator profile comes with every account</div>
                     <p className="max-w-2xl text-sm text-muted-foreground">
-                      Keep one account, but unlock a separate creator homepage for your work, media, booking button, events, and discovery profile.
+                      Next you will shape the public profile people see for your work, media, contact flow, and discovery presence.
                     </p>
                   </div>
-                  <Button type="button" variant={wantsArtistPage ? "default" : "outline"} onClick={() => setWantsArtistPage((current) => !current)}>
+                  <div className="inline-flex items-center rounded-full border border-primary/20 bg-background/50 px-4 py-2 text-sm font-medium">
                     <Palette className="mr-2 h-4 w-4" />
-                    {wantsArtistPage ? "Artist Page Included" : "Yes, Add Artist Page"}
-                  </Button>
+                    Creator tools enabled
+                  </div>
                 </div>
-                <label className="mt-4 flex items-center gap-3 rounded-2xl border border-border/50 bg-background/40 px-4 py-3">
-                  <Checkbox checked={wantsArtistPage} onCheckedChange={(checked) => setWantsArtistPage(Boolean(checked))} />
-                  <span className="text-sm">I want a linked artist / creator page during setup</span>
-                </label>
               </div>
               <div className="flex justify-end gap-3">
                 <Button onClick={saveProfileStep} disabled={updateProfile.isPending}>Continue</Button>
@@ -368,7 +364,7 @@ export default function Onboarding() {
         {step === "artist" ? (
           <Card className="border-border/50 bg-card/60">
             <CardHeader>
-              <CardTitle>Create your artist page</CardTitle>
+              <CardTitle>Set up your creator profile</CardTitle>
               <CardDescription>Start simple. You can fine-tune media modules, featured content, and page style later in settings.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
@@ -392,11 +388,11 @@ export default function Onboarding() {
               </div>
               <div className="space-y-2">
                 <Label>Hero tagline</Label>
-                <Input value={artistForm.tagline} onChange={(e) => setArtistForm((current) => ({ ...current, tagline: e.target.value }))} placeholder="Industrial techno DJ for warehouse nights." />
+                <Input value={artistForm.tagline} onChange={(e) => setArtistForm((current) => ({ ...current, tagline: e.target.value }))} placeholder="Editorial model available for fashion, beauty, and concept shoots." />
               </div>
               <div className="space-y-2">
                 <Label>Tags</Label>
-                <Input value={artistForm.tags} onChange={(e) => setArtistForm((current) => ({ ...current, tags: e.target.value }))} placeholder="techno, darkwave, latex, portraiture" />
+                <Input value={artistForm.tags} onChange={(e) => setArtistForm((current) => ({ ...current, tags: e.target.value }))} placeholder="editorial, beauty, test shoot, studio, retouching" />
               </div>
               <div className="space-y-2">
                 <Label>Creator bio</Label>
@@ -408,7 +404,7 @@ export default function Onboarding() {
               </div>
               <div className="flex justify-between gap-3">
                 <Button variant="outline" onClick={() => setStep("finish")}>Skip for now</Button>
-                <Button onClick={saveArtistStep} disabled={updateArtist.isPending}>Create artist page</Button>
+                <Button onClick={saveArtistStep} disabled={updateArtist.isPending}>Save creator profile</Button>
               </div>
             </CardContent>
           </Card>
@@ -418,7 +414,7 @@ export default function Onboarding() {
           <Card className="border-border/50 bg-card/60">
             <CardHeader>
               <CardTitle>You are ready</CardTitle>
-              <CardDescription>Your personal profile is set. {wantsArtistPage ? "Your linked artist page can keep growing in settings." : "You can always add a linked artist page later."}</CardDescription>
+              <CardDescription>Your account and public creator profile are set. You can keep refining your profile in settings anytime.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="text-sm text-muted-foreground">

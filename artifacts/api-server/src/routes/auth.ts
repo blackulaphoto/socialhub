@@ -4,7 +4,7 @@ import { db, userProfileDetailsTable, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { RegisterBody, LoginBody } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth.js";
-import { formatUser } from "./helpers.js";
+import { ensureArtistProfileRecord, ensureCreatorSettingsRecord, formatUser } from "./helpers.js";
 
 const router = Router();
 
@@ -33,17 +33,20 @@ router.post("/register", async (req, res) => {
     username,
     email,
     passwordHash,
-    profileType: "user",
+    profileType: "artist",
   }).returning();
 
-  await db.insert(userProfileDetailsTable).values({
+  const [details] = await db.insert(userProfileDetailsTable).values({
     userId: user.id,
     themeName: "nocturne",
     accentColor: "#8b5cf6",
     onboardingCompleted: false,
     onboardingStep: "profile",
     links: [],
-  }).onConflictDoNothing();
+  }).onConflictDoNothing().returning();
+
+  await ensureArtistProfileRecord(user, details);
+  await ensureCreatorSettingsRecord(user.id);
 
   req.session.userId = user.id;
   res.status(201).json({

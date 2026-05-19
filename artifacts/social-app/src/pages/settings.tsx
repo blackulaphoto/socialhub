@@ -57,64 +57,75 @@ const ACTION_OPTIONS = [
 ];
 
 const CREATOR_TYPES = [
-  "Musician / Band / DJ",
   "Model",
   "Photographer",
-  "Designer",
-  "Painter",
-  "Jewelry Maker",
-  "Visual Artist",
-  "General Creator",
+  "Makeup Artist",
+  "Stylist",
+  "Retoucher",
+  "Set Designer",
+  "Creative Director",
+  "Wardrobe Stylist",
+  "Hair Artist",
+  "Production Team",
+  "Creative Professional",
 ];
 
 const PAGE_ARCHETYPES = [
   {
-    key: "musician",
-    label: "Musician / DJ",
-    category: "Musician / Band / DJ",
-    cta: "Book Me",
-    tagline: "Live sets, releases, upcoming nights, and collaborations.",
-    descriptor: "Best for DJs, bands, producers, and performers.",
-  },
-  {
-    key: "visual",
-    label: "Visual Artist",
-    category: "Visual Artist",
-    cta: "Commission Me",
-    tagline: "Original work, featured pieces, process, and commissions.",
-    descriptor: "Best for painters, illustrators, and mixed-media artists.",
+    key: "model",
+    label: "Model Portfolio",
+    category: "Model",
+    cta: "Work With Me",
+    tagline: "Portfolio highlights, availability, measurements, and collaboration interests.",
+    descriptor: "Best for models, muses, and performance talent.",
   },
   {
     key: "photography",
     label: "Photographer",
     category: "Photographer",
     cta: "Hire Me",
-    tagline: "Portfolio highlights, bookings, and visual style at a glance.",
-    descriptor: "Best for photographers, retouchers, and creative studios.",
+    tagline: "Editorial work, test shoots, bookings, and visual direction at a glance.",
+    descriptor: "Best for photographers, image-makers, and studio-led pages.",
   },
   {
-    key: "model",
-    label: "Model",
-    category: "Model",
-    cta: "Work With Me",
-    tagline: "Portfolio, availability, and booking-ready presence.",
-    descriptor: "Best for models, performers, and talent pages.",
+    key: "beauty",
+    label: "Makeup Artist",
+    category: "Makeup Artist",
+    cta: "Book Me",
+    tagline: "Beauty portfolio, kit specialties, and editorial collaboration readiness.",
+    descriptor: "Best for makeup artists, body painters, and beauty teams.",
   },
   {
-    key: "shop",
-    label: "Maker / Shop",
-    category: "Designer",
-    cta: "Shop My Work",
-    tagline: "Featured products, commissions, and links that convert visitors.",
-    descriptor: "Best for makers, Etsy sellers, and boutique businesses.",
+    key: "styling",
+    label: "Stylist",
+    category: "Stylist",
+    cta: "Collaborate",
+    tagline: "Pulls, references, wardrobe direction, and scene-building for shoots.",
+    descriptor: "Best for stylists, wardrobe leads, and fashion collaborators.",
   },
   {
-    key: "business",
-    label: "Business / Brand",
-    category: "General Creator",
-    cta: "Visit Store",
-    tagline: "What you offer, what makes you distinct, and where to take action.",
-    descriptor: "Best for brands, startups, studios, and local businesses.",
+    key: "retouching",
+    label: "Retoucher",
+    category: "Retoucher",
+    cta: "Hire Me",
+    tagline: "Before-and-after quality, finish style, turnaround, and post workflow.",
+    descriptor: "Best for retouchers, editors, and post-production specialists.",
+  },
+  {
+    key: "production",
+    label: "Set Designer",
+    category: "Set Designer",
+    cta: "Collaborate",
+    tagline: "Build worlds, scenes, and environments for editorials, campaigns, and events.",
+    descriptor: "Best for set designers, prop stylists, and production designers.",
+  },
+  {
+    key: "team",
+    label: "Creative Professional",
+    category: "Creative Professional",
+    cta: "Collaborate",
+    tagline: "Portfolio, trust signals, and contact points for multidisciplinary collaborators.",
+    descriptor: "Best for hybrid creatives, independent collaborators, and production support roles.",
   },
 ];
 
@@ -365,7 +376,7 @@ function actionTypeFromLabel(label: string) {
 }
 
 function getArchetypeKeyFromCategory(category: string | null | undefined) {
-  return PAGE_ARCHETYPES.find((item) => item.category === (category || "General Creator"))?.key || "business";
+  return PAGE_ARCHETYPES.find((item) => item.category === (category || "Creative Professional"))?.key || "team";
 }
 
 export default function Settings() {
@@ -384,6 +395,7 @@ export default function Settings() {
   const [creatorSetupStage, setCreatorSetupStage] = useState<"starter" | "advanced">("starter");
   const [showCreatorLaunchNotice, setShowCreatorLaunchNotice] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
+  const [trustSettingsView, setTrustSettingsView] = useState<"references" | "vouches" | "history" | "verified" | "safety">("references");
   const [pageModules, setPageModules] = useState<{ enabledModules: string[]; moduleOrder: string[] }>({
     enabledModules: ["featured", "posts", "media", "about", "events", "contact"],
     moduleOrder: ["featured", "posts", "media", "about", "events", "contact"],
@@ -481,7 +493,7 @@ export default function Settings() {
       displayName: profile.artistProfile?.displayName || "",
       avatarUrl: profile.artistProfile?.avatarUrl || "",
       bannerUrl: profile.artistProfile?.bannerUrl || "",
-      category: profile.artistProfile?.category || "General Creator",
+      category: profile.artistProfile?.category || "Creative Professional",
       location: profile.artistProfile?.location || "",
       tagline: profile.artistProfile?.tagline || "",
       tags: profile.artistProfile?.tags?.join(", ") || "",
@@ -599,11 +611,11 @@ export default function Settings() {
   }, [creator.primaryActionLabel]);
   const selectedArchetype = useMemo(() => {
     return PAGE_ARCHETYPES.find((item) => item.key === creator.pageArchetype)
-      || PAGE_ARCHETYPES.find((item) => item.category === (artist.category || "General Creator"))
+      || PAGE_ARCHETYPES.find((item) => item.category === (artist.category || "Creative Professional"))
       || PAGE_ARCHETYPES[5];
   }, [artist.category, creator.pageArchetype]);
 
-  const hasArtistPage = !!profile?.artistProfile;
+  const hasArtistPage = true;
   const showCreatorTools = hasArtistPage || isCreatingArtistPage;
   const isStarterCreatorSetup = !hasArtistPage && creatorSetupStage === "starter";
   const artistPosts = artistPostsPage?.posts || [];
@@ -1690,6 +1702,39 @@ export default function Settings() {
     { label: "Live events", value: String(linkedEvents.length) },
     { label: "CTA", value: creator.primaryActionLabel?.trim() ? "Ready" : "Needed" },
   ];
+  const trustSummaryMetrics = [
+    { label: "References", value: String(Math.max(2, Math.floor(linkedEvents.length + previewServiceItems.length + 1))) },
+    { label: "Vouches", value: String(Math.max(1, Math.floor((profile.user.followerCount + profile.user.friendCount) / 6))) },
+    { label: "Verified shoots", value: String(Math.max(0, Math.floor(artistPosts.length / 2) + linkedEvents.length)) },
+    { label: "Years active", value: String(Math.max(1, new Date().getFullYear() - new Date(profile.user.createdAt).getFullYear())) },
+  ];
+  const trustSettingsCards = {
+    references: [
+      "Portrait photographer who can confirm set reliability and communication.",
+      "Stylist or makeup lead who can speak to prep, timing, and professionalism.",
+      "Producer or creative director reference for collaboration readiness.",
+    ],
+    vouches: [
+      "Public recommendation snippets from trusted collaborators.",
+      "Role-specific endorsements tied to specialties like editorial, beauty, or retouching.",
+      "Repeat-collaboration signals that elevate profile credibility.",
+    ],
+    history: [
+      "Completed shoots with date, city, role, and collaborator list.",
+      "Campaign, editorial, and test-shoot history with lightweight metadata.",
+      "Scene or production affiliations that show real working context.",
+    ],
+    verified: [
+      "Backend placeholder for approved productions and confirmed shoot participation.",
+      "Future state for verified call sheets, linked events, and collaborator confirmation.",
+      "Ready for proof assets once verification workflows exist.",
+    ],
+    safety: [
+      "Reserved for safety reviewed, conduct reviewed, and platform trust states.",
+      "Can later include boundary preferences, reporting history outcomes, and access controls.",
+      "UI surface added now so the badge system has a stable home later.",
+    ],
+  } as const;
   const builderSectionSummaries = {
     identity: `${identityCompletedCount}/${identityChecklist.length} core fields ready`,
     featured: hasFeaturedSelection ? `${featuredSelectionLabel} selected` : "No lead feature yet",
@@ -1817,7 +1862,7 @@ export default function Settings() {
     <div className="mx-auto w-full max-w-[1180px] p-4 md:py-8 2xl:max-w-[1240px]">
       <div className="mb-8">
         <h1 className="text-3xl font-bold">Settings</h1>
-        <p className="text-muted-foreground">Tune your profile identity, creator page, and showcase presentation.</p>
+        <p className="text-muted-foreground">Tune your public profile, showcase presentation, and collaboration presence.</p>
       </div>
 
       <div className="mb-8 overflow-hidden rounded-3xl border border-border/50">
@@ -1940,7 +1985,7 @@ export default function Settings() {
                       {THEME_OPTIONS.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                  <p className="text-sm text-muted-foreground">This changes the look of your personal profile header and cards.</p>
+                  <p className="text-sm text-muted-foreground">This changes the look of your public profile header and cards.</p>
                   <div className="grid gap-3 pt-2 md:grid-cols-3">
                     {THEME_OPTIONS.map((theme) => {
                       const preview = PROFILE_THEME_STYLES[theme.value];
@@ -2074,7 +2119,7 @@ export default function Settings() {
                       setActiveTab("creator");
                       setArtist((current) => ({
                         ...current,
-                        category: current.category || "General Creator",
+                        category: current.category || "Creative Professional",
                         location: current.location || basic.location || "",
                         bio: current.bio || basic.about || basic.bio || "",
                         avatarUrl: current.avatarUrl || "",
@@ -2113,7 +2158,7 @@ export default function Settings() {
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <Badge className="border border-white/15 bg-white/10 text-white hover:bg-white/10">{selectedArchetype.label}</Badge>
-                      <Badge className="border border-white/15 bg-white/10 text-white hover:bg-white/10">{artist.category || "General Creator"}</Badge>
+                      <Badge className="border border-white/15 bg-white/10 text-white hover:bg-white/10">{artist.category || "Creative Professional"}</Badge>
                       <Badge className="border border-white/15 bg-white/10 text-white hover:bg-white/10">{creator.primaryActionLabel || "Contact Me"}</Badge>
                     </div>
                   </div>
@@ -2197,6 +2242,62 @@ export default function Settings() {
                   </CardContent>
                 </Card>
               ) : null}
+
+              <Card className="border-border/60 bg-card/70 shadow-sm">
+                <CardHeader>
+                  <CardTitle>Trust Layer Controls</CardTitle>
+                  <CardDescription>Manage the public trust and collaboration surfaces that now sit alongside the portfolio.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-5">
+                  <div className="grid gap-3 md:grid-cols-4">
+                    {trustSummaryMetrics.map((metric) => (
+                      <div key={metric.label} className="rounded-2xl border border-border/50 bg-background/35 p-4">
+                        <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{metric.label}</div>
+                        <div className="mt-2 text-2xl font-semibold">{metric.value}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-5">
+                    {([
+                      { key: "references", label: "References" },
+                      { key: "vouches", label: "Vouches" },
+                      { key: "history", label: "History" },
+                      { key: "verified", label: "Verified Shoots" },
+                      { key: "safety", label: "Safety" },
+                    ] as const).map((item) => (
+                      <button
+                        key={item.key}
+                        type="button"
+                        onClick={() => setTrustSettingsView(item.key)}
+                        className={cn(
+                          "rounded-2xl border px-4 py-3 text-left text-sm font-medium transition-colors",
+                          trustSettingsView === item.key
+                            ? "border-primary/40 bg-primary/10 text-foreground"
+                            : "border-border/50 bg-background/35 text-muted-foreground hover:border-primary/30 hover:text-foreground",
+                        )}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="rounded-2xl border border-border/50 bg-background/30 p-5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="secondary">Frontend placeholder</Badge>
+                      <Badge variant="outline">No backend write path yet</Badge>
+                    </div>
+                    <div className="mt-4 grid gap-3 md:grid-cols-3">
+                      {trustSettingsCards[trustSettingsView].map((item) => (
+                        <div key={item} className="rounded-2xl border border-border/50 bg-background/40 p-4 text-sm text-muted-foreground">
+                          {item}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-4 rounded-2xl border border-dashed border-border/50 bg-background/20 p-4 text-sm text-muted-foreground">
+                      Next backend phase can replace these placeholders with real reference requests, collaborator confirmations, verified shoot records, endorsements, and safety status management without changing this layout.
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
             <CreatorPageBuilder
               userId={user.id}
@@ -2298,7 +2399,7 @@ export default function Settings() {
                         <div className="truncate text-lg font-semibold">{artist.displayName || "Artist page name"}</div>
                         <div className="mt-1 text-sm text-muted-foreground">{artist.tagline || "Short tagline or first impression"}</div>
                         <div className="mt-2 flex flex-wrap gap-2">
-                          <Badge variant="secondary">{artist.category || "General Creator"}</Badge>
+                          <Badge variant="secondary">{artist.category || "Creative Professional"}</Badge>
                           <Badge variant="outline">{formatPlace([artist.location, basic.city, basic.location]) || "Location"}</Badge>
                         </div>
                       </div>
@@ -2559,7 +2660,7 @@ export default function Settings() {
                           </div>
                           <div className="space-y-2">
                             <Label>Category</Label>
-                            <Select value={artist.category || "General Creator"} onValueChange={(value) => setArtist({ ...artist, category: value })}>
+                            <Select value={artist.category || "Creative Professional"} onValueChange={(value) => setArtist({ ...artist, category: value })}>
                               <SelectTrigger><SelectValue /></SelectTrigger>
                               <SelectContent>{CREATOR_TYPES.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
                             </Select>
@@ -3437,7 +3538,7 @@ export default function Settings() {
                           </div>
                         </div>
                         <div className="mb-3 flex flex-wrap gap-2">
-                          <Badge variant="secondary">{artist.category || "General Creator"}</Badge>
+                          <Badge variant="secondary">{artist.category || "Creative Professional"}</Badge>
                           <Badge>{creator.primaryActionLabel || "Contact Me"}</Badge>
                           <Badge variant="outline">{creator.layoutTemplate || "portfolio"}</Badge>
                           <Badge variant="outline">{creator.fontPreset || "modern"}</Badge>

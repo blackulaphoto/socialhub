@@ -107,6 +107,74 @@ function formatCreatorSettingsRecord(
 
 export { formatCreatorSettingsRecord };
 
+export async function ensureArtistProfileRecord(
+  user: typeof usersTable.$inferSelect,
+  details?: typeof userProfileDetailsTable.$inferSelect | null,
+) {
+  const [existing] = await db.select().from(artistProfilesTable).where(eq(artistProfilesTable.userId, user.id)).limit(1);
+  if (existing) return existing;
+
+  const [created] = await db.insert(artistProfilesTable).values({
+    userId: user.id,
+    displayName: user.username,
+    avatarUrl: user.avatarUrl ?? null,
+    bannerUrl: details?.bannerUrl ?? null,
+    category: "General Creator",
+    location: details?.location ?? details?.city ?? null,
+    tagline: null,
+    tags: [],
+    bio: user.bio ?? null,
+    influences: null,
+    availabilityStatus: null,
+    pronouns: null,
+    yearsActive: null,
+    representedBy: null,
+    openForCommissions: false,
+    touring: false,
+    acceptsCollaborations: true,
+    customFields: [],
+    bookingEmail: user.email ?? null,
+  }).returning();
+
+  return created;
+}
+
+export async function ensureCreatorSettingsRecord(userId: number) {
+  const [existing] = await db.select().from(creatorProfileSettingsTable).where(eq(creatorProfileSettingsTable.userId, userId)).limit(1);
+  if (existing) return existing;
+
+  const [created] = await db.insert(creatorProfileSettingsTable).values({
+    userId,
+    pageType: "creator",
+    pageArchetype: "business",
+    pageStatus: "published",
+    primaryActionType: "contact",
+    primaryActionLabel: "Contact Me",
+    primaryActionUrl: null,
+    featuredTitle: null,
+    featuredDescription: null,
+    featuredUrl: null,
+    featuredType: "highlight",
+    featuredContent: null,
+    linkItems: [],
+    serviceItems: [],
+    pricingSummary: null,
+    turnaroundInfo: null,
+    moodPreset: "sleek",
+    layoutTemplate: "portfolio",
+    fontPreset: "modern",
+    accentColor: "#8b5cf6",
+    backgroundStyle: "soft-glow",
+    lightThemeVariant: "studio",
+    enabledModules: DEFAULT_ENABLED_MODULES,
+    moduleOrder: DEFAULT_MODULE_ORDER,
+    sectionConfigs: {},
+    pinnedPostId: null,
+  }).returning();
+
+  return created;
+}
+
 export async function getBlockState(currentUserId: number | undefined, targetUserId: number) {
   if (!currentUserId || currentUserId === targetUserId) {
     return {
@@ -265,7 +333,7 @@ export async function getUserCounts(userId: number) {
 export async function getUserSummary(user: typeof usersTable.$inferSelect, currentUserId?: number) {
   const [followerResult] = await db.select({ count: count() }).from(followsTable).where(eq(followsTable.followingId, user.id));
   const [details] = await db.select().from(userProfileDetailsTable).where(eq(userProfileDetailsTable.userId, user.id)).limit(1);
-  const [artistProfile] = await db.select().from(artistProfilesTable).where(eq(artistProfilesTable.userId, user.id)).limit(1);
+  const artistProfile = await ensureArtistProfileRecord(user, details);
   const friendCount = await getFriendCount(user.id);
   const blockState = await getBlockState(currentUserId, user.id);
 
@@ -303,7 +371,8 @@ export async function getUserSummary(user: typeof usersTable.$inferSelect, curre
 export async function formatUser(user: typeof usersTable.$inferSelect) {
   const counts = await getUserCounts(user.id);
   const [details] = await db.select().from(userProfileDetailsTable).where(eq(userProfileDetailsTable.userId, user.id)).limit(1);
-  const [artistProfile] = await db.select().from(artistProfilesTable).where(eq(artistProfilesTable.userId, user.id)).limit(1);
+  const artistProfile = await ensureArtistProfileRecord(user, details);
+  await ensureCreatorSettingsRecord(user.id);
 
   return {
     id: user.id,
@@ -342,7 +411,7 @@ export async function formatArtistProfile(profile: typeof artistProfilesTable.$i
     .where(eq(galleryItemsTable.artistId, profile.id))
     .orderBy(desc(galleryItemsTable.createdAt));
   const summary = await getUserSummary(user, currentUserId);
-  const [settings] = await db.select().from(creatorProfileSettingsTable).where(eq(creatorProfileSettingsTable.userId, user.id)).limit(1);
+  const settings = await ensureCreatorSettingsRecord(user.id);
   const pinnedPost = settings?.pinnedPostId
     ? await enrichPostById(settings.pinnedPostId)
     : null;

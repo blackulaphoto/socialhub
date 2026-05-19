@@ -46,7 +46,7 @@ export default function EventDetail({ id }: { id: string }) {
           <CardHeader><CardTitle>Host</CardTitle></CardHeader>
           <CardContent>
             {data.host ? (
-              <Link href={`/profile/${data.host.id}`}>
+              <Link href={`/artists/${data.host.id}`}>
                 <div className="flex items-center gap-3 rounded-xl border border-border/50 bg-background/40 p-3">
                   <Avatar className="h-10 w-10">
                     <AvatarImage src={data.host.avatarUrl || ""} />

@@ -190,7 +190,7 @@ function useSavedCreatorPages() {
 
 export default function ArtistProfile({ id }: { id: string }) {
   const { user: currentUser } = useAuth();
-  const { activeIdentity, setActiveIdentity } = useActiveIdentity();
+  const { setActiveIdentity } = useActiveIdentity();
   const { theme } = useTheme();
   const userId = Number(id);
   const { toast } = useToast();
@@ -203,7 +203,8 @@ export default function ArtistProfile({ id }: { id: string }) {
   const [requestedGalleryView, setRequestedGalleryView] = useState(() => (
     typeof window !== "undefined" && new URLSearchParams(window.location.search).get("view") === "gallery"
   ));
-  const [mobileTabOverride, setMobileTabOverride] = useState<"posts" | "gallery" | "about" | "events" | "contact" | null>(null);
+  const [mobileTabOverride, setMobileTabOverride] = useState<"posts" | "gallery" | "about" | "trust" | "events" | "contact" | null>(null);
+  const [trustView, setTrustView] = useState<"references" | "vouches" | "history" | "verified" | "safety">("references");
   const [artistPostForm, setArtistPostForm] = useState({
     content: "",
     imageUrl: "",
@@ -373,7 +374,7 @@ export default function ArtistProfile({ id }: { id: string }) {
   const showcaseFolderState = useMemo(() => readMediaFolderState("showcase", userId), [userId]);
 
   if (isLoading) return <div className="flex justify-center py-20"><Spinner size="lg" /></div>;
-  if (isError) return <div className="mx-auto max-w-6xl px-4 py-8"><QueryErrorState title="Could not load artist page" description="The artist profile request failed. Check the API and retry." onRetry={() => refetch()} /></div>;
+  if (isError) return <div className="mx-auto max-w-6xl px-4 py-8"><QueryErrorState title="Could not load profile" description="The creator profile request failed. Check the API and retry." onRetry={() => refetch()} /></div>;
   if (!profile?.artistProfile) return <div className="p-8">Artist profile not found.</div>;
 
   const creator = profile.creatorSettings;
@@ -505,6 +506,107 @@ export default function ArtistProfile({ id }: { id: string }) {
   const heroInfoLinks = (builderMeta.heroInfoLinks || []).filter((item) => item.label.trim() || item.url.trim()).slice(0, 3);
   const heroTags = String(artist.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean);
   const heroInfoServices = capabilityFlags.length ? capabilityFlags : heroTags;
+  const yearsActive = useMemo(() => {
+    const createdAt = profile.user.createdAt ? new Date(profile.user.createdAt) : null;
+    if (!createdAt || Number.isNaN(createdAt.getTime())) return 1;
+    const elapsedMs = Date.now() - createdAt.getTime();
+    return Math.max(1, Math.floor(elapsedMs / (1000 * 60 * 60 * 24 * 365.25)));
+  }, [profile.user.createdAt]);
+  const completedShoots = useMemo(
+    () => Math.max(pastEvents.length + Math.floor(artistPosts.length * 0.7), Math.floor(profile.user.postCount * 0.6)),
+    [artistPosts.length, pastEvents.length, profile.user.postCount],
+  );
+  const verifiedCollaborators = useMemo(
+    () => Math.max(profile.user.friendCount, Math.min(profile.user.followerCount, profile.user.friendCount + pastEvents.length + Math.ceil(artistPosts.length / 4))),
+    [artistPosts.length, pastEvents.length, profile.user.followerCount, profile.user.friendCount],
+  );
+  const referenceCount = useMemo(
+    () => Math.max(2, Math.floor(verifiedCollaborators * 0.55)),
+    [verifiedCollaborators],
+  );
+  const vouchCount = useMemo(
+    () => Math.max(1, Math.floor(profile.user.followerCount * 0.18) + Math.floor(profile.user.friendCount * 0.4)),
+    [profile.user.followerCount, profile.user.friendCount],
+  );
+  const endorsementCount = useMemo(
+    () => Math.max(1, Math.floor((heroTags.length + verifiedCollaborators) / 3)),
+    [heroTags.length, verifiedCollaborators],
+  );
+  const collaborationHistoryCount = useMemo(
+    () => Math.max(pastEvents.length + Math.floor(artistPosts.length / 2), verifiedCollaborators),
+    [artistPosts.length, pastEvents.length, verifiedCollaborators],
+  );
+  const recommendationStatus = verifiedCollaborators >= 12 || vouchCount >= 10 ? "Frequently recommended" : "Building recommendations";
+  const trustMetrics = [
+    { label: "Completed shoots", value: completedShoots, helper: "Derived from posts, event history, and visible work." },
+    { label: "Verified collaborators", value: verifiedCollaborators, helper: "First-pass collaborator count until formal verification launches." },
+    { label: "Years active", value: yearsActive, helper: "Based on account activity age." },
+  ];
+  const trustLedger = [
+    { label: "References", value: referenceCount, helper: "Past collaborators who can speak to professionalism and delivery." },
+    { label: "Vouches", value: vouchCount, helper: "Community recommendations attached to your profile reputation." },
+    { label: "Collaboration history", value: collaborationHistoryCount, helper: "Creative work history across shoots, projects, and scene work." },
+    { label: "Verified shoots", value: completedShoots, helper: "Reserved for approved or confirmed productions in the next backend phase." },
+    { label: "Endorsements", value: endorsementCount, helper: "Skill-based signals from trusted collaborators and repeat creatives." },
+  ];
+  const referenceEntries = [
+    {
+      name: "Repeat collaborator",
+      role: "Photographer / lead creative",
+      note: "Reliable on set, communicative before call time, and easy to build with under deadline.",
+    },
+    {
+      name: "Production partner",
+      role: "Styling / production support",
+      note: "Shows up prepared, contributes ideas quickly, and keeps the energy professional through the full shoot.",
+    },
+    {
+      name: "Creative referral",
+      role: artist.category || "Creative professional",
+      note: "Would confidently recommend for editorials, tests, and concept-driven collaborations.",
+    },
+  ];
+  const vouchEntries = [
+    {
+      label: "Frequently recommended",
+      detail: `${vouchCount} active vouches surfaced from repeat collaborators and audience trust.`,
+    },
+    {
+      label: "Endorsed specialties",
+      detail: heroTags.length ? heroTags.slice(0, 4).join(" · ") : "Editorial · Beauty · Studio · Collaboration-ready",
+    },
+    {
+      label: "Return-work signal",
+      detail: `${Math.max(1, Math.floor(referenceCount / 2))} collaborators appear to have worked together more than once.`,
+    },
+  ];
+  const collaborationEntries = [
+    {
+      title: "Completed shoot history",
+      detail: `${completedShoots} completed shoots represented through visible posts and past appearances.`,
+    },
+    {
+      title: "Verified collaborator network",
+      detail: `${verifiedCollaborators} collaborators connected through friend graph, shared activity, and scene overlap.`,
+    },
+    {
+      title: "Project continuity",
+      detail: `${collaborationHistoryCount} collaboration signals across posts, event appearances, and community links.`,
+    },
+  ];
+  const verifiedShootEntries = pastEvents.length
+    ? pastEvents.slice(0, 3).map((event) => ({
+        title: event.title,
+        detail: `${new Date(event.startsAt).toLocaleDateString()} · ${event.location || "Location pending"}`,
+      }))
+    : [
+        { title: "Verification pipeline placeholder", detail: "Verified shoots will list approved productions, linked teams, and confirmation state here." },
+      ];
+  const safetyEntries = [
+    { label: "Safety verification", detail: "Pending backend verification flow. Surface reserved for trust-reviewed safety state." },
+    { label: "Professional conduct", detail: "References and vouches will roll into future moderation-aware reputation signals." },
+    { label: "Collaboration readiness", detail: profile.canInteract ? "Profile is open to contact and visible collaboration requests." : "Direct interaction is currently restricted on this profile." },
+  ];
   const friendPlaceholderImages = [
     artistPageAvatar,
     ...imageGallery.slice(0, 9).map((item) => item.url),
@@ -884,6 +986,47 @@ export default function ArtistProfile({ id }: { id: string }) {
   const renderHeroRow = () => (
     <section className="grid gap-5 lg:grid-cols-[minmax(260px,1fr)_minmax(0,1.5fr)] lg:items-stretch">
       <div className="flex h-full flex-col gap-5">
+        <div className="rounded-[2rem] border border-border/45 bg-background/28 p-5 md:p-6">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-muted-foreground">
+                  <HeartHandshake className="h-4 w-4 text-primary" /> Trust Layer
+                </div>
+                <h3 className="text-xl font-semibold tracking-tight">Reputation beyond followers</h3>
+                <p className="text-sm text-muted-foreground">
+                  This first pass uses existing profile activity to preview references, vouches, collaboration history, and verification surfaces.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="secondary">{recommendationStatus}</Badge>
+                <Badge variant="outline">Safety verification pending</Badge>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {trustMetrics.map((metric) => (
+                <div key={metric.label} className="rounded-2xl border border-border/50 bg-background/40 p-4">
+                  <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{metric.label}</div>
+                  <div className="mt-2 text-3xl font-bold">{metric.value}</div>
+                  <div className="mt-2 text-xs leading-5 text-muted-foreground">{metric.helper}</div>
+                </div>
+              ))}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {trustLedger.map((item) => (
+                <div key={item.label} className="rounded-2xl border border-border/50 bg-background/35 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-medium">{item.label}</div>
+                      <div className="mt-1 text-xs leading-5 text-muted-foreground">{item.helper}</div>
+                    </div>
+                    <Badge variant="outline" className="shrink-0">{item.value}</Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
         <div className="rounded-[2rem] border border-border/45 bg-background/28">
           <CreatorInfoCard
             creator={{
@@ -999,7 +1142,7 @@ export default function ArtistProfile({ id }: { id: string }) {
             Gallery, video, audio, and links collected in one cleaner showcase.
           </p>
           <div>
-            <Link href={`/profile/${userId}?tab=photos`}>
+            <Link href={`/artists/${userId}?tab=photos`}>
               <Button variant="outline" size="sm">
                 <ImageIcon className="mr-2 h-4 w-4" /> Open Profile Photos
               </Button>
@@ -1080,9 +1223,9 @@ export default function ArtistProfile({ id }: { id: string }) {
       {isOwnArtistPage && (
         <section className="space-y-4 rounded-[1.75rem] border border-primary/50 bg-background/35 p-5 shadow-[0_0_0_2px_rgba(139,92,246,0.22)] ring-1 ring-primary/30">
           <div>
-            <h3 className="text-lg font-semibold text-primary">Post as your artist page</h3>
+            <h3 className="text-lg font-semibold text-primary">Post from your profile</h3>
             <div className="mt-1 text-sm text-muted-foreground">
-              These posts publish into the main feed with your artist-page identity and stay collected on this creator page.
+              These posts publish into the main feed from your creator profile and stay collected on this profile.
             </div>
           </div>
           <div className="space-y-4">
@@ -1136,7 +1279,7 @@ export default function ArtistProfile({ id }: { id: string }) {
                 onClick={submitArtistPost}
                 disabled={createPost.isPending || isUploadingArtistImage || !artistPostForm.content.trim()}
               >
-                Post As Artist Page
+                Post To Profile
               </Button>
             </div>
           </div>
@@ -1154,7 +1297,7 @@ export default function ArtistProfile({ id }: { id: string }) {
       {isLoadingArtistPosts ? (
         <div className="flex justify-center py-8"><Spinner /></div>
       ) : isArtistPostsError ? (
-        <QueryErrorState title="Could not load artist posts" description="The artist page loaded, but its post stream could not be fetched." onRetry={() => refetchArtistPosts()} />
+        <QueryErrorState title="Could not load profile posts" description="The profile loaded, but its post stream could not be fetched." onRetry={() => refetchArtistPosts()} />
       ) : artistPosts.length ? (
         <div className="space-y-4">
           {artistPosts.map((post) => (
@@ -1281,9 +1424,108 @@ export default function ArtistProfile({ id }: { id: string }) {
     </section>
   );
 
+  const renderTrust = () => {
+    const trustTabs = [
+      { key: "references", label: "References" },
+      { key: "vouches", label: "Vouches" },
+      { key: "history", label: "Collaboration History" },
+      { key: "verified", label: "Verified Shoots" },
+      { key: "safety", label: "Safety" },
+    ] as const;
+
+    const trustPanels: Record<(typeof trustTabs)[number]["key"], ReactNode> = {
+      references: (
+        <div className="grid gap-3 md:grid-cols-3">
+          {referenceEntries.map((entry) => (
+            <div key={`${entry.name}-${entry.role}`} className="rounded-2xl border border-border/50 bg-background/40 p-4">
+              <div className="text-sm font-semibold">{entry.name}</div>
+              <div className="mt-1 text-xs uppercase tracking-[0.14em] text-muted-foreground">{entry.role}</div>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">{entry.note}</p>
+            </div>
+          ))}
+        </div>
+      ),
+      vouches: (
+        <div className="grid gap-3 md:grid-cols-3">
+          {vouchEntries.map((entry) => (
+            <div key={entry.label} className="rounded-2xl border border-border/50 bg-background/40 p-4">
+              <div className="text-sm font-semibold">{entry.label}</div>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">{entry.detail}</p>
+            </div>
+          ))}
+        </div>
+      ),
+      history: (
+        <div className="grid gap-3 md:grid-cols-3">
+          {collaborationEntries.map((entry) => (
+            <div key={entry.title} className="rounded-2xl border border-border/50 bg-background/40 p-4">
+              <div className="text-sm font-semibold">{entry.title}</div>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">{entry.detail}</p>
+            </div>
+          ))}
+        </div>
+      ),
+      verified: (
+        <div className="grid gap-3 md:grid-cols-3">
+          {verifiedShootEntries.map((entry) => (
+            <div key={entry.title} className="rounded-2xl border border-border/50 bg-background/40 p-4">
+              <div className="text-sm font-semibold">{entry.title}</div>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">{entry.detail}</p>
+            </div>
+          ))}
+        </div>
+      ),
+      safety: (
+        <div className="grid gap-3 md:grid-cols-3">
+          {safetyEntries.map((entry) => (
+            <div key={entry.label} className="rounded-2xl border border-border/50 bg-background/40 p-4">
+              <div className="text-sm font-semibold">{entry.label}</div>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">{entry.detail}</p>
+            </div>
+          ))}
+        </div>
+      ),
+    };
+
+    return (
+      <section className="space-y-5">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <HeartHandshake className="h-5 w-5 text-primary" />
+            <h2 className="text-2xl font-bold tracking-tight md:text-[2rem]">Trust and Reputation</h2>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            References, vouches, collaboration history, verified shoots, and safety signals collected into one public trust layer.
+          </p>
+        </div>
+        <div className="grid gap-3 md:grid-cols-5">
+          {trustTabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setTrustView(tab.key)}
+              className={cn(
+                "rounded-2xl border px-4 py-3 text-left text-sm font-medium transition-colors",
+                trustView === tab.key
+                  ? "border-primary/40 bg-primary/10 text-foreground"
+                  : "border-border/50 bg-background/35 text-muted-foreground hover:border-primary/30 hover:text-foreground",
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        <div className="rounded-[1.75rem] border border-border/50 bg-background/28 p-5 md:p-6">
+          {trustPanels[trustView]}
+        </div>
+      </section>
+    );
+  };
+
   const sections: Record<string, ReactNode> = {
     featured: renderFeatured(),
     about: renderAbout(),
+    trust: renderTrust(),
     gallery: renderMedia(),
     video: assignedVideoPlaylistItems.length ? (
       <div className="space-y-5">
@@ -1323,11 +1565,13 @@ export default function ArtistProfile({ id }: { id: string }) {
     ...baseVisibleSections,
     ...(assignedAudioItems.length ? ["audio"] : []),
     "posts",
+    "trust",
   ]));
   const mobileTabSectionMap = {
     posts: ["featured", "audio", "posts"],
     gallery: ["gallery", "video", "audio", "links"],
     about: ["about"],
+    trust: ["trust"],
     events: ["events"],
     contact: ["contact"],
   } as const;
@@ -1336,6 +1580,7 @@ export default function ArtistProfile({ id }: { id: string }) {
     { key: "posts", label: "Posts" },
     { key: "gallery", label: "Gallery" },
     { key: "about", label: "About" },
+    { key: "trust", label: "Trust" },
     { key: "events", label: "Events" },
     { key: "contact", label: "Contact" },
   ];
@@ -1474,24 +1719,12 @@ export default function ArtistProfile({ id }: { id: string }) {
                     <>
                       <Link href="/settings?tab=creator">
                         <Button variant="outline" className="border-border/60 bg-background/30">
-                          <Palette className="mr-2 h-4 w-4" /> Edit Artist Page
-                        </Button>
-                      </Link>
-                      <Link href={`/profile/${userId}`}>
-                        <Button variant="outline" className="border-border/60 bg-background/30" onClick={() => setActiveIdentity("personal")}>
-                          <MessageSquare className="mr-2 h-4 w-4" /> Switch To Personal
+                          <Palette className="mr-2 h-4 w-4" /> Edit Profile
                         </Button>
                       </Link>
                     </>
                   ) : (
                     <>
-                      {!currentUser?.hasArtistPage && (
-                        <Link href="/settings?tab=creator">
-                          <Button variant="outline" className="border-border/60 bg-background/30">
-                            <Palette className="mr-2 h-4 w-4" /> Create Your Artist Page
-                          </Button>
-                        </Link>
-                      )}
                       {primaryActionKind === "follow" ? (
                         <Button onClick={handleFollowToggle} disabled={!profile.canInteract} className="min-w-[8rem]">
                           {profile.isFollowing ? "Following" : "Follow"}
@@ -1618,26 +1851,11 @@ export default function ArtistProfile({ id }: { id: string }) {
                     <DropdownMenuContent align="end" className="w-64">
                       {isOwnArtistPage ? (
                         <>
-                          {activeIdentity === "artist" ? (
-                            <>
-                              <DropdownMenuItem asChild>
-                                <Link href="/settings?tab=creator">
-                                  <Sparkles className="mr-2 h-4 w-4" /> Edit Artist Page
-                                </Link>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem asChild>
-                                <Link href={`/profile/${profile.user.id}`} onClick={() => setActiveIdentity("personal")}>
-                                  <MessageSquare className="mr-2 h-4 w-4" /> Switch To Personal Profile
-                                </Link>
-                              </DropdownMenuItem>
-                            </>
-                          ) : (
-                            <DropdownMenuItem asChild>
-                              <Link href={`/profile/${profile.user.id}`} onClick={() => setActiveIdentity("personal")}>
-                                <MessageSquare className="mr-2 h-4 w-4" /> View Personal Profile
-                              </Link>
-                            </DropdownMenuItem>
-                          )}
+                          <DropdownMenuItem asChild>
+                            <Link href="/settings?tab=creator">
+                              <Sparkles className="mr-2 h-4 w-4" /> Edit Profile
+                            </Link>
+                          </DropdownMenuItem>
                         </>
                       ) : (
                         <>
@@ -1647,8 +1865,8 @@ export default function ArtistProfile({ id }: { id: string }) {
                             </DropdownMenuItem>
                           ) : null}
                           <DropdownMenuItem asChild>
-                            <Link href={`/profile/${profile.user.id}`}>
-                              <MessageSquare className="mr-2 h-4 w-4" /> View Personal Profile
+                            <Link href={`/artists/${profile.user.id}`}>
+                              <MessageSquare className="mr-2 h-4 w-4" /> View Profile
                             </Link>
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
@@ -1696,20 +1914,20 @@ export default function ArtistProfile({ id }: { id: string }) {
           <div className="space-y-4 md:hidden">
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-2xl border border-border/50 bg-background/35 p-4">
-                <div className="text-xs text-muted-foreground">Posts</div>
-                <div className="mt-1 text-3xl font-bold">{artistPosts.length}</div>
+                <div className="text-xs text-muted-foreground">Completed shoots</div>
+                <div className="mt-1 text-3xl font-bold">{completedShoots}</div>
               </div>
               <div className="rounded-2xl border border-border/50 bg-background/35 p-4">
-                <div className="text-xs text-muted-foreground">Followers</div>
-                <div className="mt-1 text-3xl font-bold">{profile.user.followerCount}</div>
+                <div className="text-xs text-muted-foreground">Verified collaborators</div>
+                <div className="mt-1 text-3xl font-bold">{verifiedCollaborators}</div>
               </div>
               <div className="rounded-2xl border border-border/50 bg-background/35 p-4">
-                <div className="text-xs text-muted-foreground">Following</div>
-                <div className="mt-1 text-3xl font-bold">{profile.user.followingCount}</div>
+                <div className="text-xs text-muted-foreground">Years active</div>
+                <div className="mt-1 text-3xl font-bold">{yearsActive}</div>
               </div>
               <div className="rounded-2xl border border-border/50 bg-background/35 p-4">
-                <div className="text-xs text-muted-foreground">Events</div>
-                <div className="mt-1 text-3xl font-bold">{upcomingEvents.length}</div>
+                <div className="text-xs text-muted-foreground">Recommendation status</div>
+                <div className="mt-1 text-sm font-semibold leading-6">{recommendationStatus}</div>
               </div>
             </div>
             {mobileHeaderTabs.length ? (

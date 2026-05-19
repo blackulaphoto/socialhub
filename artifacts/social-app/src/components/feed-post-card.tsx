@@ -246,7 +246,7 @@ export function FeedPostCard({
   };
 
   const handleShare = async () => {
-    const url = `${window.location.origin}/profile/${post.userId}`;
+    const url = `${window.location.origin}/artists/${post.userId}`;
     const shareText = `${url}#post-${post.id}`;
     try {
       if (navigator.share) {
@@ -358,7 +358,7 @@ export function FeedPostCard({
   const canDelete = user?.id === post.userId || user?.isAdmin;
   const authorHref = post.actorSurface === "artist"
     ? `/artists/${post.author?.id ?? post.userId}`
-    : `/profile/${post.author?.id ?? post.userId}`;
+    : `/artists/${post.author?.id ?? post.userId}`;
   const authorDisplayName = post.actorSurface === "artist"
     ? (post.author?.artistDisplayName || post.author?.username || "Unknown")
     : (post.author?.username || "Unknown");
@@ -374,7 +374,7 @@ export function FeedPostCard({
   const hashtags = post.hashtags?.length ? post.hashtags : extractPostHashtags(post.content);
   const visibilityLabel = post.visibility === "friends" ? "Friends" : post.visibility === "private" ? "Private" : "Public";
   const VisibilityIcon = post.visibility === "friends" ? UsersRound : post.visibility === "private" ? Lock : Globe2;
-  const surfaceLabel = post.actorSurface === "artist" ? "Artist Page" : "Personal";
+  const surfaceLabel = post.actorSurface === "artist" ? "Creator Profile" : "Profile";
   const postTimestamp = new Date(post.createdAt).toLocaleString([], {
     year: "numeric",
     month: "numeric",
@@ -390,7 +390,7 @@ export function FeedPostCard({
     : (post.originalPost?.author?.avatarUrl || "");
   const originalAuthorHref = post.originalPost?.actorSurface === "artist"
     ? `/artists/${post.originalPost.author?.id ?? post.originalPost.userId}`
-    : `/profile/${post.originalPost?.author?.id ?? post.originalPost?.userId ?? post.userId}`;
+    : `/artists/${post.originalPost?.author?.id ?? post.originalPost?.userId ?? post.userId}`;
   const showHeaderIdentity = Boolean(post.author);
 
   // Separate image media from video/audio media

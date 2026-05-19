@@ -2,7 +2,7 @@ import { Router } from "express";
 import { artistProfilesTable, creatorProfileSettingsTable, db, followsTable, galleryItemsTable, userProfileDetailsTable, usersTable } from "@workspace/db";
 import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth.js";
-import { formatArtistProfile, getBlockState, getBlockedUserIds } from "./helpers.js";
+import { ensureArtistProfileRecord, formatArtistProfile, getBlockState, getBlockedUserIds } from "./helpers.js";
 import { expandLocationTerms } from "../lib/locations.js";
 
 const router = Router();
@@ -113,7 +113,8 @@ router.get("/artists/:userId", async (req, res) => {
   }
 
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
-  const [profile] = await db.select().from(artistProfilesTable).where(eq(artistProfilesTable.userId, userId)).limit(1);
+  const [details] = await db.select().from(userProfileDetailsTable).where(eq(userProfileDetailsTable.userId, userId)).limit(1);
+  const profile = user ? await ensureArtistProfileRecord(user, details) : null;
 
   if (!user || !profile) {
     res.status(404).json({ error: "Not found", message: "Artist profile not found" });
@@ -298,11 +299,13 @@ router.post("/artists/:userId/gallery", requireAuth, async (req, res) => {
     return;
   }
 
-  const [profile] = await db.select().from(artistProfilesTable).where(eq(artistProfilesTable.userId, userId)).limit(1);
-  if (!profile) {
-    res.status(404).json({ error: "Artist profile not found" });
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
     return;
   }
+  const [details] = await db.select().from(userProfileDetailsTable).where(eq(userProfileDetailsTable.userId, userId)).limit(1);
+  const profile = await ensureArtistProfileRecord(user, details);
 
   const { type, url, caption, thumbnailUrl } = req.body;
   if (!type || !url) {

@@ -75,7 +75,7 @@ const TOPIC_VIEWS: Array<{ value: TopicView; label: string; helper: string }> = 
   { value: "artists", label: "Creator Pages", helper: "Public pages carrying this tag." },
   { value: "events", label: "Events", helper: "Lineups and happenings tagged to the topic." },
   { value: "groups", label: "Groups", helper: "Communities clustering around the topic." },
-  { value: "users", label: "People", helper: "Personal profiles tied into the topic." },
+  { value: "users", label: "People", helper: "Creator profiles tied into the topic." },
 ];
 
 export default function Topic({ tag }: { tag: string }) {
@@ -340,7 +340,7 @@ export default function Topic({ tag }: { tag: string }) {
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <h2 className="text-xl font-bold">People Following The Topic</h2>
-                  <p className="text-sm text-muted-foreground">Personal profiles surfacing this topic in their account context.</p>
+                  <p className="text-sm text-muted-foreground">Creator profiles surfacing this topic in their account context.</p>
                 </div>
                 <Link href={`/search?tags=${encodeURIComponent(normalizedTag)}&type=users`}>
                   <Button variant="ghost">See all people</Button>
@@ -358,15 +358,15 @@ export default function Topic({ tag }: { tag: string }) {
                           </Avatar>
                           <div className="min-w-0 flex-1">
                             <div className="truncate font-semibold">{person.username}</div>
-                            <div className="text-xs text-muted-foreground">{[person.city || person.location, person.hasArtistPage ? "Artist page attached" : "Personal profile"].filter(Boolean).join(" · ")}</div>
+                            <div className="text-xs text-muted-foreground">{[person.city || person.location, "Creator profile"].filter(Boolean).join(" · ")}</div>
                           </div>
                         </div>
                         {person.about ? <p className="line-clamp-3 text-sm text-muted-foreground">{person.about}</p> : null}
                         <div className="flex flex-wrap gap-2">
                           {person.location ? <Badge variant="outline"><MapPin className="mr-1 h-3 w-3" />{person.location}</Badge> : null}
-                          {person.hasArtistPage ? <Badge variant="secondary"><Users className="mr-1 h-3 w-3" />Creator identity</Badge> : null}
+                          <Badge variant="secondary"><Users className="mr-1 h-3 w-3" />Creator identity</Badge>
                         </div>
-                        <Link href={`/profile/${person.id}`}>
+                        <Link href={`/artists/${person.id}`}>
                           <Button variant="outline" size="sm">Open Profile</Button>
                         </Link>
                       </CardContent>
@@ -376,7 +376,7 @@ export default function Topic({ tag }: { tag: string }) {
               ) : (
                 <Card className="border-dashed border-border/50 bg-card/20">
                   <CardContent className="p-10 text-center text-muted-foreground">
-                    No personal profiles are surfacing {topicLabel} yet.
+                    No creator profiles are surfacing {topicLabel} yet.
                   </CardContent>
                 </Card>
               )}

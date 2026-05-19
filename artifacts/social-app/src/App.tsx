@@ -13,7 +13,6 @@ import { AppLayout } from "@/components/layout";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
 import Home from "@/pages/home";
-import Profile from "@/pages/profile";
 import ArtistProfile from "@/pages/artist-profile";
 import Discover from "@/pages/discover";
 import Search from "@/pages/search";
@@ -102,7 +101,7 @@ function Router() {
         <AppLayout><Home /></AppLayout>
       </Route>
       <Route path="/profile/:id">
-        {params => <AppLayout><Profile id={params.id} /></AppLayout>}
+        {params => <AppLayout><ArtistProfile id={params.id} /></AppLayout>}
       </Route>
       <Route path="/artists/:id">
         {params => <AppLayout><ArtistProfile id={params.id} /></AppLayout>}

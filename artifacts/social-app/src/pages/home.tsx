@@ -44,7 +44,6 @@ import { uploadImage } from "@/lib/upload-image";
 import { getEmbedDescriptor } from "@/lib/embeds";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LoadMoreSentinel } from "@/components/load-more-sentinel";
-import { useActiveIdentity } from "@/hooks/useActiveIdentity";
 import { LocationInput } from "@/components/location-input";
 import { getTopicPath } from "@/lib/topics";
 
@@ -80,7 +79,6 @@ function extractTopicTags(content: string) {
 export default function Home() {
   const [location] = useLocation();
   const { user } = useAuth();
-  const { activeIdentity, canUseArtistIdentity, setActiveIdentity } = useActiveIdentity();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -254,10 +252,8 @@ export default function Home() {
   }, [feedPosts]);
   const resolvedTrendingTopics = trendingTopics?.topics?.length ? trendingTopics.topics : fallbackTrendingTopics;
   const followingCount = followingPreview?.length || 0;
-  const currentPostingIdentity = canUseArtistIdentity && activeIdentity === "artist" ? "Artist Page" : "Personal";
-  const postingIdentityHelper = canUseArtistIdentity && activeIdentity === "artist"
-    ? "Posts publish into the main feed with your artist-page identity and also stay on your artist page."
-    : "Posts publish into the main feed as your personal profile.";
+  const currentPostingIdentity = "Profile";
+  const postingIdentityHelper = "Posts now publish from your public creator profile and remain attached to that profile.";
   const shouldNudgeDiscovery = followingCount === 0 && !selectedCustomFeed;
 
   const handlePostImageUpload = async (file: File | null) => {
@@ -285,7 +281,7 @@ export default function Home() {
         content: postForm.content,
         imageUrl: postForm.imageUrl || undefined,
         visibility: postForm.visibility,
-        actorSurface: canUseArtistIdentity && activeIdentity === "artist" ? "artist" : "personal",
+        actorSurface: "artist",
         media: [
           postForm.imageUrl ? { type: "image", url: postForm.imageUrl } : null,
           linkMedia ? { type: linkMedia.kind, url: linkMedia.href, title: linkMedia.label } : null,
@@ -497,7 +493,7 @@ export default function Home() {
                   <DialogHeader>
                     <DialogTitle>Create Post</DialogTitle>
                     <DialogDescription>
-                      Choose whether this publishes as Personal or Artist Page. Artist-page posts still appear in the main feed and stay attached to your creator page.
+                      Posts now publish directly from your creator profile and stay attached to that public profile.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4">
@@ -564,31 +560,13 @@ export default function Home() {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <div className="text-sm font-medium">Post as</div>
-                      <div className="flex items-center gap-2 rounded-2xl border border-border/60 bg-background/40 p-2">
-                        <Button
-                          type="button"
-                          variant={activeIdentity === "personal" ? "default" : "ghost"}
-                          size="sm"
-                          className="rounded-full"
-                          onClick={() => setActiveIdentity("personal")}
-                        >
-                          Personal
-                        </Button>
-                        <Button
-                          type="button"
-                          variant={activeIdentity === "artist" ? "default" : "ghost"}
-                          size="sm"
-                          className="rounded-full"
-                          onClick={() => setActiveIdentity("artist")}
-                          disabled={!canUseArtistIdentity}
-                        >
-                          Artist Page
-                        </Button>
+                      <div className="text-sm font-medium">Posting identity</div>
+                      <div className="rounded-2xl border border-border/60 bg-background/40 p-3 text-sm">
+                        <div className="font-medium">{currentPostingIdentity}</div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {postingIdentityHelper}
+                        </p>
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        {postingIdentityHelper}
-                      </p>
                     </div>
                     <input
                       ref={fileInputRef}
@@ -757,7 +735,7 @@ export default function Home() {
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <Badge variant="secondary">{currentPostingIdentity}</Badge>
                 <span className="text-xs text-slate-500">
-                  {canUseArtistIdentity ? "Switch identity before posting if you want this update to represent your artist page." : "Posts publish from your personal profile."}
+                  Posts publish from your creator profile.
                 </span>
               </div>
             </button>
@@ -1017,7 +995,7 @@ export default function Home() {
                         {suggestedCreators.artists.slice(0, 6).map((artist) => (
                           <Link
                             key={`know-${artist.userId}`}
-                            href={`/profile/${artist.userId}`}
+                            href={`/artists/${artist.userId}`}
                             className="flex flex-col items-center gap-2 rounded-xl border border-border/40 bg-card/60 p-2 text-center hover:border-primary/40"
                           >
                             <Avatar className="h-12 w-12">
@@ -1072,7 +1050,7 @@ export default function Home() {
                   <div className="flex items-center justify-between gap-3">
                     <div className="text-sm text-muted-foreground">
                       {followingCount
-                        ? `You are following ${followingCount} ${followingCount === 1 ? "person or page" : "people and pages"}.`
+                        ? `You are following ${followingCount} ${followingCount === 1 ? "creator" : "creators"}.`
                         : "You are not following anyone yet."}
                     </div>
                     <Link href="/discover">
@@ -1086,7 +1064,7 @@ export default function Home() {
                       {followingPreview!.slice(0, 6).map((followedUser) => (
                         <Link
                           key={followedUser.id}
-                          href={followedUser.hasArtistPage ? `/artists/${followedUser.id}` : `/profile/${followedUser.id}`}
+                          href={`/artists/${followedUser.id}`}
                           className="flex flex-col items-center gap-2 rounded-2xl border border-border/50 bg-background/30 p-3 text-center transition-colors hover:border-primary/30"
                         >
                           <Avatar className="h-16 w-16 border-2 border-border/60 bg-card shadow-sm">

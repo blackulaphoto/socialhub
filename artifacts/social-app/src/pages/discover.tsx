@@ -2,7 +2,7 @@ import { Link } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useFollowUser, useUnfollowUser } from "@workspace/api-client-react";
 import { useState } from "react";
-import { ArrowRight, MapPin, Mic2, Palette, Search, Sparkles, Users } from "lucide-react";
+import { ArrowRight, MapPin, Mic2, Search, Sparkles, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -185,32 +185,6 @@ export default function Discover() {
         </div>
       </section>
 
-      {!user?.hasArtistPage && (
-        <Card className="overflow-hidden border-border/50 bg-card/40">
-          <CardContent className="relative p-6 md:p-7">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(139,92,246,0.14),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(14,165,233,0.12),transparent_32%)]" />
-            <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div className="space-y-2">
-                <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[10px] uppercase tracking-[0.24em] text-primary">
-                  <Sparkles className="h-3.5 w-3.5" />
-                  Creator Upgrade
-                </div>
-                <div className="text-2xl font-bold">Turn your profile into a real artist page.</div>
-                <p className="max-w-2xl text-sm text-muted-foreground">
-                  Add a media-rich creator homepage with gallery, booking button, featured work, and event presence, all linked to your personal account.
-                </p>
-              </div>
-              <Link href="/settings?tab=creator">
-                <Button className="rounded-full">
-                  <Palette className="mr-2 h-4 w-4" />
-                  Create Artist Page
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       <Card className="border-border/50 bg-card/30 backdrop-blur-sm">
         <CardContent className="p-4 flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
@@ -229,10 +203,12 @@ export default function Discover() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="Musician / Band / DJ">Music</SelectItem>
-                <SelectItem value="Visual Artist">Visual Arts</SelectItem>
+                <SelectItem value="Model">Models</SelectItem>
                 <SelectItem value="Photographer">Photography</SelectItem>
-                <SelectItem value="Designer">Design</SelectItem>
+                <SelectItem value="Makeup Artist">Makeup</SelectItem>
+                <SelectItem value="Stylist">Styling</SelectItem>
+                <SelectItem value="Retoucher">Retouching</SelectItem>
+                <SelectItem value="Set Designer">Set Design</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -398,7 +374,7 @@ export default function Discover() {
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-semibold">{person.username}</div>
                       <div className="text-xs text-muted-foreground">
-                        {[person.city || person.location, person.hasArtistPage ? "Personal + artist page" : "Personal profile"].filter(Boolean).join(" · ")}
+                        {[person.city || person.location, "Creator profile"].filter(Boolean).join(" · ")}
                       </div>
                     </div>
                   </div>
@@ -408,7 +384,7 @@ export default function Discover() {
                     {person.location ? <Badge variant="outline">{person.location}</Badge> : null}
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Link href={`/profile/${person.id}`}><Button variant="outline" size="sm">View Profile</Button></Link>
+                    <Link href={`/artists/${person.id}`}><Button variant="outline" size="sm">View Profile</Button></Link>
                     <FriendActionButton userId={person.id} friendship={person.friendship} invalidateKeys={[["suggested-people", user?.id], ["/api/users", person.id]]} />
                   </div>
                 </CardContent>

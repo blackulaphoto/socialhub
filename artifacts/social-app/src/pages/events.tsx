@@ -330,16 +330,16 @@ export default function Events() {
                 <Input placeholder="Event image URL" value={form.imageUrl} onChange={(e) => setForm({ ...form, imageUrl: e.target.value })} />
                 <Input type="file" accept="image/*" onChange={(e) => handleEventImageUpload(e.target.files?.[0] || null)} disabled={isUploadingImage} />
               </div>
-              <Input placeholder="Lineup tags: techno, darkwave" value={form.lineupTags} onChange={(e) => setForm({ ...form, lineupTags: e.target.value })} />
+              <Input placeholder="Lineup tags: editorial, beauty, fashion, campaign" value={form.lineupTags} onChange={(e) => setForm({ ...form, lineupTags: e.target.value })} />
               <div className="space-y-3 rounded-2xl border border-border/50 bg-card/40 p-4">
                 <div>
                   <div className="text-sm font-medium">Lineup artists</div>
-                  <div className="text-xs text-muted-foreground">Search creator pages and add them to the lineup. No internal IDs needed.</div>
+                  <div className="text-xs text-muted-foreground">Search creator profiles and add them to the lineup. No internal IDs needed.</div>
                 </div>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
-                    placeholder="Search artist pages..."
+                    placeholder="Search creator profiles..."
                     className="pl-9"
                     value={artistSearch}
                     onChange={(e) => setArtistSearch(e.target.value)}
@@ -378,7 +378,7 @@ export default function Events() {
                           <div className="min-w-0">
                             <div className="truncate font-medium">{artist.displayName || artist.user.username}</div>
                             <div className="truncate text-xs text-muted-foreground">
-                              {[artist.category, artist.location].filter(Boolean).join(" · ") || "Creator page"}
+                              {[artist.category, artist.location].filter(Boolean).join(" · ") || "Creator profile"}
                             </div>
                           </div>
                           <Badge variant="outline">Add</Badge>
@@ -386,7 +386,7 @@ export default function Events() {
                       ))
                   ) : (
                     <div className="rounded-xl border border-dashed border-border/50 bg-background/30 p-4 text-sm text-muted-foreground">
-                      {artistSearch.trim().length > 1 ? "No artist pages matched that search." : "Suggested artist pages will show up here."}
+                      {artistSearch.trim().length > 1 ? "No creator profiles matched that search." : "Suggested creator profiles will show up here."}
                     </div>
                   )}
                 </div>

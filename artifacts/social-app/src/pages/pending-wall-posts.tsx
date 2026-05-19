@@ -112,7 +112,7 @@ export default function PendingWallPostsPage() {
         <CardHeader>
           <CardTitle>Pending Wall Posts</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Review posts that others have submitted to your artist page
+            Review posts that others have submitted to your profile
           </p>
         </CardHeader>
         <CardContent>
@@ -120,7 +120,7 @@ export default function PendingWallPostsPage() {
             <div className="py-12 text-center">
               <p className="text-muted-foreground">No pending wall posts</p>
               <p className="mt-2 text-sm text-muted-foreground">
-                Posts submitted to your page will appear here for review
+                Posts submitted to your profile will appear here for review
               </p>
             </div>
           ) : (

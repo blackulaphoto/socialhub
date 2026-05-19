@@ -13,24 +13,18 @@ const ActiveIdentityContext = createContext<ActiveIdentityContextValue | undefin
 
 export function ActiveIdentityProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const canUseArtistIdentity = Boolean(user?.hasArtistPage);
-  const [activeIdentity, setActiveIdentityState] = useState<ActiveIdentity>("personal");
+  const canUseArtistIdentity = Boolean(user?.id);
+  const [activeIdentity, setActiveIdentityState] = useState<ActiveIdentity>("artist");
 
   useEffect(() => {
     if (!user?.id) {
-      setActiveIdentityState("personal");
-      return;
-    }
-
-    if (!canUseArtistIdentity) {
-      setActiveIdentityState("personal");
+      setActiveIdentityState("artist");
       return;
     }
   }, [canUseArtistIdentity, user?.id]);
 
   const setActiveIdentity = (identity: ActiveIdentity) => {
-    const nextIdentity = canUseArtistIdentity ? identity : "personal";
-    setActiveIdentityState(nextIdentity);
+    setActiveIdentityState(identity === "personal" ? "artist" : identity);
   };
 
   return (

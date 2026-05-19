@@ -348,13 +348,13 @@ export default function Search() {
                         </Avatar>
                         <div className="min-w-0 flex-1">
                           <div className="font-semibold truncate">{person.username}</div>
-                          <div className="text-xs text-muted-foreground">{person.hasArtistPage ? "Personal profile + artist page" : "Personal profile"}</div>
+                          <div className="text-xs text-muted-foreground">Creator profile</div>
                           {person.location && <div className="text-xs text-muted-foreground mt-1">{person.location}</div>}
                         </div>
                       </div>
                       {person.about ? <div className="line-clamp-2 text-xs text-muted-foreground">{person.about}</div> : null}
                       <div className="flex flex-wrap gap-2">
-                        <Link href={`/profile/${person.id}`}><Button variant="outline" size="sm">View Profile</Button></Link>
+                        <Link href={`/artists/${person.id}`}><Button variant="outline" size="sm">View Profile</Button></Link>
                         <FriendActionButton userId={person.id} friendship={person.friendship} invalidateKeys={[["site-search"], ["/api/users", person.id]]} />
                       </div>
                     </CardContent>

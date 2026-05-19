@@ -22,6 +22,8 @@ import {
   getBlockState,
   canUsersInteract,
   canViewPost,
+  ensureArtistProfileRecord,
+  ensureCreatorSettingsRecord,
   formatArtistProfile,
   formatCreatorSettingsRecord,
   formatUser,
@@ -62,9 +64,9 @@ router.get("/:userId", async (req, res) => {
     friendship = await getFriendshipState(req.session.userId, userId);
   }
 
-  const [artistProfile] = await db.select().from(artistProfilesTable).where(eq(artistProfilesTable.userId, userId)).limit(1);
   const [details] = await db.select().from(userProfileDetailsTable).where(eq(userProfileDetailsTable.userId, userId)).limit(1);
-  const [creatorSettings] = await db.select().from(creatorProfileSettingsTable).where(eq(creatorProfileSettingsTable.userId, userId)).limit(1);
+  const artistProfile = await ensureArtistProfileRecord(user, details);
+  const creatorSettings = await ensureCreatorSettingsRecord(userId);
   const profileReactions = await getProfileReactionSummary(userId, req.session.userId);
 
   const pinnedPost = creatorSettings?.pinnedPostId
@@ -82,7 +84,7 @@ router.get("/:userId", async (req, res) => {
     canInteract: !blockState.isBlockedEitherWay,
     profileReactions,
     details: details ?? null,
-    artistProfile: artistProfile ? await formatArtistProfile(artistProfile, user, req.session.userId) : null,
+    artistProfile: await formatArtistProfile(artistProfile, user, req.session.userId),
     creatorSettings: formatCreatorSettingsRecord(
       creatorSettings,
       visiblePinnedPost ? await enrichPost(visiblePinnedPost, req.session.userId) : null,

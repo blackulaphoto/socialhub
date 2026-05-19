@@ -67,7 +67,7 @@ function getPageMeta(location: string) {
   if (location.startsWith("/settings")) return { title: "Settings", subtitle: "Profile, creator page, and showcase controls." };
   if (location.startsWith("/insights")) return { title: "Insights", subtitle: "Track page views, followers, and inquiries." };
   if (location.startsWith("/admin")) return { title: "Admin", subtitle: "Moderation and platform operations." };
-  if (location.startsWith("/profile")) return { title: "Profile", subtitle: "Identity, posts, and public presence." };
+  if (location.startsWith("/profile") || location.startsWith("/artists")) return { title: "Profile", subtitle: "Portfolio, identity, and collaboration presence." };
   return { title: "ArtistHub", subtitle: "Creative social networking." };
 }
 
@@ -103,9 +103,9 @@ export function AppSidebar() {
     { title: "Events", url: "/events", icon: CalendarRange },
     { title: "Search", url: "/search", icon: Search },
     { title: "Messages", url: "/messages", icon: MessageSquare },
-    { title: "Profile", url: `/profile/${user?.id}`, icon: UserIcon },
-    { title: user?.hasArtistPage ? "Artist Page" : "Create Artist Page", url: user?.hasArtistPage ? `/artists/${user?.id}` : "/settings?tab=creator", icon: Palette },
-    ...(user?.hasArtistPage ? [{ title: "Insights", url: "/insights", icon: TrendingUp }] : []),
+    { title: "Profile", url: `/artists/${user?.id}`, icon: UserIcon },
+    { title: "Edit Profile", url: "/settings?tab=creator", icon: Palette },
+    { title: "Insights", url: "/insights", icon: TrendingUp },
     { title: "Settings", url: "/settings", icon: Settings },
   ];
 
@@ -141,10 +141,10 @@ export function AppSidebar() {
                 Create
               </Button>
             </Link>
-            <Link href={user?.hasArtistPage ? `/artists/${user?.id}` : "/settings?tab=creator"} className="w-full">
+            <Link href="/settings?tab=creator" className="w-full">
               <Button variant="outline" className="h-9 w-full justify-start rounded-full px-4">
                 <Palette className="mr-2 h-4 w-4" />
-                {user?.hasArtistPage ? "Artist Page" : "Start Page"}
+                Edit Profile
               </Button>
             </Link>
           </div>
@@ -165,8 +165,7 @@ export function AppSidebar() {
                     <Link
                       href={item.url}
                       onClick={() => {
-                        if (item.title === "Profile") setActiveIdentity("personal");
-                        if (item.title === "Artist Page") setActiveIdentity("artist");
+                        if (item.title === "Profile") setActiveIdentity("artist");
                       }}
                     >
                       <item.icon />
@@ -193,7 +192,6 @@ export function AppSidebar() {
 function HeaderActions() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
-  const { activeIdentity, setActiveIdentity, canUseArtistIdentity } = useActiveIdentity();
   const { theme, setTheme } = useTheme();
   const { mutate: logout } = useLogout();
   const { mutate: readNotification } = useReadNotification();
@@ -324,7 +322,7 @@ function HeaderActions() {
             </Avatar>
             <div className="hidden md:block text-left ml-2">
               <div className="text-sm font-medium leading-none">{user?.username}</div>
-              <div className="text-[11px] text-muted-foreground mt-1">{user?.hasArtistPage ? "Personal + artist page" : "Personal profile"}</div>
+              <div className="text-[11px] text-muted-foreground mt-1">Public creator profile</div>
             </div>
             <ChevronDown className="ml-2 hidden h-4 w-4 text-muted-foreground md:block" />
           </Button>
@@ -336,49 +334,11 @@ function HeaderActions() {
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild>
-            <Link href={`/profile/${user?.id}`}>Profile</Link>
+            <Link href={`/artists/${user?.id}`}>Profile</Link>
           </DropdownMenuItem>
-          {canUseArtistIdentity ? (
-            activeIdentity === "artist" ? (
-              <DropdownMenuItem asChild>
-                <Link href={`/artists/${user?.id}`}>Edit Artist Page</Link>
-              </DropdownMenuItem>
-            ) : (
-              <DropdownMenuItem asChild>
-                <Link href={`/profile/${user?.id}`}>Edit Profile</Link>
-              </DropdownMenuItem>
-            )
-          ) : (
-            <DropdownMenuItem asChild>
-              <Link href={`/profile/${user?.id}`}>Edit Profile</Link>
-            </DropdownMenuItem>
-          )}
-          {canUseArtistIdentity ? (
-            activeIdentity === "artist" ? (
-              <DropdownMenuItem
-                onClick={() => {
-                  setActiveIdentity("personal");
-                  setLocation(`/profile/${user?.id}`);
-                }}
-              >
-                Switch To Personal
-              </DropdownMenuItem>
-            ) : (
-              <DropdownMenuItem
-                onClick={() => {
-                  setActiveIdentity("artist");
-                  setLocation(`/artists/${user?.id}`);
-                }}
-              >
-                Switch To Artist Page
-              </DropdownMenuItem>
-            )
-          ) : null}
-          {!user?.hasArtistPage ? (
-            <DropdownMenuItem asChild>
-              <Link href="/settings?tab=creator">Create Artist Page</Link>
-            </DropdownMenuItem>
-          ) : null}
+          <DropdownMenuItem asChild>
+            <Link href="/settings?tab=creator">Edit Profile</Link>
+          </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <Link href="/settings">Settings</Link>
           </DropdownMenuItem>
@@ -397,9 +357,7 @@ function HeaderActions() {
 }
 
 function AppHeader() {
-  const [location, setLocation] = useLocation();
-  const { user } = useAuth();
-  const { activeIdentity, setActiveIdentity, canUseArtistIdentity } = useActiveIdentity();
+  const [location] = useLocation();
   const { data: siteSettings } = useSiteSettings();
   const meta = getPageMeta(location);
 
@@ -422,39 +380,9 @@ function AppHeader() {
               {meta.title}
             </div>
             <div className="max-w-[24rem] truncate text-sm text-muted-foreground">{meta.subtitle}</div>
-            {canUseArtistIdentity ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="h-9 rounded-full px-4 transition-colors hover:border-primary/35 hover:bg-accent/60">
-                    {activeIdentity === "artist" ? "Artist Page" : "Personal"}
-                    <ChevronDown className="ml-2 h-4 w-4 text-muted-foreground" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="center" className="w-52">
-                  <DropdownMenuLabel>Viewing as</DropdownMenuLabel>
-                  <div className="px-2 pb-2 text-xs text-muted-foreground">
-                    Switching identity changes the name and avatar used when you publish a post.
-                  </div>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => {
-                      setActiveIdentity("personal");
-                      setLocation(`/profile/${user?.id}`);
-                    }}
-                  >
-                    Personal
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => {
-                      setActiveIdentity("artist");
-                      setLocation(`/artists/${user?.id}`);
-                    }}
-                  >
-                    Artist Page
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : null}
+            <div className="rounded-full border border-border/60 px-4 py-2 text-sm text-muted-foreground">
+              Creator profile
+            </div>
           </div>
         </div>
 
@@ -479,7 +407,7 @@ function MobileBottomNav() {
     { title: "Discover", href: "/artists", icon: Compass, onClick: () => undefined },
     { title: "Create", href: "/?compose=1", icon: Plus, onClick: () => undefined },
     { title: "Messages", href: "/messages", icon: MessageSquare, onClick: () => undefined },
-    { title: "Profile", href: `/profile/${user.id}`, icon: UserIcon, onClick: () => setActiveIdentity("personal") },
+    { title: "Profile", href: `/artists/${user.id}`, icon: UserIcon, onClick: () => setActiveIdentity("artist") },
   ];
 
   return (

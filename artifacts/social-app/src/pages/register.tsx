@@ -53,7 +53,7 @@ export default function Register() {
         <CardHeader className="space-y-3 text-center pb-6">
           <CardTitle className="text-3xl font-bold tracking-tight">Join ArtistHub</CardTitle>
           <CardDescription className="text-muted-foreground text-base">
-            Create your personal account first. You can add a linked artist page later from settings.
+            Create your account and you will get a public creator profile with editing tools from the start.
           </CardDescription>
         </CardHeader>
         <CardContent>

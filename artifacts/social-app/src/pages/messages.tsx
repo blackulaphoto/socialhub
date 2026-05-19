@@ -153,7 +153,7 @@ export default function Messages({ conversationId }: { conversationId?: string }
           id: person.id,
           name: person.username,
           avatarUrl: person.avatarUrl || null,
-          subtitle: [person.city || person.location, person.hasArtistPage ? "Personal + artist page" : "Personal profile"].filter(Boolean).join(" · "),
+          subtitle: [person.city || person.location, "Creator profile"].filter(Boolean).join(" · "),
         });
       }
     }
@@ -336,7 +336,7 @@ export default function Messages({ conversationId }: { conversationId?: string }
                   </Button>
                   {activeConversation && (
                     <>
-                      <Link href={`/profile/${activeConversation.otherUser.id}`} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+                      <Link href={`/artists/${activeConversation.otherUser.id}`} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
                         <Avatar className="h-10 w-10 border border-border">
                           <AvatarImage src={activeConversation.otherUser.avatarUrl || ""} />
                           <AvatarFallback>{activeConversation.otherUser.username.substring(0, 2).toUpperCase()}</AvatarFallback>
@@ -471,7 +471,7 @@ export default function Messages({ conversationId }: { conversationId?: string }
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Start a new message</DialogTitle>
-            <DialogDescription>Search for a person or creator page, then send the first message from here.</DialogDescription>
+            <DialogDescription>Search for a person or creator profile, then send the first message from here.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="relative">
