@@ -1,0 +1,411 @@
+You are conducting a UX, aesthetic, and functionality audit of this social media platform. 
+Your focus is the FRONTEND EXPERIENCE only — not auth security, not deployment, 
+not production infrastructure. You are evaluating this like a design-aware product 
+critic and a first-time user who just landed on the site.
+
+You have two lenses:
+  1. A CREATIVE DIRECTOR — does this look and feel like something people want to use?
+  2. A CONFUSED FIRST-TIME USER — can they actually figure out how to use it?
+
+NO REFACTORING. READ, CLICK, TRACE, AND REPORT ONLY.
+Every finding must reference a specific file, component name, or route.
+
+════════════════════════════════════════════
+PHASE 1 — VISUAL INVENTORY
+════════════════════════════════════════════
+
+First, map every screen and component that a user can see. Run:
+
+  find . -type f \( -name "*.tsx" -o -name "*.jsx" \) \
+    | grep -v node_modules | grep -v .next | grep -v dist \
+    | grep -E "(page|screen|view|layout|component)" \
+    | sort
+
+Then catalog:
+
+  SCREENS INVENTORY:
+  - List every page/route a user can visit
+  - List every modal or drawer that appears
+  - List every form a user fills out
+  - List every settings panel
+  - Identify: which screens are artist-specific vs. general user
+
+Then read the global styles. Find:
+  - tailwind.config.ts / tailwind.config.js
+  - globals.css or global.scss
+  - Any theme file or design token file
+  - Any component library in use (shadcn, radix, MUI, etc.)
+
+Report:
+  DESIGN SYSTEM SNAPSHOT:
+  - Primary font(s): [found or "not defined"]
+  - Color palette: [list CSS variables or primary values found]
+  - Component library: [name or "custom only"]
+  - Dark mode: [supported | not implemented]
+  - Responsive breakpoints: [list or "not defined"]
+  - Animation/transition usage: [present | minimal | none]
+
+════════════════════════════════════════════
+PHASE 2 — FIRST IMPRESSIONS AUDIT
+════════════════════════════════════════════
+
+Read the landing/home page component (the first thing a visitor sees).
+Read the onboarding flow (registration or welcome screens).
+
+Answer these questions. Be honest and specific:
+
+  LANDING PAGE:
+  □ Within 5 seconds, can a new visitor understand what this platform is for?
+     FINDING: [yes / no / unclear — quote the headline or describe what they see]
+  □ Is there a clear primary call to action?
+     FINDING: [what is it, where is it, is it prominent]
+  □ Does the visual design communicate "music/art platform" or does it look generic?
+     FINDING: [specific visual evidence — colors, fonts, imagery, layout]
+  □ Is the hero section compelling or placeholder-feeling?
+     FINDING: [describe what's actually there]
+  □ Are there any broken images, missing icons, or empty sections visible?
+     FINDING: [list every instance]
+
+  ONBOARDING:
+  □ How many steps does it take to get to your first piece of content?
+     FINDING: [count the screens]
+  □ Does the onboarding explain what an Artist Page is and why you'd want one?
+     FINDING: [yes / no / partially]
+  □ Is there a clear moment where the user chooses "I'm an artist" vs. "I'm a fan"?
+     FINDING: [where, or "not found"]
+  □ Does the onboarding feel exciting or feel like a chore?
+     FINDING: [honest assessment with specific reasons]
+
+════════════════════════════════════════════
+PHASE 3 — ARTIST PAGE CREATION FLOW AUDIT
+════════════════════════════════════════════
+
+This is the core differentiator of this platform. Audit it harder than anything else.
+
+Trace the complete flow from: "I want to create my artist page" → published artist page.
+
+Find:
+  - The component or page where artist page creation begins
+  - Every form field, toggle, or option presented during setup
+  - The customization UI (where they edit colors, layout, media, bio, etc.)
+  - The preview mechanism (can they see what it looks like before publishing?)
+  - The published/public artist page component
+
+For the SETUP FLOW, report:
+
+  ARTIST PAGE SETUP:
+  □ Entry point — how does a user get to "create artist page"?
+     PATH: [exact navigation steps + file:component]
+     CLARITY: [obvious | buried | unclear]
+
+  □ What fields are in the creation form?
+     LIST EVERY FIELD: [label, input type, required or optional, placeholder text]
+     REDUNDANT FIELDS: [any fields that seem duplicated or confusing]
+     MISSING FIELDS: [anything an artist would obviously expect: genre, city, links, bio, etc.]
+
+  □ Is the form broken into logical sections or is it one overwhelming dump?
+     FINDING: [describe the layout]
+
+  □ Is there inline help text, tooltips, or examples for confusing fields?
+     FINDING: [yes / no — list which fields lack guidance]
+
+  □ Can the user see a live preview or preview mode while editing?
+     FINDING: [yes / no / partial]
+
+  □ Is the save/publish flow clear? Do they know what "publishing" means?
+     FINDING: [describe the CTA and any confirmation state]
+
+  □ After creation, does the user land somewhere that makes sense?
+     FINDING: [where do they go, does it feel like success?]
+
+For the CUSTOMIZATION UI, report:
+
+  ARTIST PAGE CUSTOMIZATION:
+  □ What can they actually customize? List every option:
+     - Layout/template choice: [yes/no — how many options]
+     - Banner image: [yes/no]
+     - Profile photo: [yes/no]
+     - Color scheme/theme: [yes/no — how granular]
+     - Font choice: [yes/no]
+     - Section ordering (drag to reorder): [yes/no]
+     - Sections they can add/remove: [list them]
+     - Embedded media (music player, video): [yes/no]
+     - Links (social, streaming, merch): [yes/no]
+     - Custom domain or slug: [yes/no]
+
+  □ CONFUSION SCORE — for each customization option, is it:
+     INTUITIVE (obvious what it does) | NEEDS LABEL (unclear without tooltip) | CONFUSING (likely to cause mistakes)
+     [rate each option you found above]
+
+  □ Are there any customization options that overlap or do the same thing?
+     FINDING: [list redundancies]
+
+  □ Is the customization UI a standard form, a visual editor, or something else?
+     FINDING: [describe the UX pattern — form with fields, drag-and-drop builder, live canvas, etc.]
+
+  □ Does the customization feel closer to Linktree, Squarespace, Bandcamp, or Myspace?
+     FINDING: [honest comparison + what's missing to reach the best of those]
+
+════════════════════════════════════════════
+PHASE 4 — INTERACTIVE ELEMENT AUDIT
+════════════════════════════════════════════
+
+Go through every interactive element you can find in the codebase. 
+For each one, verify it has an actual handler — not just a visual element with no action.
+
+Find all buttons:
+  grep -rn "<button\|<Button\|onClick" --include="*.tsx" --include="*.jsx" \
+    | grep -v node_modules | grep -v ".test." \
+    | grep -v "//.*onClick" \
+    | head -100
+
+Find all links:
+  grep -rn "<Link\|href=" --include="*.tsx" --include="*.jsx" \
+    | grep -v node_modules | grep -v ".test." | head -80
+
+Find all form submissions:
+  grep -rn "onSubmit\|handleSubmit\|<form" --include="*.tsx" --include="*.jsx" \
+    | grep -v node_modules | head -60
+
+For EVERY button, link, and form found, categorize it as:
+
+  ✅ WIRED — has a real handler that does something
+  ⚠️  PARTIAL — has a handler but it's a console.log, TODO, or empty function
+  ❌ DEAD — onClick with no function, href="#", disabled with no explanation
+  ❓ UNKNOWN — can't determine without running the app
+
+Report the full list:
+
+  INTERACTIVE ELEMENTS AUDIT:
+  [Component file] — [element description] — [STATUS]
+
+Then give counts:
+  Total buttons/CTAs found: N
+  ✅ Wired: N
+  ⚠️  Partial: N
+  ❌ Dead: N
+
+════════════════════════════════════════════
+PHASE 5 — NAVIGATION & WAYFINDING AUDIT
+════════════════════════════════════════════
+
+Read every navigation component (navbar, sidebar, bottom tab bar, mobile menu, breadcrumbs).
+
+  NAVIGATION STRUCTURE:
+  □ What is the main nav? List every item in it.
+  □ Is there a mobile nav? Is it a hamburger menu, bottom tab bar, or drawer?
+  □ Are nav items the same on mobile and desktop or different?
+  □ Is the current page/active state visually indicated?
+  □ Are there orphan pages — screens reachable only if you know the URL?
+  □ Are there dead-end pages — no clear next action or way back?
+
+  WEB NAVIGATION:
+  □ Does the nav make sense for both artists and regular users?
+     FINDING: [is it the same nav for both? Should it be different?]
+  □ Is "Artist Page" prominently accessible from the nav for artists?
+     FINDING: [yes / no / buried]
+  □ Are settings, profile, and account options easy to find?
+     FINDING: [where are they, how many clicks]
+  □ Is there a consistent back/breadcrumb pattern?
+     FINDING: [yes / no]
+
+  MOBILE NAVIGATION:
+  □ Does the bottom tab bar (if exists) cover the right primary actions?
+     FINDING: [list what's in it, what's missing]
+  □ Are tap targets large enough? (minimum 44x44px)
+     FINDING: [check padding/height on nav items — pass/fail]
+  □ Does the mobile nav collapse or hide the artist page tools?
+     FINDING: [where do artist-specific features live on mobile]
+  □ On mobile, can you complete the artist page creation flow without frustration?
+     FINDING: [trace the creation flow on mobile layout — is any step unusable]
+
+════════════════════════════════════════════
+PHASE 6 — REDUNDANCY & CLUTTER AUDIT
+════════════════════════════════════════════
+
+Look for features, sections, and UI elements that are redundant, confusing, or add noise without value.
+
+  UI REDUNDANCY CHECK:
+  □ Are there multiple places to do the same thing?
+     (e.g., "Edit profile" in nav AND in settings AND on profile page)
+     FINDING: [list every duplicate entry point]
+
+  □ Are there settings panels with overlapping options?
+     FINDING: [e.g., "notifications" appearing in two different settings pages]
+
+  □ On the artist page editor, are there blocks or sections that feel like they do the same thing?
+     FINDING: [e.g., "About" and "Bio" both present, or "Links" and "Social Links" separate]
+
+  □ Are there empty or near-empty sections shown to users by default?
+     (e.g., an "Events" section shown even when no events exist, with no call to add one)
+     FINDING: [list every default-empty section that shows as blank space]
+
+  □ Are there any onboarding prompts, banners, or tooltips that appear more than once?
+     FINDING: [list any repeated prompts]
+
+  □ Is there content in the sidebar, feed, or home page that feels irrelevant or filler?
+     FINDING: [describe what feels like noise]
+
+  INFORMATION ARCHITECTURE:
+  □ Profile Settings vs. Artist Page Settings — are they clearly separate?
+     FINDING: [where is the line drawn, is it confusing]
+  □ Is it clear to a user what "public" content is vs. "private/account" content?
+     FINDING: [how is this communicated visually]
+  □ Are labels and terminology consistent across the platform?
+     (e.g., is it called "Artist Page" in some places and "Creator Profile" in others?)
+     FINDING: [list any terminology inconsistencies]
+
+════════════════════════════════════════════
+PHASE 7 — RETENTION & ENGAGEMENT AUDIT
+════════════════════════════════════════════
+
+Evaluate whether the platform gives users a reason to come back and stay.
+
+  HOOKS AUDIT:
+  □ When a user logs in, is the first screen engaging or empty?
+     FINDING: [what does an empty new account see on login]
+  □ Is there an empty state strategy? 
+     (When someone has no followers/posts/messages yet, does it guide them or show blank space?)
+     FINDING: [check empty states in feed, notifications, messages, followers list]
+  □ Is there any "suggested users to follow" or discovery prompt for new users?
+     FINDING: [yes / no / where]
+  □ Is there any visual reward for completing profile setup?
+     FINDING: [progress bar, completion %, celebratory state — yes/no/where]
+  □ For artists: is there any dashboard showing their growth (views, follows, plays)?
+     FINDING: [yes / partial / not implemented]
+  □ Is there a reason to come back daily? 
+     (activity feed, new content from followed accounts, notifications, trending)
+     FINDING: [what exists, what's missing]
+
+  EMOTIONAL DESIGN:
+  □ Does the platform feel like it has a personality and point of view, or generic?
+     FINDING: [specific evidence — copywriting tone, visual character, any memorable moments]
+  □ Are there any micro-interactions or motion that feel delightful?
+     FINDING: [list any animations, transitions, hover effects — or note their absence]
+  □ Is the typography doing meaningful work — hierarchy, personality, readability?
+     FINDING: [describe heading vs. body vs. label treatment]
+  □ Does the color palette feel intentional and evocative for a music/art platform?
+     FINDING: [describe what palette is actually in use and whether it fits the audience]
+  □ Are there any moments in the UI that feel surprising or memorable?
+     FINDING: [name them or report "none found"]
+
+════════════════════════════════════════════
+PHASE 8 — COMPETITIVE AESTHETIC BENCHMARK
+════════════════════════════════════════════
+
+Based on your full read of the codebase and UI, benchmark this platform honestly against:
+
+  - Bandcamp (artist pages, music-first, community feel)
+  - Instagram (visual polish, mobile-first, creator tools)
+  - Linktree (simplicity of artist page setup)
+  - TikTok (engagement design, discovery, retention hooks)
+  - Myspace in its prime (deep artist page customization)
+
+For each competitor, answer:
+
+  vs. [Competitor]:
+  WHERE WE WIN: [specific things this platform does better or differently]
+  WHERE WE LOSE: [specific gaps or inferior execution]
+  THE ONE THING TO STEAL: [the single most important design lesson from them]
+
+════════════════════════════════════════════
+PHASE 9 — CONSOLIDATED FINDINGS REPORT
+════════════════════════════════════════════
+
+Produce a master issue and wins list using this exact format:
+
+For EVERY problem found:
+
+  ───────────────────────────────
+  ISSUE #[N]
+  TYPE: Broken Button | Dead Link | Confusing UX | Redundant UI | 
+        Missing Empty State | Visual Problem | Navigation Gap | 
+        Mobile Breakage | Retention Gap | Aesthetic Problem
+  SEVERITY: BLOCKER | HIGH | MEDIUM | LOW
+  LOCATION: [component file:line or route or "no file — concept missing"]
+  WHAT'S WRONG: [plain English, one sentence]
+  USER IMPACT: [what a real user experiences because of this]
+  FIX: [specific, actionable — what to change, remove, add, or rewrite]
+  EFFORT: [S = few hours | M = 1–2 days | L = 3+ days]
+  ───────────────────────────────
+
+For every genuine strength found:
+
+  ───────────────────────────────
+  WIN #[N]
+  CATEGORY: Visual Design | UX Flow | Feature Differentiation | 
+             Mobile Experience | Artist Tools | Retention Design
+  LOCATION: [component or route]
+  WHAT'S WORKING: [specific, plain English]
+  WHY IT MATTERS: [what user benefit this creates]
+  HOW TO PROTECT IT: [make sure this doesn't get broken in future work]
+  ───────────────────────────────
+
+Then output the final scorecard:
+
+  ════════════════════════════════════════
+  UX + AESTHETIC AUDIT SCORECARD
+  ════════════════════════════════════════
+
+  ARTIST PAGE CREATION FLOW:
+    Clarity: [1–10] — [one sentence why]
+    Completeness: [1–10] — [one sentence why]
+    Delight: [1–10] — [one sentence why]
+
+  GENERAL USER EXPERIENCE:
+    First Impression: [1–10]
+    Navigation (Web): [1–10]
+    Navigation (Mobile): [1–10]
+    Empty State Handling: [1–10]
+    Retention Design: [1–10]
+
+  VISUAL DESIGN:
+    Aesthetic Cohesion: [1–10]
+    Typography: [1–10]
+    Mobile Polish: [1–10]
+    Memorability: [1–10]
+
+  BUTTON/LINK HEALTH:
+    Total interactive elements: N
+    Fully wired: N (N%)
+    Broken/dead: N (N%) ← if this is >10%, flag as BLOCKER
+
+  ISSUES SUMMARY:
+    BLOCKER: N
+    HIGH: N
+    MEDIUM: N
+    LOW: N
+
+  WINS FOUND: N
+
+  TOP 5 THINGS TO FIX FOR MAXIMUM IMPACT:
+    1. [Issue #] — [why this one first]
+    2. [Issue #]
+    3. [Issue #]
+    4. [Issue #]
+    5. [Issue #]
+
+  TOP 3 THINGS TO DOUBLE DOWN ON:
+    1. [Win #] — [why protect this]
+    2. [Win #]
+    3. [Win #]
+
+  HONEST PRODUCT VERDICT:
+  [3–5 sentences. What is the real user experience right now?
+   What kind of person would love this platform today?
+   What stands between this and something people genuinely want to use daily?
+   No softening. No "great foundation" filler. Just truth.]
+  ════════════════════════════════════════
+
+════════════════════════════════════════════
+AUDIT RULES — ENFORCED THROUGHOUT
+════════════════════════════════════════════
+
+- NEVER say "looks good" or "seems fine" without specific evidence.
+- NEVER report a button as working without finding its handler in code.
+- NEVER skip the mobile pass — trace every flow on mobile layout too.
+- If a section is visually present but has no real content or handler, report it as DEAD WEIGHT.
+- If terminology is inconsistent (e.g., "Artist Page" vs. "Creator Profile"), flag every instance.
+- The artist page creation and customization flow gets MORE scrutiny than anything else.
+  It is the reason this platform exists. If it's confusing, nothing else matters.
+- Report findings from the perspective of a real user, not a developer.

@@ -1,0 +1,348 @@
+You are conducting a full technical and product audit of this social media platform codebase. Your job is to find every real problem — not to be encouraging. You will produce a structured issue report with actionable fixes.
+
+════════════════════════════════════════════
+AUDIT MANDATE
+════════════════════════════════════════════
+
+NO REFACTORING during this audit. READ and REPORT only.
+Do not suggest "while we're here" improvements.
+Do not rewrite working code.
+Do not claim anything "looks good" without evidence.
+Every finding must reference a specific file path and line number.
+
+════════════════════════════════════════════
+PHASE 1 — PROJECT INVENTORY
+════════════════════════════════════════════
+
+First, map the entire project. Run:
+
+  find . -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" -o -name "*.py" \) \
+    | grep -v node_modules | grep -v .next | grep -v dist | grep -v __pycache__ \
+    | sort > /tmp/all_files.txt && wc -l /tmp/all_files.txt && cat /tmp/all_files.txt
+
+Then identify:
+  1. Total file count by module/directory
+  2. Entry points (main.py, app.tsx, index.ts, etc.)
+  3. All route files (pages/, app/, routers/, routes/)
+  4. All database model files
+  5. All API endpoint files
+  6. All test files (test_*, *.test.*, *.spec.*)
+  7. All config/env files (.env.example, config.py, settings.ts)
+
+Report as:
+  PROJECT INVENTORY:
+  - Total source files: N
+  - Routes/Pages: [list]
+  - Models: [list]
+  - API endpoints: [list]
+  - Test files: N (list them)
+  - Config files: [list]
+
+════════════════════════════════════════════
+PHASE 2 — MODULE-BY-MODULE CODE AUDIT
+════════════════════════════════════════════
+
+For every major module (auth, user profiles, artist pages, feed, messaging, media upload, notifications, search, settings), audit each one with this exact checklist:
+
+  MODULE: [name]
+  FILE(S): [paths]
+
+  □ Does it have corresponding tests? YES/NO — if NO, flag as UNTESTED
+  □ Are errors caught and handled (no bare except/catch)? 
+  □ Are all inputs validated before use?
+  □ Is any sensitive data (tokens, passwords, PII) logged or exposed?
+  □ Are there hardcoded values that should be env vars?
+  □ Are there any TODO/FIXME/HACK comments in production paths?
+  □ Is there dead code (functions defined but never called)?
+  □ Are there circular imports or dependency issues?
+  □ Does it have a clearly defined input → output contract?
+  □ Is state managed consistently (no scattered globals)?
+
+For each module output a FINDINGS block:
+
+  MODULE FINDINGS: [module name]
+  STATUS: SOLID | HAS ISSUES | BROKEN | UNTESTED
+  ISSUES:
+    - [CRITICAL|HIGH|MEDIUM|LOW] file.ts:line — description of problem
+  MISSING:
+    - [what should exist but doesn't]
+
+════════════════════════════════════════════
+PHASE 3 — USER FLOW VERIFICATION
+════════════════════════════════════════════
+
+Trace every major user flow through the actual code. For each flow, follow the execution path from UI trigger → API call → handler → database → response → UI update. Report where the chain breaks, is incomplete, or has no tests.
+
+FLOWS TO TRACE:
+
+  FLOW 1: New User Registration
+    - Landing page → sign up form → validation → API call → DB write → email verify → login redirect
+    - Find: the registration endpoint, the DB model, the validation logic, the email trigger
+    - Report: Is each step implemented? Does it persist? Is it tested?
+
+  FLOW 2: User Login + Session
+    - Login form → auth check → token/session creation → redirect → protected route access
+    - Find: auth middleware, token storage, refresh logic
+    - Report: Token expiry handled? Refresh implemented? Logout clears state?
+
+  FLOW 3: Artist Page Creation + Customization
+    - User upgrades/opts into artist page → customization UI → save settings → public view
+    - Find: the artist page model, the customization fields, the public render path
+    - Report: What customization options actually exist in the DB schema? What's wired vs. placeholder?
+
+  FLOW 4: Artist Page Public View
+    - Unauthenticated visitor hits /artist/[slug] → page loads → media plays → follow CTA
+    - Find: the public route, data fetching, media rendering
+    - Report: Is it SEO-ready? Server-side rendered? Does it work without auth?
+
+  FLOW 5: Post/Content Creation
+    - User creates post (text/image/video) → uploads media → publishes → appears in feed
+    - Find: the post model, the upload handler, the feed query
+    - Report: File size limits? Upload progress? Feed ordering logic?
+
+  FLOW 6: Feed / Home Timeline
+    - User loads home feed → sees posts from followed accounts → infinite scroll / pagination
+    - Find: the feed query, pagination logic, follow/unfollow model
+    - Report: N+1 query risk? Pagination implemented? Feed personalization or purely chronological?
+
+  FLOW 7: Direct Messaging
+    - User opens DMs → starts new conversation → sends message → recipient gets notification
+    - Find: the messaging model, WebSocket or polling setup, notification trigger
+    - Report: Real-time or polling? Message persistence verified? Read receipts?
+
+  FLOW 8: Notifications
+    - Action triggers notification → stored in DB → delivered to user in real-time or on next load
+    - Find: notification model, delivery mechanism, read/unread state
+    - Report: What events trigger notifications? How are they delivered?
+
+  FLOW 9: Search
+    - User searches for accounts/posts/artists → results display → click through to profile
+    - Find: the search endpoint, indexing strategy, query logic
+    - Report: Full-text search or LIKE queries? Indexed? Artist-specific search?
+
+  FLOW 10: Follow / Unfollow
+    - User follows an artist → feed updates → artist follower count updates → user gets confirmation
+    - Find: follow model, feed invalidation, count logic
+    - Report: Optimistic UI? Race conditions? Duplicate follow protection?
+
+For each flow output:
+
+  FLOW AUDIT: [Flow Name]
+  COMPLETE: YES | PARTIAL | BROKEN | NOT IMPLEMENTED
+  BROKEN AT: [exact file:line where chain breaks or goes missing]
+  EVIDENCE: [what you found vs. what should be there]
+  TESTS EXIST: YES | NO
+
+════════════════════════════════════════════
+PHASE 4 — SECURITY AUDIT
+════════════════════════════════════════════
+
+Check for each of the following. Report every instance found with file:line.
+
+  AUTH & ACCESS CONTROL
+  □ Are all protected routes behind auth middleware?
+  □ Can a user read/modify another user's private data? (IDOR check)
+  □ Can a regular user access artist-only or admin endpoints?
+  □ Are JWT secrets/session secrets in env vars (not hardcoded)?
+  □ Is token expiry enforced?
+  □ Is password hashing using bcrypt/argon2 (not MD5/SHA1/plaintext)?
+
+  INPUT & DATA
+  □ Is user input sanitized before DB queries? (SQL injection risk)
+  □ Is user input sanitized before rendering? (XSS risk)
+  □ Are file uploads validated by content type (not just extension)?
+  □ Is there a file size limit on uploads?
+  □ Are filenames randomized (no user-controlled filenames on disk)?
+
+  CONFIGURATION
+  □ Are there any hardcoded API keys, secrets, or tokens in source files?
+  □ Is .env in .gitignore?
+  □ Is there a .env.example with all required vars documented?
+  □ Are CORS origins explicitly set (not wildcard *)?
+
+  Run: grep -rn "password\|secret\|api_key\|token" --include="*.ts" --include="*.tsx" --include="*.py" \
+    | grep -v ".env" | grep -v "test" | grep -v "example" | grep -v node_modules | head -50
+
+  Report every hardcoded secret found as CRITICAL.
+
+════════════════════════════════════════════
+PHASE 5 — PERFORMANCE & SCALABILITY AUDIT
+════════════════════════════════════════════
+
+  DATABASE
+  □ Are foreign keys indexed?
+  □ Are feed/timeline queries paginated? (No SELECT * without LIMIT)
+  □ Are there obvious N+1 query patterns? (loop with DB call inside)
+  □ Are there any queries without WHERE clauses on large tables?
+  □ Are timestamps indexed on post/message tables?
+
+  MEDIA & UPLOADS
+  □ Are images resized/compressed before storage?
+  □ Are files served from CDN or directly from app server?
+  □ Is there a max file size enforced?
+  □ Are video uploads transcoded or served raw?
+
+  REAL-TIME
+  □ If WebSockets used — is reconnection logic implemented?
+  □ If polling used — what is the interval? Is it aggressive?
+  □ Are notification/message queries optimized?
+
+  FRONTEND
+  □ Are images lazy-loaded?
+  □ Is there code splitting / lazy loading of routes?
+  □ Are large dependencies imported selectively?
+  □ Is the artist page media-heavy without optimization?
+
+════════════════════════════════════════════
+PHASE 6 — COMPETITIVE FEATURE GAP ANALYSIS
+════════════════════════════════════════════
+
+Compare the implemented feature set against what users expect from modern social media platforms. For each category, mark: IMPLEMENTED | PARTIAL | MISSING | UNKNOWN (not enough code to tell).
+
+  CORE SOCIAL
+  □ User registration + email verification
+  □ Profile photo + bio + links
+  □ Follow / unfollow
+  □ Block / mute users
+  □ Public vs. private account setting
+  □ Account deletion / data export
+
+  CONTENT
+  □ Text posts
+  □ Image posts (single + multi-image)
+  □ Video posts
+  □ Stories / ephemeral content
+  □ Repost / share / quote
+  □ Like / reaction system
+  □ Comment threads
+  □ Content warnings / sensitive media flags
+  □ Post editing
+  □ Post deletion
+
+  ARTIST PAGE (your differentiator — audit hardest here)
+  □ Custom URL/slug
+  □ Custom banner + theme colors
+  □ Bio / artist statement
+  □ Embedded media player (music/video)
+  □ Discography / portfolio section
+  □ Event listings
+  □ Merch / links section
+  □ Gated/subscriber content
+  □ Fan tier system
+  □ Analytics for artists (views, follows, plays)
+  □ Press kit / EPK download
+  □ Artist verification badge
+
+  MESSAGING
+  □ 1:1 DMs
+  □ Group messaging
+  □ Media in messages
+  □ Read receipts
+  □ Message requests (from non-followers)
+  □ Message deletion
+
+  DISCOVERY
+  □ Explore / trending page
+  □ Hashtag system
+  □ Genre / category tags (for artists)
+  □ Recommended follows
+  □ Search (users + content + artists)
+
+  NOTIFICATIONS
+  □ In-app notifications
+  □ Email notifications (with preferences)
+  □ Push notifications (mobile/PWA)
+  □ Notification preferences panel
+
+  MODERATION
+  □ Report user / report content
+  □ Admin review queue
+  □ Content removal
+  □ User ban / suspension
+
+  MONETIZATION HOOKS (future-proofing)
+  □ Tipping / fan support
+  □ Paid subscriptions
+  □ Promoted posts / ads infrastructure
+
+For each MISSING or PARTIAL item, add it to the issues list with priority (P1 = table stakes, P2 = competitive parity, P3 = differentiator).
+
+════════════════════════════════════════════
+PHASE 7 — TEST COVERAGE AUDIT
+════════════════════════════════════════════
+
+  Run (if JS/TS): npx jest --coverage --passWithNoTests 2>&1 | tail -30
+  Run (if Python): pytest --cov=. --cov-report=term-missing 2>&1 | tail -30
+
+  Report:
+  - Overall coverage %
+  - Modules with 0% coverage
+  - Modules with <50% coverage
+  - Whether any E2E tests exist
+  - Whether auth flows are tested
+  - Whether artist page flows are tested
+
+  If no test runner is configured, report: "NO TEST INFRASTRUCTURE DETECTED" as CRITICAL.
+
+════════════════════════════════════════════
+PHASE 8 — FINAL CONSOLIDATED ISSUE REPORT
+════════════════════════════════════════════
+
+Produce a single master list. Sort by severity. Use this exact format for every issue:
+
+  ───────────────────────────────
+  ISSUE #[N]
+  SEVERITY: CRITICAL | HIGH | MEDIUM | LOW
+  CATEGORY: Security | Bug | Missing Feature | Performance | UX | Test Coverage | Architecture
+  LOCATION: [file:line or "No file — missing entirely"]
+  DESCRIPTION: [what is wrong or missing, in plain English]
+  IMPACT: [what breaks or what users can't do]
+  FIX: [exact steps to resolve — be specific, not vague]
+  EFFORT: [S = <1 day | M = 1–3 days | L = 1 week+]
+  ───────────────────────────────
+
+After the full list, output a SUMMARY SCORECARD:
+
+  ════════════════════════════════
+  AUDIT SCORECARD
+  ════════════════════════════════
+  Total Issues Found: N
+    CRITICAL: N
+    HIGH: N
+    MEDIUM: N
+    LOW: N
+
+  Module Health:
+    [module name]: SOLID | HAS ISSUES | BROKEN | UNTESTED
+
+  User Flow Completion:
+    [flow name]: COMPLETE | PARTIAL | BROKEN | NOT IMPLEMENTED
+
+  Feature Completeness vs. Competitors: [X]%
+
+  Test Coverage: [X]% overall | [N] modules at 0%
+
+  Top 5 Things to Fix First:
+    1. [issue #] — [one line why]
+    2. [issue #] — [one line why]
+    3. [issue #] — [one line why]
+    4. [issue #] — [one line why]
+    5. [issue #] — [one line why]
+
+  Honest Assessment:
+  [2–3 sentences. What is the actual state of this project? 
+   Is it production-ready? What would need to be true for it to compete?
+   No fluff. No encouragement. Just reality.]
+  ════════════════════════════════
+
+════════════════════════════════════════════
+CONSTRAINTS FOR THIS ENTIRE AUDIT
+════════════════════════════════════════════
+
+- NO REFACTORING. Read and report only.
+- Every finding needs a file path. No vague "the auth system has issues."
+- If you cannot find a file that should exist, that IS the finding.
+- If a feature is partially wired but broken, say PARTIAL + where it breaks.
+- Do not use phrases like "looks good", "seems fine", "should work."
+- If you lack evidence that something works, call it UNKNOWN.
+- Mark your overall output: STATUS: [DESIGN|SCAFFOLD|PROTOTYPE|INTEGRATED|PRODUCTION-CANDIDATE]
