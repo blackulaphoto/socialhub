@@ -27,7 +27,7 @@ export default function Register() {
         onSuccess: (data) => {
           queryClient.setQueryData(["/api/auth/me"], data.user);
           queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-          toast({ title: "Welcome to ArtistHub!", description: "Your account has been created." });
+          toast({ title: "Welcome to HollywoodHeartbeats.com!", description: "Your account has been created." });
           navigateAfterAuth(consumeReturnTo());
         },
         onError: (err: any) => {
@@ -51,9 +51,12 @@ export default function Register() {
       
       <Card className="w-full max-w-md relative z-10 border-border/60 bg-background/80 backdrop-blur-2xl shadow-2xl">
         <CardHeader className="space-y-3 text-center pb-6">
-          <CardTitle className="text-3xl font-bold tracking-tight">Join ArtistHub</CardTitle>
+          <CardTitle className="space-y-2 text-center">
+            <div className="brand-wordmark text-[1.5rem] tracking-[0.34em] text-foreground">HollywoodHeartbeats</div>
+            <div className="brand-submark text-muted-foreground">Join the scene</div>
+          </CardTitle>
           <CardDescription className="text-muted-foreground text-base">
-            Create your account and you will get a public creator profile with editing tools from the start.
+            Create your account and you will get a public artist page with editing tools from the start.
           </CardDescription>
         </CardHeader>
         <CardContent>

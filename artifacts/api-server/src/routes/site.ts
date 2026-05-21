@@ -26,9 +26,9 @@ async function getOrCreateSiteSettings() {
 
   const [created] = await db.insert(siteSettingsTable).values({
     id: 1,
-    siteName: "ArtistHub",
-    logoUrl: "/brand-mark.png",
-    faviconUrl: "/favicon.png",
+    siteName: "HollywoodHeartbeats.com",
+    logoUrl: "/brand-mark.svg",
+    faviconUrl: "/favicon.svg",
   }).returning();
 
   return created;
@@ -50,7 +50,7 @@ router.post("/admin/site-settings", requireAdminMiddleware, async (req, res) => 
     .insert(siteSettingsTable)
     .values({
       id: 1,
-      siteName: (typeof siteName === "string" && siteName.trim()) || "ArtistHub",
+      siteName: (typeof siteName === "string" && siteName.trim()) || "HollywoodHeartbeats.com",
       logoUrl: typeof logoUrl === "string" ? logoUrl.trim() || null : null,
       faviconUrl: typeof faviconUrl === "string" ? faviconUrl.trim() || null : null,
       updatedByUserId: req.session.userId,
@@ -59,7 +59,7 @@ router.post("/admin/site-settings", requireAdminMiddleware, async (req, res) => 
     .onConflictDoUpdate({
       target: siteSettingsTable.id,
       set: {
-        siteName: (typeof siteName === "string" && siteName.trim()) || "ArtistHub",
+        siteName: (typeof siteName === "string" && siteName.trim()) || "HollywoodHeartbeats.com",
         logoUrl: typeof logoUrl === "string" ? logoUrl.trim() || null : null,
         faviconUrl: typeof faviconUrl === "string" ? faviconUrl.trim() || null : null,
         updatedByUserId: req.session.userId,

@@ -72,10 +72,10 @@ type TopicSearchResponse = {
 
 const TOPIC_VIEWS: Array<{ value: TopicView; label: string; helper: string }> = [
   { value: "all", label: "All Activity", helper: "Everything connected to this topic." },
-  { value: "artists", label: "Creator Pages", helper: "Public pages carrying this tag." },
+  { value: "artists", label: "Artist Pages", helper: "Public artist pages carrying this tag." },
   { value: "events", label: "Events", helper: "Lineups and happenings tagged to the topic." },
-  { value: "groups", label: "Groups", helper: "Communities clustering around the topic." },
-  { value: "users", label: "People", helper: "Creator profiles tied into the topic." },
+  { value: "groups", label: "Scenes", helper: "Forums and communities clustering around the topic." },
+  { value: "users", label: "People", helper: "People and artist pages tied into the topic." },
 ];
 
 export default function Topic({ tag }: { tag: string }) {
@@ -138,7 +138,7 @@ export default function Topic({ tag }: { tag: string }) {
               </div>
               <h1 className="mt-4 text-3xl font-bold tracking-tight md:text-4xl">{topicLabel}</h1>
               <p className="mt-3 text-sm text-muted-foreground md:text-base">
-                {viewConfig.helper} Use this page as the first-class destination for the topic, then branch into the full search index only when you need deeper results.
+                {viewConfig.helper} Use this page as the main landing spot for the topic, then branch into full search only when you need deeper results.
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 {TOPIC_VIEWS.map((view) => (
@@ -163,7 +163,7 @@ export default function Topic({ tag }: { tag: string }) {
           {data ? (
             <div className="relative grid gap-3 md:grid-cols-4">
               <div className="rounded-2xl border border-border/50 bg-background/70 p-4">
-                <div className="text-sm text-muted-foreground">Creator pages</div>
+                <div className="text-sm text-muted-foreground">Artist pages</div>
                 <div className="mt-1 text-2xl font-semibold">{data.artistsTotal}</div>
               </div>
               <div className="rounded-2xl border border-border/50 bg-background/70 p-4">
@@ -171,7 +171,7 @@ export default function Topic({ tag }: { tag: string }) {
                 <div className="mt-1 text-2xl font-semibold">{data.eventsTotal}</div>
               </div>
               <div className="rounded-2xl border border-border/50 bg-background/70 p-4">
-                <div className="text-sm text-muted-foreground">Groups</div>
+                  <div className="text-sm text-muted-foreground">Scenes</div>
                 <div className="mt-1 text-2xl font-semibold">{data.groupsTotal}</div>
               </div>
               <div className="rounded-2xl border border-border/50 bg-background/70 p-4">
@@ -193,11 +193,11 @@ export default function Topic({ tag }: { tag: string }) {
             <section className="space-y-4">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-xl font-bold">Featured Creator Pages</h2>
-                  <p className="text-sm text-muted-foreground">Creators carrying {topicLabel} in their public page signals.</p>
+                  <h2 className="text-xl font-bold">Featured Artist Pages</h2>
+                  <p className="text-sm text-muted-foreground">Artists carrying {topicLabel} in their public page signals.</p>
                 </div>
                 <Link href={`/search?tags=${encodeURIComponent(normalizedTag)}&type=artists`}>
-                  <Button variant="ghost">See all creators</Button>
+                  <Button variant="ghost">See all artists</Button>
                 </Link>
               </div>
               {data.artists.length ? (
@@ -227,7 +227,7 @@ export default function Topic({ tag }: { tag: string }) {
                           {artist.tags?.slice(0, 4).map((artistTag) => <Badge key={artistTag} variant="secondary">{artistTag}</Badge>)}
                         </div>
                         <Link href={`/artists/${artist.userId}`}>
-                          <Button variant="outline" size="sm">Open Creator Page</Button>
+                          <Button variant="outline" size="sm">Open Artist Page</Button>
                         </Link>
                       </CardContent>
                     </Card>
@@ -236,7 +236,7 @@ export default function Topic({ tag }: { tag: string }) {
               ) : (
                 <Card className="border-dashed border-border/50 bg-card/20">
                   <CardContent className="p-10 text-center text-muted-foreground">
-                    No creator pages are tagged with {topicLabel} yet.
+                    No artist pages are tagged with {topicLabel} yet.
                   </CardContent>
                 </Card>
               )}
@@ -295,11 +295,11 @@ export default function Topic({ tag }: { tag: string }) {
             <section className="space-y-4">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-xl font-bold">Groups Around {topicLabel}</h2>
-                  <p className="text-sm text-muted-foreground">Communities, scenes, and collectives orbiting this topic.</p>
+                  <h2 className="text-xl font-bold">Scenes Around {topicLabel}</h2>
+                  <p className="text-sm text-muted-foreground">Forums, scenes, and collectives orbiting this topic.</p>
                 </div>
                 <Link href={`/search?tags=${encodeURIComponent(normalizedTag)}&type=groups`}>
-                  <Button variant="ghost">See all groups</Button>
+                  <Button variant="ghost">See all scenes</Button>
                 </Link>
               </div>
               {data.groups.length ? (
@@ -319,7 +319,7 @@ export default function Topic({ tag }: { tag: string }) {
                           {group.tags?.slice(0, 4).map((groupTag) => <Badge key={groupTag} variant="secondary">{groupTag}</Badge>)}
                         </div>
                         <Link href={`/groups/${group.id}`}>
-                          <Button variant="outline" size="sm">Open Group</Button>
+                          <Button variant="outline" size="sm">Open Scene</Button>
                         </Link>
                       </CardContent>
                     </Card>
@@ -328,7 +328,7 @@ export default function Topic({ tag }: { tag: string }) {
               ) : (
                 <Card className="border-dashed border-border/50 bg-card/20">
                   <CardContent className="p-10 text-center text-muted-foreground">
-                    No groups are clustered around {topicLabel} yet.
+                    No scenes are clustered around {topicLabel} yet.
                   </CardContent>
                 </Card>
               )}
@@ -339,8 +339,8 @@ export default function Topic({ tag }: { tag: string }) {
             <section className="space-y-4">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-xl font-bold">People Following The Topic</h2>
-                  <p className="text-sm text-muted-foreground">Creator profiles surfacing this topic in their account context.</p>
+                  <h2 className="text-xl font-bold">People Around This Topic</h2>
+                  <p className="text-sm text-muted-foreground">People surfacing this topic in their account context and public presence.</p>
                 </div>
                 <Link href={`/search?tags=${encodeURIComponent(normalizedTag)}&type=users`}>
                   <Button variant="ghost">See all people</Button>
@@ -358,16 +358,16 @@ export default function Topic({ tag }: { tag: string }) {
                           </Avatar>
                           <div className="min-w-0 flex-1">
                             <div className="truncate font-semibold">{person.username}</div>
-                            <div className="text-xs text-muted-foreground">{[person.city || person.location, "Creator profile"].filter(Boolean).join(" · ")}</div>
+                            <div className="text-xs text-muted-foreground">{[person.city || person.location, "Artist page"].filter(Boolean).join(" · ")}</div>
                           </div>
                         </div>
                         {person.about ? <p className="line-clamp-3 text-sm text-muted-foreground">{person.about}</p> : null}
                         <div className="flex flex-wrap gap-2">
                           {person.location ? <Badge variant="outline"><MapPin className="mr-1 h-3 w-3" />{person.location}</Badge> : null}
-                          <Badge variant="secondary"><Users className="mr-1 h-3 w-3" />Creator identity</Badge>
+                          <Badge variant="secondary"><Users className="mr-1 h-3 w-3" />Public identity</Badge>
                         </div>
                         <Link href={`/artists/${person.id}`}>
-                          <Button variant="outline" size="sm">Open Profile</Button>
+                          <Button variant="outline" size="sm">Open Artist Page</Button>
                         </Link>
                       </CardContent>
                     </Card>
@@ -376,7 +376,7 @@ export default function Topic({ tag }: { tag: string }) {
               ) : (
                 <Card className="border-dashed border-border/50 bg-card/20">
                   <CardContent className="p-10 text-center text-muted-foreground">
-                    No creator profiles are surfacing {topicLabel} yet.
+                    No people are surfacing {topicLabel} yet.
                   </CardContent>
                 </Card>
               )}
@@ -386,7 +386,7 @@ export default function Topic({ tag }: { tag: string }) {
       ) : (
         <Card className="border-dashed border-border/50 bg-card/30">
           <CardContent className="p-12 text-center text-muted-foreground">
-            Topic activity will appear here as more creators, events, groups, and people use {topicLabel}.
+            Topic activity will appear here as more artists, events, scenes, and people use {topicLabel}.
           </CardContent>
         </Card>
       )}

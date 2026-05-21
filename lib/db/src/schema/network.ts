@@ -249,7 +249,7 @@ export const pageViewsTable = pgTable("page_views", {
 
 export const siteSettingsTable = pgTable("site_settings", {
   id: integer("id").primaryKey().notNull().default(1),
-  siteName: text("site_name").notNull().default("ArtistHub"),
+  siteName: text("site_name").notNull().default("HollywoodHeartbeats.com"),
   logoUrl: text("logo_url"),
   faviconUrl: text("favicon_url"),
   updatedByUserId: integer("updated_by_user_id").references(() => usersTable.id, { onDelete: "set null" }),

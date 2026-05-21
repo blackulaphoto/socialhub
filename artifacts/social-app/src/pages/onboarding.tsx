@@ -162,7 +162,7 @@ export default function Onboarding() {
         updateCreatorSettings.mutate({
           userId: user.id,
           data: {
-            primaryActionLabel: "Contact Me",
+            primaryActionLabel: "Reach Out",
             primaryActionType: "contact",
           },
         });
@@ -190,7 +190,7 @@ export default function Onboarding() {
     }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-        toast({ title: "Setup complete", description: "Your profile is ready." });
+        toast({ title: "Setup complete", description: "Your artist page is ready." });
         setLocation("/");
       },
       onError: () => toast({ title: "Could not finish onboarding", variant: "destructive" }),
@@ -202,7 +202,7 @@ export default function Onboarding() {
       <div className="mx-auto flex max-w-4xl flex-col gap-6">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant={step === "profile" ? "default" : "secondary"}>1. Your profile</Badge>
-          <Badge variant={step === "artist" ? "default" : "secondary"}>2. Creator profile</Badge>
+          <Badge variant={step === "artist" ? "default" : "secondary"}>2. Artist page</Badge>
           <Badge variant={step === "finish" ? "default" : "secondary"}>3. Finish</Badge>
         </div>
 
@@ -210,7 +210,7 @@ export default function Onboarding() {
           <Card className="border-border/50 bg-card/60">
             <CardHeader>
               <CardTitle>Set up your profile</CardTitle>
-              <CardDescription>Start with a few quick details. Everything here is optional and can be changed later.</CardDescription>
+              <CardDescription>Start with a few quick details. Everything here is optional and easy to change later.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
@@ -229,7 +229,7 @@ export default function Onboarding() {
                   </div>
                   <div className="space-y-2">
                     <Label className="flex items-center gap-2">Short bio <span className="text-xs text-muted-foreground">Optional</span></Label>
-                    <Textarea value={profileForm.bio} onChange={(e) => setProfileForm((current) => ({ ...current, bio: e.target.value }))} placeholder="A quick one-line intro." />
+                    <Textarea value={profileForm.bio} onChange={(e) => setProfileForm((current) => ({ ...current, bio: e.target.value }))} placeholder="A quick line that feels like you." />
                   </div>
                   <div className="space-y-2">
                     <Label className="flex items-center gap-2">Interests <span className="text-xs text-muted-foreground">Optional</span></Label>
@@ -286,7 +286,7 @@ export default function Onboarding() {
                       </div>
                     ) : (
                       <div className="mt-3 text-xs text-muted-foreground">
-                        Add age, work, school, and a longer bio anytime.
+                        Add age, work, school, and a longer story anytime.
                       </div>
                     )}
                   </div>
@@ -294,7 +294,7 @@ export default function Onboarding() {
                 <Card className="border-border/60 bg-background/60">
                   <CardHeader>
                     <CardTitle className="text-base">Live preview</CardTitle>
-                    <CardDescription>See how your profile intro will look.</CardDescription>
+                    <CardDescription>See how your intro will land on the page.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="flex items-center gap-3">
@@ -313,7 +313,7 @@ export default function Onboarding() {
                     </div>
                     <div className="rounded-2xl border border-border/50 bg-card/60 p-4">
                       <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">About</div>
-                      <div className="mt-2 text-sm text-muted-foreground">{profileForm.about.trim() || "Add a longer story, links to your work, or what you’re into."}</div>
+                      <div className="mt-2 text-sm text-muted-foreground">{profileForm.about.trim() || "Add a longer story, what you make, or the scenes you move through."}</div>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {(profileForm.interests || "")
@@ -343,14 +343,14 @@ export default function Onboarding() {
                       <Sparkles className="h-3.5 w-3.5" />
                       Included In Setup
                     </div>
-                    <div className="text-lg font-semibold">Your creator profile comes with every account</div>
+                      <div className="text-lg font-semibold">Your artist page comes with every account</div>
                     <p className="max-w-2xl text-sm text-muted-foreground">
-                      Next you will shape the public profile people see for your work, media, contact flow, and discovery presence.
+                      Next you will shape the public page people see for your work, images, voice, and how they reach you.
                     </p>
                   </div>
                   <div className="inline-flex items-center rounded-full border border-primary/20 bg-background/50 px-4 py-2 text-sm font-medium">
                     <Palette className="mr-2 h-4 w-4" />
-                    Creator tools enabled
+                    Artist page tools enabled
                   </div>
                 </div>
               </div>
@@ -364,8 +364,8 @@ export default function Onboarding() {
         {step === "artist" ? (
           <Card className="border-border/50 bg-card/60">
             <CardHeader>
-              <CardTitle>Set up your creator profile</CardTitle>
-              <CardDescription>Start simple. You can fine-tune media modules, featured content, and page style later in settings.</CardDescription>
+              <CardTitle>Set up your artist page</CardTitle>
+              <CardDescription>Start simple. You can fine-tune media, featured work, and page style later in settings.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="grid gap-4 md:grid-cols-2">
@@ -395,8 +395,8 @@ export default function Onboarding() {
                 <Input value={artistForm.tags} onChange={(e) => setArtistForm((current) => ({ ...current, tags: e.target.value }))} placeholder="editorial, beauty, test shoot, studio, retouching" />
               </div>
               <div className="space-y-2">
-                <Label>Creator bio</Label>
-                <Textarea value={artistForm.bio} onChange={(e) => setArtistForm((current) => ({ ...current, bio: e.target.value }))} placeholder="Give people a quick sense of your work." />
+                <Label>Artist page bio</Label>
+                <Textarea value={artistForm.bio} onChange={(e) => setArtistForm((current) => ({ ...current, bio: e.target.value }))} placeholder="Give people a quick sense of your work and energy." />
               </div>
               <div className="space-y-2">
                 <Label>Booking or contact email</Label>
@@ -404,7 +404,7 @@ export default function Onboarding() {
               </div>
               <div className="flex justify-between gap-3">
                 <Button variant="outline" onClick={() => setStep("finish")}>Skip for now</Button>
-                <Button onClick={saveArtistStep} disabled={updateArtist.isPending}>Save creator profile</Button>
+                <Button onClick={saveArtistStep} disabled={updateArtist.isPending}>Save artist page</Button>
               </div>
             </CardContent>
           </Card>
@@ -414,13 +414,13 @@ export default function Onboarding() {
           <Card className="border-border/50 bg-card/60">
             <CardHeader>
               <CardTitle>You are ready</CardTitle>
-              <CardDescription>Your account and public creator profile are set. You can keep refining your profile in settings anytime.</CardDescription>
+              <CardDescription>Your account and public artist page are set. You can keep shaping the page in settings anytime.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="text-sm text-muted-foreground">
-                Next best steps: upload a profile photo, make a first post, and follow a few creators so the feed gets useful fast.
+                Next best steps: upload a profile photo, make a first post, and follow a few artists so the feed starts feeling alive fast.
               </div>
-              <Button onClick={finishOnboarding} disabled={updateProfile.isPending}>Enter ArtistHub</Button>
+              <Button onClick={finishOnboarding} disabled={updateProfile.isPending}>Enter HollywoodHeartbeats.com</Button>
             </CardContent>
           </Card>
         ) : null}

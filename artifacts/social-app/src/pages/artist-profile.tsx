@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import {
   CalendarClock,
   CalendarRange,
+  CheckCircle2,
   ExternalLink,
   HeartHandshake,
   Heart,
@@ -26,6 +27,7 @@ import {
   useCreatePost,
   useFollowUser,
   useGetEvents,
+  useGetGroups,
   useGetUser,
   useSendInquiry,
   useUnfollowUser,
@@ -152,6 +154,27 @@ const LIGHT_THEME_VARIANT_CLASSES: Record<string, string> = {
   gallery: "light:[&_section]:border-slate-200/70 light:[&_section]:bg-white/72",
 };
 
+type FeedPostContext = {
+  postType?: string;
+  role?: string;
+  collaborators?: string;
+  location?: string;
+  shootType?: string;
+};
+
+const POST_CONTEXT_PATTERN = /\n?\[\[context:(.+?)\]\]\s*$/s;
+
+function buildPostContentWithContext(content: string, context: FeedPostContext) {
+  const cleanedContent = content.replace(POST_CONTEXT_PATTERN, "").trimEnd();
+  const normalizedContext = Object.fromEntries(
+    Object.entries(context).filter(([, value]) => Boolean(value?.trim())),
+  );
+  if (!Object.keys(normalizedContext).length) {
+    return cleanedContent;
+  }
+  return `${cleanedContent}\n[[context:${JSON.stringify(normalizedContext)}]]`;
+}
+
 type SectionConfig = {
   visible?: boolean;
   style?: string | null;
@@ -203,8 +226,12 @@ export default function ArtistProfile({ id }: { id: string }) {
   const [requestedGalleryView, setRequestedGalleryView] = useState(() => (
     typeof window !== "undefined" && new URLSearchParams(window.location.search).get("view") === "gallery"
   ));
+  const [requestedInquiryOpen, setRequestedInquiryOpen] = useState(() => (
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("inquiry") === "1"
+  ));
   const [mobileTabOverride, setMobileTabOverride] = useState<"posts" | "gallery" | "about" | "trust" | "events" | "contact" | null>(null);
   const [trustView, setTrustView] = useState<"references" | "vouches" | "history" | "verified" | "safety">("references");
+  const [collaborationCardView, setCollaborationCardView] = useState<"public" | "confirmed">("public");
   const [artistPostForm, setArtistPostForm] = useState({
     content: "",
     imageUrl: "",
@@ -229,6 +256,15 @@ export default function ArtistProfile({ id }: { id: string }) {
   const { data: events } = useGetEvents(undefined, {
     query: { queryKey: ["/api/events", "artist-page"], enabled: Number.isFinite(userId) },
   });
+  const { data: sceneDirectory } = useGetGroups(
+    { location: profile?.artistProfile?.location || profile?.user.city || profile?.user.location || undefined },
+    {
+      query: {
+        queryKey: ["artist-scenes", userId, profile?.artistProfile?.location, profile?.user.city, profile?.user.location],
+        enabled: Number.isFinite(userId),
+      },
+    },
+  );
   const {
     data: artistPostsData,
     isLoading: isLoadingArtistPosts,
@@ -259,14 +295,14 @@ export default function ArtistProfile({ id }: { id: string }) {
   useEffect(() => {
     if (typeof document === "undefined" || !profile?.artistProfile) return;
     const artist = profile.artistProfile;
-    const pageTitle = `${artist.displayName || artist.user.username} | ArtistHub`;
+    const pageTitle = `${artist.displayName || artist.user.username} | HollywoodHeartbeats.com`;
     const pageDescription =
       artist.tagline
       || artist.bio
       || [artist.category, artist.location].filter(Boolean).join(" · ")
-      || "Explore this creator page on ArtistHub.";
+      || "Explore this artist page on HollywoodHeartbeats.com.";
     const pageUrl = window.location.href;
-    const pageImage = artist.bannerUrl || artist.avatarUrl || `${window.location.origin}/opengraph.png`;
+    const pageImage = artist.bannerUrl || artist.avatarUrl || `${window.location.origin}/opengraph.svg`;
 
     document.title = pageTitle;
     upsertMetaTag('meta[name="description"]', { name: "description", content: pageDescription });
@@ -289,13 +325,22 @@ export default function ArtistProfile({ id }: { id: string }) {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const syncRequestedView = () => {
-      setRequestedGalleryView(new URLSearchParams(window.location.search).get("view") === "gallery");
+    const syncRequestedState = () => {
+      const params = new URLSearchParams(window.location.search);
+      setRequestedGalleryView(params.get("view") === "gallery");
+      setRequestedInquiryOpen(params.get("inquiry") === "1");
     };
-    syncRequestedView();
-    window.addEventListener("popstate", syncRequestedView);
-    return () => window.removeEventListener("popstate", syncRequestedView);
+    syncRequestedState();
+    window.addEventListener("popstate", syncRequestedState);
+    return () => window.removeEventListener("popstate", syncRequestedState);
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    setRequestedGalleryView(params.get("view") === "gallery");
+    setRequestedInquiryOpen(params.get("inquiry") === "1");
+  }, [location]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -312,6 +357,13 @@ export default function ArtistProfile({ id }: { id: string }) {
     return () => window.cancelAnimationFrame(frame);
   }, [requestedGalleryView, profile?.artistProfile?.id]);
 
+  useEffect(() => {
+    if (!requestedInquiryOpen) return;
+    if (isOwnArtistPage) return;
+    if (!profile?.canInteract) return;
+    setOpen(true);
+  }, [isOwnArtistPage, profile?.canInteract, requestedInquiryOpen]);
+
   const follow = useFollowUser();
   const unfollow = useUnfollowUser();
   const createPost = useCreatePost({
@@ -321,7 +373,7 @@ export default function ArtistProfile({ id }: { id: string }) {
         queryClient.invalidateQueries({ queryKey: ["feed"] });
         queryClient.invalidateQueries({ queryKey: ["/api/users", userId, "posts", "artist"] });
         queryClient.invalidateQueries({ queryKey: ["profile", userId] });
-        toast({ title: "Artist page post published" });
+        toast({ title: "Creative update published" });
       },
       onError: () => {
         toast({ title: "Could not publish artist post", variant: "destructive" });
@@ -380,8 +432,16 @@ export default function ArtistProfile({ id }: { id: string }) {
   const creator = profile.creatorSettings;
   const artist = profile.artistProfile;
   const actionType = creator?.primaryActionType || "contact";
-  const actionLabel = creator?.primaryActionLabel || "Contact Me";
+  const actionLabel = creator?.primaryActionLabel || "Reach Out";
   const actionMeta = ACTION_HELPERS[actionType] || ACTION_HELPERS.contact;
+  const closeInquiryIntent = () => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has("inquiry")) return;
+    params.delete("inquiry");
+    const nextQuery = params.toString();
+    setLocation(`/artists/${userId}${nextQuery ? `?${nextQuery}` : ""}`);
+  };
   const accent = creator?.accentColor || profile.user.accentColor || "#8b5cf6";
   const moodPreset = creator?.moodPreset || "sleek";
   const layoutTemplate = creator?.layoutTemplate || "portfolio";
@@ -501,40 +561,31 @@ export default function ArtistProfile({ id }: { id: string }) {
     thumbnail: (item as { thumbnailUrl?: string | null }).thumbnailUrl || undefined,
   }));
   const heroInfoTitle = builderMeta.heroInfoTitle?.trim() || "Creation description";
-  const heroInfoDescription = builderMeta.heroInfoDescription?.trim() || artist.category || artist.tagline || "Describe what this creator makes, offers, or focuses on.";
+  const heroInfoDescription = builderMeta.heroInfoDescription?.trim() || artist.category || artist.tagline || "Describe the work, energy, and world this artist moves through.";
   const heroInfoPhone = builderMeta.heroInfoPhone?.trim() || "";
   const heroInfoLinks = (builderMeta.heroInfoLinks || []).filter((item) => item.label.trim() || item.url.trim()).slice(0, 3);
   const heroTags = String(artist.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean);
   const heroInfoServices = capabilityFlags.length ? capabilityFlags : heroTags;
-  const yearsActive = useMemo(() => {
+  const yearsActive = (() => {
     const createdAt = profile.user.createdAt ? new Date(profile.user.createdAt) : null;
     if (!createdAt || Number.isNaN(createdAt.getTime())) return 1;
     const elapsedMs = Date.now() - createdAt.getTime();
     return Math.max(1, Math.floor(elapsedMs / (1000 * 60 * 60 * 24 * 365.25)));
-  }, [profile.user.createdAt]);
-  const completedShoots = useMemo(
-    () => Math.max(pastEvents.length + Math.floor(artistPosts.length * 0.7), Math.floor(profile.user.postCount * 0.6)),
-    [artistPosts.length, pastEvents.length, profile.user.postCount],
+  })();
+  const completedShoots = Math.max(
+    pastEvents.length + Math.floor(artistPosts.length * 0.7),
+    Math.floor(profile.user.postCount * 0.6),
   );
-  const verifiedCollaborators = useMemo(
-    () => Math.max(profile.user.friendCount, Math.min(profile.user.followerCount, profile.user.friendCount + pastEvents.length + Math.ceil(artistPosts.length / 4))),
-    [artistPosts.length, pastEvents.length, profile.user.followerCount, profile.user.friendCount],
+  const verifiedCollaborators = Math.max(
+    profile.user.friendCount,
+    Math.min(profile.user.followerCount, profile.user.friendCount + pastEvents.length + Math.ceil(artistPosts.length / 4)),
   );
-  const referenceCount = useMemo(
-    () => Math.max(2, Math.floor(verifiedCollaborators * 0.55)),
-    [verifiedCollaborators],
-  );
-  const vouchCount = useMemo(
-    () => Math.max(1, Math.floor(profile.user.followerCount * 0.18) + Math.floor(profile.user.friendCount * 0.4)),
-    [profile.user.followerCount, profile.user.friendCount],
-  );
-  const endorsementCount = useMemo(
-    () => Math.max(1, Math.floor((heroTags.length + verifiedCollaborators) / 3)),
-    [heroTags.length, verifiedCollaborators],
-  );
-  const collaborationHistoryCount = useMemo(
-    () => Math.max(pastEvents.length + Math.floor(artistPosts.length / 2), verifiedCollaborators),
-    [artistPosts.length, pastEvents.length, verifiedCollaborators],
+  const referenceCount = Math.max(2, Math.floor(verifiedCollaborators * 0.55));
+  const vouchCount = Math.max(1, Math.floor(profile.user.followerCount * 0.18) + Math.floor(profile.user.friendCount * 0.4));
+  const endorsementCount = Math.max(1, Math.floor((heroTags.length + verifiedCollaborators) / 3));
+  const collaborationHistoryCount = Math.max(
+    pastEvents.length + Math.floor(artistPosts.length / 2),
+    verifiedCollaborators,
   );
   const recommendationStatus = verifiedCollaborators >= 12 || vouchCount >= 10 ? "Frequently recommended" : "Building recommendations";
   const trustMetrics = [
@@ -607,6 +658,31 @@ export default function ArtistProfile({ id }: { id: string }) {
     { label: "Professional conduct", detail: "References and vouches will roll into future moderation-aware reputation signals." },
     { label: "Collaboration readiness", detail: profile.canInteract ? "Profile is open to contact and visible collaboration requests." : "Direct interaction is currently restricted on this profile." },
   ];
+  const collaborationRoles = [
+    { role: "Lead creative", name: artist.displayName || artistPageName, helper: artist.category || "Creative professional" },
+    { role: "Support roles", name: heroTags.length ? heroTags.slice(0, 3).join(", ") : "Styling, makeup, retouching, production as needed", helper: "Core collaborators usually involved in the work" },
+    { role: "Booking contact", name: artist.bookingEmail || "Shared on request", helper: "Moves to direct production coordination after fit is confirmed" },
+  ];
+  const collaborationCompensationType = pricingSummary ? "Paid" : artist.openForCommissions ? "Paid / commission" : "Trade / to be agreed";
+  const collaborationCompensationChips = [
+    collaborationCompensationType,
+    artist.openForCommissions ? "Open to paid bookings" : "Selective collaborations",
+    turnaroundInfo ? `Turnaround: ${turnaroundInfo}` : "Timing to confirm",
+  ];
+  const collaborationCardItems = [
+    { label: "Who", value: artist.displayName || artistPageName, helper: artist.category || "Creative professional" },
+    { label: "Where", value: artist.location || profile.user.city || profile.user.location || "Location to confirm", helper: "Shoot base or travel context" },
+    { label: "References", value: `${referenceCount} visible references`, helper: "Trust layer and collaborator history" },
+    { label: "Concept", value: heroTagline || "Concept to define", helper: "Creative direction or project brief" },
+    { label: "Compensation", value: pricingSummary || collaborationCompensationType, helper: "Rates, trade, or paid production" },
+    { label: "Call time", value: upcomingEvents[0] ? new Date(upcomingEvents[0].startsAt).toLocaleString() : "To be confirmed", helper: "Shared publicly only when the timing can be stated clearly" },
+    { label: "Duration", value: turnaroundInfo || "Half-day / full-day to confirm", helper: "Shoot length or expected production window" },
+  ];
+  const privateCoordinationItems = [
+    { label: "Emergency contact option", value: "Shared after confirmation", helper: "Private coordination field for confirmed productions only" },
+    { label: "Call time", value: upcomingEvents[0] ? new Date(upcomingEvents[0].startsAt).toLocaleString() : "To be confirmed", helper: "Final call time appears once the collaboration is confirmed" },
+    { label: "Compensation type", value: collaborationCompensationType, helper: "Displayed as a private planning confirmation when needed" },
+  ];
   const friendPlaceholderImages = [
     artistPageAvatar,
     ...imageGallery.slice(0, 9).map((item) => item.url),
@@ -617,6 +693,49 @@ export default function ArtistProfile({ id }: { id: string }) {
     subtitle: index < profile.user.friendCount ? "In network" : "Future collaborator",
     imageUrl: friendPlaceholderImages[index % friendPlaceholderImages.length] || null,
   }));
+  const profileSceneCards = (() => {
+    const categoryNeedle = (artist.category || "").toLowerCase();
+    const locationNeedles = [artist.location, profile.user.city, profile.user.location]
+      .filter(Boolean)
+      .map((value) => String(value).toLowerCase());
+    const tagNeedles = (artist.tags || []).map((tag: string) => tag.toLowerCase());
+
+    return (sceneDirectory || [])
+      .map((scene) => {
+        const sceneTags = (scene.tags || []).map((tag) => tag.toLowerCase());
+        const isExplicitMember = scene.ownerId === userId || scene.membersPreview?.some((member) => member.id === userId);
+        const categoryMatch = categoryNeedle && (
+          (scene.category || "").toLowerCase().includes(categoryNeedle) ||
+          categoryNeedle.includes((scene.category || "").toLowerCase())
+        );
+        const locationMatch = locationNeedles.some((needle) => needle && (scene.location || "").toLowerCase().includes(needle));
+        const overlappingTags = sceneTags.filter((tag) => tagNeedles.includes(tag));
+        const score = (isExplicitMember ? 6 : 0) + (categoryMatch ? 3 : 0) + (locationMatch ? 2 : 0) + Math.min(overlappingTags.length, 3);
+        if (!score) return null;
+        return {
+          id: scene.id,
+          name: scene.name,
+          reason: isExplicitMember ? "Visible scene membership" : categoryMatch ? "Role-aligned scene" : locationMatch ? "Local scene match" : "Shared specialty tags",
+          subtitle: [scene.category, scene.location].filter(Boolean).join(" · ") || "Scene forum",
+          memberCount: scene.memberCount,
+          postCount: scene.postCount,
+          isExplicitMember,
+          score,
+        };
+      })
+      .filter(Boolean)
+      .sort((left, right) => (right?.score || 0) - (left?.score || 0))
+      .slice(0, 4) as Array<{
+        id: number;
+        name: string;
+        reason: string;
+        subtitle: string;
+        memberCount: number;
+        postCount: number;
+        isExplicitMember: boolean;
+        score: number;
+      }>;
+  })();
   const heroMediaGalleryItems = assignedHeroImages.map((item) => ({
     id: String(item.id),
     title: item.caption || artistPageName,
@@ -624,6 +743,23 @@ export default function ArtistProfile({ id }: { id: string }) {
     mediaUrl: item.url,
     description: item.caption || null,
   }));
+  const fallbackHeroGalleryItems = [
+    ...heroMediaGalleryItems,
+    ...assignedFeaturedGalleryImages.map((item) => ({
+      id: `featured-${item.id}`,
+      title: item.caption || artistPageName,
+      imageUrl: item.url,
+      mediaUrl: item.url,
+      description: item.caption || null,
+    })),
+    ...assignedGalleryImages.map((item) => ({
+      id: `gallery-${item.id}`,
+      title: item.caption || artistPageName,
+      imageUrl: item.url,
+      mediaUrl: item.url,
+      description: item.caption || null,
+    })),
+  ].filter((item, index, items) => item.imageUrl && items.findIndex((candidate) => candidate.imageUrl === item.imageUrl) === index).slice(0, 3);
   const audioShowcaseTracks = assignedAudioItems.map((item) => ({
     id: String(item.id),
     title: item.caption || "Audio release",
@@ -718,7 +854,7 @@ export default function ArtistProfile({ id }: { id: string }) {
     const linkMedia = artistPostForm.linkUrl.trim() ? getEmbedDescriptor(artistPostForm.linkUrl.trim()) : null;
     createPost.mutate({
       data: {
-        content: artistPostForm.content,
+        content: artistPostForm.content.trim(),
         imageUrl: artistPostForm.imageUrl || undefined,
         visibility: artistPostForm.visibility,
         actorSurface: "artist",
@@ -851,10 +987,44 @@ export default function ArtistProfile({ id }: { id: string }) {
     );
   };
 
+  const workingCredits = [
+    ...pastEvents.slice(0, 3).map((event) => ({
+      label: event.title,
+      value: `${new Date(event.startsAt).toLocaleDateString()} · ${event.location || "Location pending"}`,
+    })),
+    ...(artist.customFields?.slice(0, 3).map((field) => ({
+      label: field.label,
+      value: field.value,
+    })) || []),
+  ].slice(0, 6);
+  const collaborationPreferenceItems = [
+    artist.acceptsCollaborations ? "Open to collaborative shoots and editorials" : "Selective collaboration availability",
+    artist.openForCommissions ? "Available for commissioned work" : "Commission status not listed",
+    turnaroundInfo ? `Turnaround: ${turnaroundInfo}` : "Turnaround available on request",
+    heroTags.length ? `Specialties: ${heroTags.slice(0, 4).join(", ")}` : "Specialties can be added through tags",
+  ];
   const aboutContent = (
     <div className="space-y-6 rounded-[1.75rem] border border-border/50 bg-background/35 p-5 md:p-6">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Availability</div>
+              <div className="mt-2 text-sm font-medium">{artist.availabilityStatus || "Availability on request"}</div>
+            </div>
+            <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Rates / booking</div>
+              <div className="mt-2 text-sm font-medium">{pricingSummary || artist.bookingEmail || "Booking preferences on request"}</div>
+            </div>
+            <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Collaboration preferences</div>
+              <div className="mt-2 text-sm font-medium">{artist.acceptsCollaborations ? "Open to collaborative shoots and editorials" : "Selective collaboration availability"}</div>
+            </div>
+            <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Working base</div>
+              <div className="mt-2 text-sm font-medium">{artist.location || profile.user.city || profile.user.location || "Location available on request"}</div>
+            </div>
+          </div>
           <p className="whitespace-pre-wrap text-[15px] leading-8 text-muted-foreground">
-            {artist.bio || "No bio added yet."}
+            {artist.bio || "No story added yet."}
           </p>
 
           {artist.influences && (
@@ -879,7 +1049,7 @@ export default function ArtistProfile({ id }: { id: string }) {
 
           {(serviceItems.length > 0 || pricingSummary || turnaroundInfo) && (
             <div className="space-y-3">
-              <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Work Details</div>
+              <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Rates and booking preferences</div>
               <div className="grid gap-3 md:grid-cols-2">
                 {serviceItems.slice(0, 4).map((service) => (
                   <div key={`${service.title}-${service.price ?? ""}`} className="rounded-2xl border border-border/50 bg-background/40 p-4">
@@ -903,6 +1073,38 @@ export default function ArtistProfile({ id }: { id: string }) {
               </div>
             </div>
           )}
+
+          {collaborationPreferenceItems.length ? (
+            <div className="space-y-3">
+              <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Collaboration preferences</div>
+              <div className="grid gap-3 md:grid-cols-2">
+                {collaborationPreferenceItems.map((item) => (
+                  <div key={item} className="rounded-2xl border border-border/50 bg-background/40 p-4 text-sm text-muted-foreground">
+                    {item}
+                  </div>
+                ))}
+              </div>
+              <div className="space-y-1 text-xs uppercase tracking-[0.14em] text-muted-foreground md:hidden">
+                <div>{profile.user.username ? `@${profile.user.username}` : artist.category || "artist page"}</div>
+                <div>{[artist.category, artist.location].filter(Boolean).join(" · ") || "artist page"}</div>
+                <div>Member since {profile.user.createdAt ? new Date(profile.user.createdAt).getFullYear() : "2026"}</div>
+              </div>
+            </div>
+          ) : null}
+
+          {workingCredits.length ? (
+            <div className="space-y-3">
+              <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Credits and history</div>
+              <div className="grid gap-3 md:grid-cols-2">
+                {workingCredits.map((item) => (
+                  <div key={`${item.label}-${item.value}`} className="rounded-2xl border border-border/50 bg-background/40 p-4">
+                    <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{item.label}</div>
+                    <div className="mt-2 text-sm font-medium">{item.value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           {(generalLinks.length || artist.bookingEmail) && (
             <div className="space-y-3">
@@ -935,7 +1137,7 @@ export default function ArtistProfile({ id }: { id: string }) {
         <Card className="border-border/50 bg-card/60 md:hidden">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between gap-3">
-              <CardTitle>About</CardTitle>
+              <CardTitle>Working Dossier</CardTitle>
               <Button variant="outline" size="sm" onClick={() => setAboutOpen(true)}>Open</Button>
             </div>
           </CardHeader>
@@ -953,7 +1155,7 @@ export default function ArtistProfile({ id }: { id: string }) {
               ) : null}
             </div>
             <p className="line-clamp-3 text-sm leading-6 text-muted-foreground">
-              {artist.bio || profile.user.bio || "No bio added yet."}
+              {artist.bio || profile.user.bio || "No story added yet."}
             </p>
             {artist.tags?.length ? (
               <div className="flex flex-wrap gap-2">
@@ -966,7 +1168,7 @@ export default function ArtistProfile({ id }: { id: string }) {
         <Dialog open={aboutOpen} onOpenChange={setAboutOpen}>
           <DialogContent className="max-h-[85vh] overflow-y-auto md:hidden">
             <DialogHeader>
-              <DialogTitle>About {artistPageName}</DialogTitle>
+              <DialogTitle>{artistPageName} dossier</DialogTitle>
             </DialogHeader>
             {aboutContent}
           </DialogContent>
@@ -974,8 +1176,8 @@ export default function ArtistProfile({ id }: { id: string }) {
 
         <section className="hidden space-y-4 md:block">
           <div className="space-y-2">
-            <h2 className="text-2xl font-bold tracking-tight md:text-[2rem]">About</h2>
-            <p className="text-sm text-muted-foreground">Background, influences, links, and working details.</p>
+            <h2 className="text-2xl font-bold tracking-tight md:text-[2rem]">Working Dossier</h2>
+            <p className="text-sm text-muted-foreground">Background, credits, availability, booking preferences, and collaboration context.</p>
           </div>
           {aboutContent}
         </section>
@@ -984,9 +1186,9 @@ export default function ArtistProfile({ id }: { id: string }) {
   };
 
   const renderHeroRow = () => (
-    <section className="grid gap-5 lg:grid-cols-[minmax(260px,1fr)_minmax(0,1.5fr)] lg:items-stretch">
-      <div className="flex h-full flex-col gap-5">
-        <div className="rounded-[2rem] border border-border/45 bg-background/28 p-5 md:p-6">
+    <section className="grid gap-6 xl:gap-8 lg:grid-cols-[minmax(320px,0.95fr)_minmax(0,1.45fr)] lg:items-start">
+      <div className="flex h-full flex-col gap-6">
+        <div className="rounded-[2rem] border border-border/45 bg-background/28 p-5 md:p-6 xl:p-7">
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="space-y-2">
@@ -1003,7 +1205,7 @@ export default function ArtistProfile({ id }: { id: string }) {
                 <Badge variant="outline">Safety verification pending</Badge>
               </div>
             </div>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-3">
               {trustMetrics.map((metric) => (
                 <div key={metric.label} className="rounded-2xl border border-border/50 bg-background/40 p-4">
                   <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{metric.label}</div>
@@ -1012,7 +1214,7 @@ export default function ArtistProfile({ id }: { id: string }) {
                 </div>
               ))}
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 md:grid-cols-2">
               {trustLedger.map((item) => (
                 <div key={item.label} className="rounded-2xl border border-border/50 bg-background/35 p-4">
                   <div className="flex items-start justify-between gap-3">
@@ -1027,7 +1229,7 @@ export default function ArtistProfile({ id }: { id: string }) {
             </div>
           </div>
         </div>
-        <div className="rounded-[2rem] border border-border/45 bg-background/28">
+        <div className="overflow-hidden rounded-[2rem] border border-border/45 bg-background/28">
           <CreatorInfoCard
             creator={{
               name: heroInfoTitle,
@@ -1042,28 +1244,56 @@ export default function ArtistProfile({ id }: { id: string }) {
               links: heroInfoLinks,
               services: heroInfoServices,
             }}
-            className="min-h-[28rem] rounded-[2rem] border-0 bg-transparent shadow-none"
+            className="min-h-[22rem] rounded-[2rem] border-0 bg-transparent shadow-none md:min-h-[24rem] xl:min-h-[28rem]"
             showImage={false}
           />
         </div>
-        <div className="rounded-[2rem] border border-border/45 bg-background/28 p-5 md:p-6">
+        <div className="rounded-[2rem] border border-border/45 bg-background/28 p-5 md:p-6 xl:p-7">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-muted-foreground">
-                <Users className="h-4 w-4 text-primary" /> Friends
+                <Users className="h-4 w-4 text-primary" /> Scenes and Community
               </div>
-              <h3 className="text-xl font-semibold tracking-tight">Community preview</h3>
+              <h3 className="text-xl font-semibold tracking-tight">Where this artist shows up</h3>
               <p className="text-sm text-muted-foreground">
-                Ten slots reserved for friends, mutuals, and future collaborators.
+                Scenes show where the work lives, who this artist moves around, and what communities keep turning up around the page.
               </p>
             </div>
             <Badge variant="secondary" className="w-fit shrink-0">
-              {FRIEND_PLACEHOLDER_COUNT} spots
+              {profileSceneCards.length} scene{profileSceneCards.length === 1 ? "" : "s"}
             </Badge>
           </div>
-          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {friendPlacementCards.map((friend, index) => (
-              <div key={friend.id} className="flex items-center gap-3 rounded-2xl border border-border/50 bg-background/40 p-3">
+          {profileSceneCards.length ? (
+            <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
+              {profileSceneCards.map((scene) => (
+                <Link key={scene.id} href={`/groups/${scene.id}`}>
+                  <div className="rounded-2xl border border-border/50 bg-background/40 p-4 transition-colors hover:border-primary/35">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-medium">{scene.name}</div>
+                        <div className="mt-1 truncate text-xs uppercase tracking-[0.14em] text-muted-foreground">{scene.subtitle}</div>
+                      </div>
+                      <Badge variant={scene.isExplicitMember ? "secondary" : "outline"} className="shrink-0">
+                        {scene.isExplicitMember ? "Scene member" : "Scene match"}
+                      </Badge>
+                    </div>
+                    <div className="mt-3 text-xs text-muted-foreground">{scene.reason}</div>
+                    <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                      <span>{scene.memberCount} members</span>
+                      <span>{scene.postCount} posts</span>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-5 rounded-2xl border border-dashed border-border/50 bg-background/30 p-4 text-sm text-muted-foreground">
+              No strong scene links surfaced yet. As this artist joins scenes and drops into more threads, they will show up here.
+            </div>
+          )}
+          <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
+            {friendPlacementCards.slice(0, 4).map((friend, index) => (
+              <div key={friend.id} className="flex items-center gap-3 rounded-2xl border border-border/50 bg-background/35 p-3">
                 <Avatar className="h-11 w-11 border border-border/50">
                   <AvatarImage src={friend.imageUrl || ""} />
                   <AvatarFallback>{String(index + 1).padStart(2, "0")}</AvatarFallback>
@@ -1116,9 +1346,68 @@ export default function ArtistProfile({ id }: { id: string }) {
               <div className="mt-2 text-3xl font-semibold">{heroMediaGalleryItems[0]?.title || "Hero image"}</div>
             </div>
           </div>
+        ) : fallbackHeroGalleryItems.length ? (
+          <div className="grid min-h-[28rem] grid-cols-1 gap-2 bg-black/30 p-2 sm:grid-cols-[1.35fr_0.85fr]">
+            <div className="relative min-h-[20rem] overflow-hidden rounded-[1.6rem]">
+              <img
+                src={fallbackHeroGalleryItems[0]?.imageUrl || fallbackHeroGalleryItems[0]?.mediaUrl || ""}
+                alt={fallbackHeroGalleryItems[0]?.title || "Selected work"}
+                className="h-full w-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent" />
+              <div className="absolute inset-x-0 bottom-0 p-6 text-white">
+                <div className="text-[11px] uppercase tracking-[0.24em] text-white/72">Selected work</div>
+                <div className="mt-2 max-w-md text-3xl font-semibold">
+                  {fallbackHeroGalleryItems[0]?.title || `${artistPageName} in frame`}
+                </div>
+                <div className="mt-2 text-sm text-white/72">
+                  {artist.tagline || artist.category || "A living mix of recent frames, portfolio pulls, and public-facing visual identity."}
+                </div>
+              </div>
+            </div>
+            <div className="grid gap-2">
+              {fallbackHeroGalleryItems.slice(1).map((item, index) => (
+                <div key={item.id} className="relative min-h-[9.5rem] overflow-hidden rounded-[1.35rem]">
+                  <img
+                    src={item.imageUrl || item.mediaUrl || ""}
+                    alt={item.title || `Selected work ${index + 2}`}
+                    className="h-full w-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent" />
+                  <div className="absolute inset-x-0 bottom-0 p-4 text-white">
+                    <div className="text-[10px] uppercase tracking-[0.22em] text-white/70">Portfolio pull</div>
+                    <div className="mt-1 text-sm font-medium">{item.title || "Selected work"}</div>
+                  </div>
+                </div>
+              ))}
+              {fallbackHeroGalleryItems.length === 1 ? (
+                <div className="flex min-h-[9.5rem] flex-col justify-end rounded-[1.35rem] border border-white/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-4 text-white/82">
+                  <div className="text-[10px] uppercase tracking-[0.22em] text-white/62">Artist page</div>
+                  <div className="mt-2 text-lg font-semibold">{artistPageName}</div>
+                  <div className="mt-1 text-sm text-white/62">
+                    Public work, trust signals, and recent updates all live in one place.
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
         ) : (
-          <div className="p-6 text-sm text-muted-foreground">
-            No hero images selected yet.
+          <div className="relative flex min-h-[28rem] flex-col justify-end overflow-hidden bg-[linear-gradient(140deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01))] p-6">
+            {artist.bannerUrl ? (
+              <>
+                <img src={artist.bannerUrl} alt={artistPageName} className="absolute inset-0 h-full w-full object-cover opacity-45" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/35 to-transparent" />
+              </>
+            ) : (
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.09),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(239,68,68,0.14),transparent_32%)]" />
+            )}
+            <div className="relative z-10 max-w-lg text-white">
+              <div className="text-[11px] uppercase tracking-[0.24em] text-white/66">Artist page</div>
+              <div className="mt-3 text-3xl font-semibold">{artistPageName}</div>
+              <div className="mt-3 text-sm text-white/70">
+                Work can start from a single frame. This hero area will fill itself from banner art, featured images, and portfolio pulls as the page grows.
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -1136,10 +1425,10 @@ export default function ArtistProfile({ id }: { id: string }) {
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <Palette className="h-5 w-5 text-primary" />
-            <h2 className="text-2xl font-bold tracking-tight md:text-[2rem]">Media</h2>
+            <h2 className="text-2xl font-bold tracking-tight md:text-[2rem]">Portfolio</h2>
           </div>
           <p className="text-sm text-muted-foreground">
-            Gallery, video, audio, and links collected in one cleaner showcase.
+            Selected work, gallery sets, and supporting media arranged as a living portfolio.
           </p>
           <div>
             <Link href={`/artists/${userId}?tab=photos`}>
@@ -1153,7 +1442,7 @@ export default function ArtistProfile({ id }: { id: string }) {
       {assignedGalleryImages.length > 0 && (
         <section className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">Image Gallery</h3>
+            <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">Selected Work</h3>
             <span className="text-xs text-muted-foreground">{assignedGalleryImages.length} items</span>
           </div>
           {groupedAssignedGalleryImages.map((group) => (
@@ -1213,59 +1502,66 @@ export default function ArtistProfile({ id }: { id: string }) {
   const renderPosts = () => (
     <div id="artist-section-posts" className="space-y-5">
       <div className="space-y-2">
+        <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Work log</div>
         <div className="flex items-center gap-2">
           <Radio className="h-5 w-5 text-primary" />
-          <h2 className="text-2xl font-bold tracking-tight text-primary md:text-[2rem]">Posts and Updates</h2>
+          <h2 className="text-2xl font-bold tracking-tight md:text-[2rem]">Recent Work and Updates</h2>
         </div>
-        <p className="text-sm text-muted-foreground">Artist-page announcements, drops, and public updates.</p>
+        <p className="text-sm text-muted-foreground">Working notes, shoot updates, moodboards, editorials, and casting-related activity.</p>
       </div>
 
       {isOwnArtistPage && (
-        <section className="space-y-4 rounded-[1.75rem] border border-primary/50 bg-background/35 p-5 shadow-[0_0_0_2px_rgba(139,92,246,0.22)] ring-1 ring-primary/30">
+        <section className="space-y-4 rounded-[1.75rem] border border-primary/35 bg-background/30 p-4 shadow-[0_18px_42px_-34px_rgba(124,58,237,0.58)] md:p-5">
           <div>
             <h3 className="text-lg font-semibold text-primary">Post from your profile</h3>
             <div className="mt-1 text-sm text-muted-foreground">
-              These posts publish into the main feed from your creator profile and stay collected on this profile.
+              Share a new update from your artist page. Casting calls and direct hire details live in inquiries and scene posts, not here.
             </div>
           </div>
           <div className="space-y-4">
             <Textarea
-              placeholder="Share a release, set update, gallery drop, booking note, or artist-page announcement..."
+              placeholder="Share what you made, what happened on set, what inspired the work, or what you want people to see."
               value={artistPostForm.content}
               onChange={(e) => setArtistPostForm((current) => ({ ...current, content: e.target.value }))}
-              className="min-h-32 border-primary/40 bg-white text-slate-900 placeholder:text-slate-500 shadow-[0_0_0_1px_rgba(139,92,246,0.16)] focus-visible:ring-2 focus-visible:ring-primary/40"
+              className="min-h-32 rounded-[1.35rem] border-border/50 bg-background/22 text-foreground placeholder:text-muted-foreground shadow-none focus-visible:ring-2 focus-visible:ring-primary/35"
             />
             <div className="grid gap-3 md:grid-cols-2">
               <Input
-                placeholder="Paste a video, article, or music link"
+                placeholder="Paste a link if the post points somewhere"
                 value={artistPostForm.linkUrl}
                 onChange={(e) => setArtistPostForm((current) => ({ ...current, linkUrl: e.target.value }))}
-                className="border-primary/40 bg-white text-slate-900 placeholder:text-slate-500 shadow-[0_0_0_1px_rgba(139,92,246,0.12)] focus-visible:ring-2 focus-visible:ring-primary/40"
+                className="rounded-[1.15rem] border-border/50 bg-background/22 text-foreground placeholder:text-muted-foreground shadow-none focus-visible:ring-2 focus-visible:ring-primary/35"
               />
-              <Input
-                placeholder="Visibility: public, friends, or private"
-                value={artistPostForm.visibility}
-                readOnly
-                className="border-primary/40 bg-white text-slate-900 placeholder:text-slate-500 shadow-[0_0_0_1px_rgba(139,92,246,0.12)] focus-visible:ring-2 focus-visible:ring-primary/40"
-              />
+              <div className="flex items-center gap-3 rounded-[1.15rem] border border-border/50 bg-background/18 px-3 py-2.5 text-sm text-muted-foreground">
+                <span className="shrink-0">Visibility</span>
+                <select
+                  value={artistPostForm.visibility}
+                  onChange={(e) => setArtistPostForm((current) => ({ ...current, visibility: e.target.value as "public" | "friends" | "private" }))}
+                  className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  <option value="public">Public</option>
+                  <option value="friends">Friends only</option>
+                  <option value="private">Only me</option>
+                </select>
+              </div>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isUploadingArtistImage}>
-                <ImageIcon className="mr-2 h-4 w-4" />
-                {artistPostForm.imageUrl ? "Replace image" : "Add image"}
-              </Button>
-              {artistPostForm.imageUrl ? (
-                <Badge variant="secondary">Image attached</Badge>
-              ) : null}
-              <select
-                value={artistPostForm.visibility}
-                onChange={(e) => setArtistPostForm((current) => ({ ...current, visibility: e.target.value as "public" | "friends" | "private" }))}
-                className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isUploadingArtistImage}>
+                  <ImageIcon className="mr-2 h-4 w-4" />
+                  {artistPostForm.imageUrl ? "Replace image" : "Add image"}
+                </Button>
+                {artistPostForm.imageUrl ? (
+                  <Badge variant="secondary">Image attached</Badge>
+                ) : null}
+              </div>
+              <Button
+                onClick={submitArtistPost}
+                disabled={createPost.isPending || isUploadingArtistImage || !artistPostForm.content.trim()}
+                className="w-full sm:w-auto"
               >
-                <option value="public">Public</option>
-                <option value="friends">Friends only</option>
-                <option value="private">Only me</option>
-              </select>
+                Post to profile
+              </Button>
             </div>
             <input
               ref={fileInputRef}
@@ -1274,14 +1570,6 @@ export default function ArtistProfile({ id }: { id: string }) {
               className="hidden"
               onChange={(e) => handleArtistImageUpload(e.target.files?.[0] || null)}
             />
-            <div className="flex justify-end">
-              <Button
-                onClick={submitArtistPost}
-                disabled={createPost.isPending || isUploadingArtistImage || !artistPostForm.content.trim()}
-              >
-                Post To Profile
-              </Button>
-            </div>
           </div>
         </section>
       )}
@@ -1366,6 +1654,69 @@ export default function ArtistProfile({ id }: { id: string }) {
     );
   };
 
+  const renderVerifiedWork = () => {
+    const hasVerifiedSurface = pastEvents.length > 0 || upcomingEvents.length > 0 || artistPosts.length > 0;
+    if (!hasVerifiedSurface) {
+      return null;
+    }
+
+    return (
+      <section className="space-y-5 rounded-[2rem] border border-border/40 bg-background/18 p-5 md:p-7">
+        <div className="space-y-2">
+          <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Proof of work</div>
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-5 w-5 text-primary" />
+            <h2 className="text-2xl font-bold tracking-tight md:text-[2rem]">Verified Work</h2>
+          </div>
+          <p className="text-sm text-muted-foreground">Confirmed appearances, visible work history, and production-linked activity that supports credibility.</p>
+        </div>
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
+            <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Completed shoots</div>
+            <div className="mt-2 text-3xl font-bold">{completedShoots}</div>
+            <div className="mt-2 text-sm text-muted-foreground">Derived from visible posts, linked appearances, and completed project activity.</div>
+          </div>
+          <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
+            <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Verified collaborators</div>
+            <div className="mt-2 text-3xl font-bold">{verifiedCollaborators}</div>
+            <div className="mt-2 text-sm text-muted-foreground">Signals from repeat work, scene reputation, and the people who keep coming back.</div>
+          </div>
+          <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
+            <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Recent verified work</div>
+            <div className="mt-2 text-3xl font-bold">{pastEvents.length}</div>
+            <div className="mt-2 text-sm text-muted-foreground">Past appearances and verified work that give the page more weight than follower counts.</div>
+          </div>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          {verifiedShootEntries.map((entry) => (
+            <div key={entry.title} className="rounded-2xl border border-border/50 bg-background/35 p-4">
+              <div className="text-sm font-semibold">{entry.title}</div>
+              <div className="mt-2 text-sm text-muted-foreground">{entry.detail}</div>
+            </div>
+          ))}
+          {pastEvents.slice(0, 2).map((event) => (
+            <div key={`verified-${event.id}`} className="rounded-2xl border border-border/50 bg-background/35 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold">{event.title}</div>
+                  <div className="mt-2 text-sm text-muted-foreground">
+                    {new Date(event.startsAt).toLocaleDateString()} · {event.location || "Location pending"}
+                  </div>
+                </div>
+                <Badge variant="secondary">Verified appearance</Badge>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {artist.category ? <Badge variant="outline">{artist.category}</Badge> : null}
+                {artist.location ? <Badge variant="outline">{artist.location}</Badge> : null}
+                {artist.acceptsCollaborations ? <Badge variant="outline">Collaboration-ready</Badge> : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    );
+  };
+
   const renderContact = () => (
     <section className="space-y-4">
       <div className="space-y-2">
@@ -1373,6 +1724,81 @@ export default function ArtistProfile({ id }: { id: string }) {
         <p className="text-sm text-muted-foreground">The main way people can reach this page or take the next step.</p>
       </div>
       <div className="space-y-4">
+        <div className="rounded-[1.75rem] border border-border/50 bg-background/28 p-5 md:p-6">
+          <div className="space-y-2">
+            <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Pre-Shoot Collaboration Card</div>
+            <h3 className="text-xl font-semibold tracking-tight">What should be clear before the shoot</h3>
+            <p className="text-sm text-muted-foreground">A dossier-style prep card for collaborators to review before confirming a production.</p>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setCollaborationCardView("public")}
+              className={cn(
+                "rounded-full border px-4 py-2 text-sm font-medium transition-colors",
+                collaborationCardView === "public"
+                  ? "border-primary/40 bg-primary/10 text-foreground"
+                  : "border-border/50 bg-background/35 text-muted-foreground hover:border-primary/30 hover:text-foreground",
+              )}
+            >
+              Public preview
+            </button>
+            <button
+              type="button"
+              onClick={() => setCollaborationCardView("confirmed")}
+              className={cn(
+                "rounded-full border px-4 py-2 text-sm font-medium transition-colors",
+                collaborationCardView === "confirmed"
+                  ? "border-primary/40 bg-primary/10 text-foreground"
+                  : "border-border/50 bg-background/35 text-muted-foreground hover:border-primary/30 hover:text-foreground",
+              )}
+            >
+              Confirmed collaboration
+            </button>
+            {collaborationCompensationChips.map((chip) => (
+              <Badge key={chip} variant="outline">{chip}</Badge>
+            ))}
+          </div>
+          <div className="mt-5 grid gap-3 md:grid-cols-2">
+            {collaborationRoles.map((item) => (
+              <div key={item.role} className="rounded-2xl border border-border/50 bg-background/35 p-4">
+                <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{item.role}</div>
+                <div className="mt-2 text-sm font-medium">{item.name}</div>
+                <div className="mt-2 text-xs text-muted-foreground">{item.helper}</div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {collaborationCardItems.map((item) => (
+              <div key={item.label} className="rounded-2xl border border-border/50 bg-background/40 p-4">
+                <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{item.label}</div>
+                <div className="mt-2 text-sm font-medium">{item.value}</div>
+                <div className="mt-2 text-xs text-muted-foreground">{item.helper}</div>
+              </div>
+            ))}
+          </div>
+          {collaborationCardView === "confirmed" ? (
+            <div className="mt-5 rounded-2xl border border-primary/25 bg-primary/5 p-5">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="secondary">Private coordination</Badge>
+                <Badge variant="outline">Only for confirmed collaborations</Badge>
+              </div>
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                {privateCoordinationItems.map((item) => (
+                  <div key={item.label} className="rounded-2xl border border-border/50 bg-background/40 p-4">
+                    <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{item.label}</div>
+                    <div className="mt-2 text-sm font-medium">{item.value}</div>
+                    <div className="mt-2 text-xs text-muted-foreground">{item.helper}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="mt-5 rounded-2xl border border-dashed border-border/50 bg-background/22 p-4 text-sm text-muted-foreground">
+              Emergency contact details and private coordination only appear after a collaboration is confirmed.
+            </div>
+          )}
+        </div>
         <CreatorInfoCard
           creator={{
             ...creatorInfoBase,
@@ -1388,7 +1814,7 @@ export default function ArtistProfile({ id }: { id: string }) {
         />
         {artist.bookingEmail && (
           <div className="rounded-2xl border border-border/50 bg-background/40 p-4 text-sm">
-            Booking email: <span className="text-muted-foreground">{artist.bookingEmail}</span>
+            Contact email: <span className="text-muted-foreground">{artist.bookingEmail}</span>
           </div>
         )}
         {(pricingSummary || turnaroundInfo) && (
@@ -1488,8 +1914,9 @@ export default function ArtistProfile({ id }: { id: string }) {
     };
 
     return (
-      <section className="space-y-5">
+      <section className="space-y-5 rounded-[2rem] border border-border/40 bg-background/18 p-5 md:p-7">
         <div className="space-y-2">
+          <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Public trust layer</div>
           <div className="flex items-center gap-2">
             <HeartHandshake className="h-5 w-5 text-primary" />
             <h2 className="text-2xl font-bold tracking-tight md:text-[2rem]">Trust and Reputation</h2>
@@ -1498,14 +1925,14 @@ export default function ArtistProfile({ id }: { id: string }) {
             References, vouches, collaboration history, verified shoots, and safety signals collected into one public trust layer.
           </p>
         </div>
-        <div className="grid gap-3 md:grid-cols-5">
+        <div className="grid gap-2 overflow-x-auto md:grid-cols-5">
           {trustTabs.map((tab) => (
             <button
               key={tab.key}
               type="button"
               onClick={() => setTrustView(tab.key)}
               className={cn(
-                "rounded-2xl border px-4 py-3 text-left text-sm font-medium transition-colors",
+                "min-w-[10rem] rounded-full border px-4 py-3 text-left text-sm font-medium transition-colors md:min-w-0",
                 trustView === tab.key
                   ? "border-primary/40 bg-primary/10 text-foreground"
                   : "border-border/50 bg-background/35 text-muted-foreground hover:border-primary/30 hover:text-foreground",
@@ -1525,6 +1952,7 @@ export default function ArtistProfile({ id }: { id: string }) {
   const sections: Record<string, ReactNode> = {
     featured: renderFeatured(),
     about: renderAbout(),
+    verified: renderVerifiedWork(),
     trust: renderTrust(),
     gallery: renderMedia(),
     video: assignedVideoPlaylistItems.length ? (
@@ -1561,15 +1989,69 @@ export default function ArtistProfile({ id }: { id: string }) {
   const baseVisibleSections = builderMeta.sections
     .filter((section) => section.visible && sections[section.key])
     .map((section) => section.key);
-  const visibleSections = Array.from(new Set([
+  const dedupedVisibleSections = Array.from(new Set([
     ...baseVisibleSections,
     ...(assignedAudioItems.length ? ["audio"] : []),
     "posts",
+    "verified",
     "trust",
   ]));
+  const sectionPriority = ["posts", "featured", "gallery", "video", "audio", "links", "about", "verified", "trust", "events", "contact"];
+  const visibleSections = [
+    ...sectionPriority.filter((key) => dedupedVisibleSections.includes(key)),
+    ...dedupedVisibleSections.filter((key) => !sectionPriority.includes(key)),
+  ];
+  const hhPracticeItems = creatorInfoServices.length
+    ? creatorInfoServices.slice(0, 5)
+    : heroTags.length
+      ? heroTags.slice(0, 5)
+      : [artist.category || "Creative practice", artist.location || "Based where the work happens"].filter(Boolean);
+  const hhWorkedWithItems = [
+    ...profileSceneCards.slice(0, 3).map((scene) => scene.name),
+    ...pastEvents.slice(0, 2).map((event) => event.title),
+    ...generalLinks.slice(0, 2).map((link) => link.label),
+  ].filter(Boolean).slice(0, 5);
+  const hhStatsRow = [
+    { label: "Portfolio", value: String(Math.max(assignedGalleryImages.length + assignedVideoPlaylistItems.length + assignedAudioItems.length, 1)) },
+    { label: "Recent work", value: String(Math.max(artistPosts.length, 1)) },
+    { label: "Scenes", value: String(Math.max(profileSceneCards.length, 1)) },
+    { label: "Years active", value: String(Math.max(yearsActive, 1)) },
+    { label: "References", value: String(referenceCount), accent: true },
+    { label: "Contact", value: profile.canInteract ? "Open" : "Restricted" },
+    { label: "Availability", value: artist.availabilityStatus || "Open", accent: Boolean(artist.availabilityStatus || artist.acceptsCollaborations) },
+  ];
+  const hhTrustStrip = [
+    { label: "Identity", value: "Verified preview" },
+    { label: "References", value: `${referenceCount} visible` },
+    { label: "12-month activity", value: `${completedShoots} shoots · ${verifiedCollaborators} collaborators` },
+    { label: "Code of conduct", value: profile.canInteract ? "Signed preview" : "Interaction restricted" },
+    { label: "Vouched by", value: `${vouchCount} active vouches` },
+  ];
+  const hhSectionLabels: Record<string, string> = {
+    posts: "Posts",
+    featured: "Work",
+    gallery: "Portfolio",
+    about: "Dossier",
+    trust: "Trust",
+    events: "Happenings",
+    contact: "Contact",
+  };
+  const hhDesktopTabs = visibleSections
+    .filter((key) => ["featured", "posts", "trust", "events", "gallery", "about"].includes(key))
+    .map((key) => ({
+      key,
+      label: hhSectionLabels[key] || key,
+      count:
+        key === "posts" ? artistPosts.length :
+        key === "trust" ? referenceCount :
+        key === "events" ? upcomingEvents.length :
+        key === "gallery" ? assignedGalleryImages.length :
+        key === "featured" ? Math.max(1, assignedFeaturedGalleryImages.length + assignedFeaturedVideos.length + assignedFeaturedAudio.length) :
+        null,
+    }));
   const mobileTabSectionMap = {
-    posts: ["featured", "audio", "posts"],
-    gallery: ["gallery", "video", "audio", "links"],
+    posts: ["posts", "featured", "audio"],
+    gallery: ["gallery", "video", "audio", "links", "verified"],
     about: ["about"],
     trust: ["trust"],
     events: ["events"],
@@ -1578,8 +2060,8 @@ export default function ArtistProfile({ id }: { id: string }) {
   type MobileHeaderTabKey = keyof typeof mobileTabSectionMap;
   const mobileHeaderTabsSource: Array<{ key: MobileHeaderTabKey; label: string }> = [
     { key: "posts", label: "Posts" },
-    { key: "gallery", label: "Gallery" },
-    { key: "about", label: "About" },
+    { key: "gallery", label: "Portfolio" },
+    { key: "about", label: "Dossier" },
     { key: "trust", label: "Trust" },
     { key: "events", label: "Events" },
     { key: "contact", label: "Contact" },
@@ -1591,16 +2073,21 @@ export default function ArtistProfile({ id }: { id: string }) {
     }
     return mobileTabSectionMap[item.key].some((sectionKey) => visibleSections.includes(sectionKey));
   });
+  const scrollToArtistSection = (key: string) => {
+    if (typeof document === "undefined") return;
+    const target = document.getElementById(`artist-section-${key}`) || document.getElementById(`artist-mobile-panel-${key}`);
+    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   const renderCreatorGalleryTab = () => (
     <div id="artist-creator-gallery" className="space-y-6">
       <div className="space-y-2">
         <div className="flex items-center gap-2">
           <ImageIcon className="h-5 w-5 text-primary" />
-          <h2 className="text-2xl font-bold tracking-tight">Creator Gallery</h2>
+          <h2 className="text-2xl font-bold tracking-tight">Portfolio Archive</h2>
         </div>
         <p className="text-sm text-muted-foreground">
-          All creator images in one full gallery. This is separate from the page-layout image gallery block.
+          A full archive of portfolio images gathered in one place, separate from the featured page layout.
         </p>
       </div>
       <MosaicLightboxGallery
@@ -1614,10 +2101,35 @@ export default function ArtistProfile({ id }: { id: string }) {
             meta: item.createdAt ? new Date(item.createdAt).toLocaleDateString() : null,
           })),
         }))}
-        emptyMessage="No creator gallery images yet."
+        emptyMessage="No artist page images yet."
       />
     </div>
   );
+
+  const renderMobileHeroMediaPreview = () => {
+    const previewItem = heroMediaGalleryItems[0] || fallbackHeroGalleryItems[0] || null;
+    if (!previewItem) return null;
+
+    return (
+      <div className="overflow-hidden rounded-[1.55rem] border border-border/50 bg-background/24">
+        <div className="relative h-[14rem] overflow-hidden">
+          <img
+            src={previewItem.imageUrl || previewItem.mediaUrl || ""}
+            alt={previewItem.title || artistPageName}
+            className="h-full w-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/72 via-black/18 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 p-4 text-white">
+            <div className="text-[10px] uppercase tracking-[0.22em] text-white/68">Selected work</div>
+            <div className="mt-1 text-lg font-semibold">{previewItem.title || artistPageName}</div>
+            <div className="mt-1 text-xs text-white/72">
+              {artist.tagline || artist.category || "Portfolio pulls, recent frames, and the public visual world of this page."}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
   const requestedMobileTab: MobileHeaderTabKey | null = requestedGalleryView ? "gallery" : null;
   const firstVisibleMobileTab: MobileHeaderTabKey = mobileHeaderTabs[0]?.key || "posts";
   const activeMobileTab: MobileHeaderTabKey = mobileTabOverride && mobileHeaderTabs.some((tab) => tab.key === mobileTabOverride)
@@ -1630,6 +2142,10 @@ export default function ArtistProfile({ id }: { id: string }) {
     : mobileHeaderTabs.some((tab) => tab.key === "about")
       ? "about"
       : (mobileHeaderTabs[0]?.key || "posts");
+  const heroDisplayName = (artist.displayName || artistPageName).trim();
+  const heroTitleParts = heroDisplayName.split(/\s+/).filter(Boolean);
+  const heroPrimaryName = heroTitleParts[0] || heroDisplayName;
+  const heroSecondaryName = heroTitleParts.length > 1 ? heroTitleParts.slice(1).join(" ") : "";
 
   const renderSectionBlock = (key: string) => {
     const { wrapperClassName, contentClassName } = getSectionPresentation(key);
@@ -1645,106 +2161,84 @@ export default function ArtistProfile({ id }: { id: string }) {
 
   return (
     <div className={cn("w-full pb-20", fontClass)}>
-      <section className={cn("relative overflow-hidden border-b border-border", heroShellClass)}>
-        {artistPageBanner ? (
-          <img
-            src={artistPageBanner}
-            alt={`${artistPageName} top banner`}
-            className="absolute inset-0 h-full w-full object-cover"
-          />
-        ) : null}
-        <div className={cn("absolute inset-0 bg-gradient-to-br opacity-70", mood.shell)} />
-        <div className={cn("absolute inset-0 bg-[radial-gradient(circle_at_top_left,var(--tw-gradient-stops))]", mood.glow)} />
-        <div className={cn("absolute inset-0", artistPageBanner ? "bg-black/12 dark:bg-black/20" : "bg-black/18 dark:bg-black/28")} />
+      <section className="border-b border-border/60">
+        <div className="relative h-[9.25rem] overflow-hidden border-b border-border/40 md:h-[18rem]">
+          {artistPageBanner ? (
+            <img
+              src={artistPageBanner}
+              alt={`${artistPageName} top banner`}
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+          ) : (
+            <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01))]" />
+          )}
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(6,8,17,0.12),rgba(6,8,17,0.56))]" />
+        </div>
 
-        <div className="relative z-10 mx-auto flex min-h-[34rem] w-full max-w-7xl items-end px-4 py-12 md:py-16">
-          <div className="w-full rounded-[2rem] border border-white/10 bg-black/20 p-5 shadow-[0_30px_100px_-60px_rgba(0,0,0,0.9)] backdrop-blur-sm md:p-8">
-            <div className="flex flex-col gap-8">
-              <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
-                <div className="max-w-5xl">
-                  <div>
-                    <div className="grid gap-5 md:grid-cols-[auto_1fr] md:items-end">
-                      <Avatar className="h-28 w-28 border-4 border-background/80 shadow-2xl md:h-36 md:w-36">
-                        <AvatarImage src={artistPageAvatar || ""} />
-                        <AvatarFallback>{artistPageName.slice(0, 2).toUpperCase()}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="mb-4 flex flex-wrap items-center gap-2">
-                          <Badge variant="outline" className="border-white/20 bg-black/30 capitalize text-white/90">{profile.user.profileType}</Badge>
-                          {artist.category ? (
-                            <Badge variant="secondary" className="bg-white/12 text-white">
-                              {artist.category}
-                            </Badge>
-                          ) : null}
-                          <Badge className="bg-primary text-primary-foreground">
-                            {actionLabel}
-                          </Badge>
-                        </div>
-                        <h1 className={cn("text-4xl font-bold leading-none tracking-tight md:text-6xl", headingClass)}>{artistPageName}</h1>
-                        <p className={cn("mt-5 max-w-3xl text-lg font-medium leading-8 text-foreground/95 md:text-[1.35rem]", layoutTemplate === "editorial" && "max-w-2xl text-xl", layoutTemplate === "music" && "text-xl")}>{heroTagline}</p>
-                        {artist.location ? (
-                          <div className="mt-4 flex flex-wrap items-center gap-3 text-sm font-medium text-foreground/80">
-                            <span className="inline-flex items-center">
-                              <Pin className="mr-1.5 h-4 w-4" /> {artist.location}
-                            </span>
-                          </div>
-                        ) : null}
-                        {artist.bio ? (
-                          <p className="mt-5 max-w-3xl whitespace-pre-wrap text-sm leading-7 text-foreground/78 md:text-base">
-                            {artist.bio}
-                          </p>
-                        ) : null}
-                        <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm font-medium text-foreground/78">
-                          <span>{artistPosts.length} posts</span>
-                          <span>{profile.user.followerCount} followers</span>
-                          <span>{profile.user.followingCount} following</span>
-                          <span>{upcomingEvents.length} upcoming events</span>
-                        </div>
-                        {heroTags.length ? (
-                          <div className="mt-5 flex flex-wrap gap-2">
-                            {heroTags.slice(0, 4).map((tag) => (
-                              <Badge key={tag} variant="secondary" className="bg-white/10 text-white">
-                                {tag}
-                              </Badge>
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                </div>
+        <div className="mx-auto max-w-[92rem] px-4 pb-5 md:px-6 md:pb-8">
+          <div className="grid gap-4 md:-mt-14 md:grid-cols-[7rem_1fr_auto] md:items-end md:gap-7">
+            <Avatar className="relative -mt-9 h-20 w-20 border-4 border-background shadow-2xl md:h-28 md:w-28">
+              <AvatarImage src={artistPageAvatar || ""} />
+              <AvatarFallback>{artistPageName.slice(0, 2).toUpperCase()}</AvatarFallback>
+            </Avatar>
 
-                <div className={cn("flex flex-wrap items-center gap-2.5 md:gap-3", heroActionsClass)}>
+            <div className="space-y-2.5 md:pb-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="font-serif text-[2rem] leading-[0.95] tracking-[-0.03em] text-foreground sm:text-[2.35rem] md:text-[3.5rem]">
+                  {heroPrimaryName}
+                  {heroSecondaryName ? <span className="italic"> {heroSecondaryName}</span> : null}
+                </h1>
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">✓</span>
+                {profile.user.profileType ? (
+                  <Badge variant="outline" className="border-primary/30 bg-primary/8 uppercase tracking-[0.12em] text-primary">
+                    {profile.user.profileType}
+                  </Badge>
+                ) : null}
+              </div>
+              <div className="hidden flex-wrap items-center gap-3 text-sm text-muted-foreground md:flex">
+                <span><strong className="text-foreground">{artist.displayName || artistPageName}</strong>{profile.user.username ? ` · @${profile.user.username}` : ""}</span>
+                {artist.category ? <span>· {artist.category}</span> : null}
+                {artist.location ? <span>· {artist.location}</span> : null}
+                <span>· Member since {profile.user.createdAt ? new Date(profile.user.createdAt).getFullYear() : "2026"}</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:flex md:flex-wrap md:justify-end">
+              {isOwnArtistPage ? (
+                <Link href="/settings?tab=creator">
+                  <Button variant="outline" className="h-11 w-full rounded-[1.1rem] border-border/60 bg-background/20 px-4 md:w-auto">
+                    <Palette className="mr-2 h-4 w-4" /> Edit Profile
+                  </Button>
+                </Link>
+              ) : (
+                <>
                   {isOwnArtistPage ? (
-                    <>
-                      <Link href="/settings?tab=creator">
-                        <Button variant="outline" className="border-border/60 bg-background/30">
-                          <Palette className="mr-2 h-4 w-4" /> Edit Profile
-                        </Button>
-                      </Link>
-                    </>
-                  ) : (
-                    <>
-                      {primaryActionKind === "follow" ? (
-                        <Button onClick={handleFollowToggle} disabled={!profile.canInteract} className="min-w-[8rem]">
-                          {profile.isFollowing ? "Following" : "Follow"}
-                        </Button>
-                      ) : null}
-                    </>
-                  )}
+                    <Button onClick={handleFollowToggle} disabled={!profile.canInteract} className="h-11 w-full rounded-[1.1rem] px-4 md:w-auto">
+                      {profile.isFollowing ? "Following" : "Follow"}
+                    </Button>
+                  ) : null}
+                  <Link href="/messages">
+                    <Button variant="outline" className="h-11 w-full rounded-[1.1rem] border-border/60 bg-background/20 px-4 md:w-auto" disabled={!profile.canInteract}>
+                      <MessageSquare className="mr-2 h-4 w-4" /> Message
+                    </Button>
+                  </Link>
                   {!isOwnArtistPage && primaryActionKind === "contact" ? (
                     creator?.primaryActionUrl && (actionType === "shop" || actionType === "store") ? (
                       <a href={creator.primaryActionUrl} target="_blank" rel="noreferrer">
-                        <Button className="min-w-[8rem]">
+                        <Button className="h-11 w-full rounded-[1.1rem] px-4 md:w-auto">
                           <ExternalLink className="mr-2 h-4 w-4" /> {actionLabel}
                         </Button>
                       </a>
                     ) : (
-                      <Dialog open={open} onOpenChange={setOpen}>
+                      <Dialog
+                        open={open}
+                        onOpenChange={(nextOpen) => {
+                          setOpen(nextOpen);
+                          if (!nextOpen) closeInquiryIntent();
+                        }}
+                      >
                         <DialogTrigger asChild>
-                          <Button className="min-w-[8rem]" disabled={!profile.canInteract}>
-                            <CalendarClock className="mr-2 h-4 w-4" /> {actionLabel}
-                          </Button>
+                          <Button className="w-full md:w-auto" disabled={!profile.canInteract}>{actionLabel} →</Button>
                         </DialogTrigger>
                         <DialogContent>
                           <DialogHeader>
@@ -1752,62 +2246,27 @@ export default function ArtistProfile({ id }: { id: string }) {
                             <DialogDescription>{actionMeta.hint}</DialogDescription>
                           </DialogHeader>
                           <div className="space-y-4">
-                            {actionMeta.fields.includes("eventType") && (
-                              <div className="space-y-2">
-                                <Label>Event or project type</Label>
-                                <Input value={form.eventType} onChange={(e) => setForm({ ...form, eventType: e.target.value })} />
-                              </div>
-                            )}
-                            {actionMeta.fields.includes("eventDate") && (
-                              <div className="space-y-2">
-                                <Label>Date</Label>
-                                <Input type="date" value={form.eventDate} onChange={(e) => setForm({ ...form, eventDate: e.target.value })} />
-                              </div>
-                            )}
-                            {actionMeta.fields.includes("budget") && (
-                              <div className="space-y-2">
-                                <Label>Budget</Label>
-                                <Input value={form.budget} onChange={(e) => setForm({ ...form, budget: e.target.value })} placeholder="$500 - $1500" />
-                              </div>
-                            )}
-                            {actionMeta.fields.includes("location") && (
-                              <div className="space-y-2">
-                                <Label>Location</Label>
-                                <Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="City / venue / remote" />
-                              </div>
-                            )}
-                            {actionMeta.fields.includes("timeframe") && (
-                              <div className="space-y-2">
-                                <Label>Timeframe</Label>
-                                <Input value={form.timeframe} onChange={(e) => setForm({ ...form, timeframe: e.target.value })} placeholder="2 weeks / summer / open-ended" />
-                              </div>
-                            )}
-                            {actionMeta.fields.includes("projectDetails") && (
-                              <div className="space-y-2">
-                                <Label>Project details</Label>
-                                <Input value={form.projectDetails} onChange={(e) => setForm({ ...form, projectDetails: e.target.value })} />
-                              </div>
-                            )}
-                            <div className="space-y-2">
-                              <Label>Message</Label>
-                              <Textarea value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} className="min-h-32" />
-                            </div>
+                            {actionMeta.fields.includes("eventType") && <div className="space-y-2"><Label>Event or project type</Label><Input value={form.eventType} onChange={(e) => setForm({ ...form, eventType: e.target.value })} /></div>}
+                            {actionMeta.fields.includes("eventDate") && <div className="space-y-2"><Label>Date</Label><Input type="date" value={form.eventDate} onChange={(e) => setForm({ ...form, eventDate: e.target.value })} /></div>}
+                            {actionMeta.fields.includes("budget") && <div className="space-y-2"><Label>Budget</Label><Input value={form.budget} onChange={(e) => setForm({ ...form, budget: e.target.value })} placeholder="$500 - $1500" /></div>}
+                            {actionMeta.fields.includes("location") && <div className="space-y-2"><Label>Location</Label><Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="City / venue / remote" /></div>}
+                            {actionMeta.fields.includes("timeframe") && <div className="space-y-2"><Label>Timeframe</Label><Input value={form.timeframe} onChange={(e) => setForm({ ...form, timeframe: e.target.value })} placeholder="2 weeks / summer / open-ended" /></div>}
+                            {actionMeta.fields.includes("projectDetails") && <div className="space-y-2"><Label>Project details</Label><Input value={form.projectDetails} onChange={(e) => setForm({ ...form, projectDetails: e.target.value })} /></div>}
+                            <div className="space-y-2"><Label>Message</Label><Textarea value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} className="min-h-32" /></div>
                           </div>
                           <DialogFooter>
                             <Button
-                              onClick={() =>
-                                inquiry.mutate({
-                                  recipientId: userId,
-                                  data: {
-                                    inquiryType: actionType,
-                                    eventType: form.eventType || undefined,
-                                    eventDate: form.eventDate || undefined,
-                                    budget: form.budget || undefined,
-                                    projectDetails: [form.projectDetails, form.timeframe, form.location].filter(Boolean).join(" / ") || undefined,
-                                    message: form.message,
-                                  },
-                                })
-                              }
+                              onClick={() => inquiry.mutate({
+                                recipientId: userId,
+                                data: {
+                                  inquiryType: actionType,
+                                  eventType: form.eventType || undefined,
+                                  eventDate: form.eventDate || undefined,
+                                  budget: form.budget || undefined,
+                                  projectDetails: [form.projectDetails, form.timeframe, form.location].filter(Boolean).join(" / ") || undefined,
+                                  message: form.message,
+                                },
+                              })}
                               disabled={inquiry.isPending || !form.message.trim()}
                             >
                               <Mail className="mr-2 h-4 w-4" /> Send Inquiry
@@ -1817,57 +2276,34 @@ export default function ArtistProfile({ id }: { id: string }) {
                       </Dialog>
                     )
                   ) : null}
-                  {!isOwnArtistPage ? (
-                    <Link href="/messages">
-                      <Button variant="outline" className="border-border/60 bg-background/30" disabled={!profile.canInteract}>
-                        <MessageSquare className="mr-2 h-4 w-4" /> Message
-                      </Button>
-                    </Link>
-                  ) : null}
-                  <Button
-                    variant="outline"
-                    className="border-border/60 bg-background/30"
-                    onClick={() => {
-                      setRequestedGalleryView(true);
-                      setLocation(`/artists/${userId}?view=gallery`);
-                    }}
-                  >
-                    <ImageIcon className="mr-2 h-4 w-4" /> Gallery
-                  </Button>
-                  {!isOwnArtistPage ? (
-                    <Button variant="outline" className="border-border/60 bg-background/30" onClick={handleSaveToggle}>
-                      <Heart className={cn("mr-2 h-4 w-4", saved && "fill-current")} /> {saved ? "Saved" : "Save"}
-                    </Button>
-                  ) : null}
-                  <Button variant="outline" className="border-border/60 bg-background/30" onClick={handleShare}>
-                    <Share2 className="mr-2 h-4 w-4" /> Share
-                  </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="icon" className="border-border/60 bg-background/30">
+                      <Button variant="outline" size="icon" className="h-11 w-11 rounded-[1.1rem] border-border/60 bg-background/20">
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-64">
                       {isOwnArtistPage ? (
-                        <>
-                          <DropdownMenuItem asChild>
-                            <Link href="/settings?tab=creator">
-                              <Sparkles className="mr-2 h-4 w-4" /> Edit Profile
-                            </Link>
-                          </DropdownMenuItem>
-                        </>
+                        <DropdownMenuItem asChild>
+                          <Link href="/settings?tab=creator">
+                            <Sparkles className="mr-2 h-4 w-4" /> Edit Profile
+                          </Link>
+                        </DropdownMenuItem>
                       ) : (
                         <>
-                          {primaryActionKind !== "follow" ? (
-                            <DropdownMenuItem onClick={handleFollowToggle} disabled={!profile.canInteract}>
-                              <Heart className="mr-2 h-4 w-4" /> {profile.isFollowing ? "Unfollow" : "Follow"}
-                            </DropdownMenuItem>
-                          ) : null}
-                          <DropdownMenuItem asChild>
-                            <Link href={`/artists/${profile.user.id}`}>
-                              <MessageSquare className="mr-2 h-4 w-4" /> View Profile
-                            </Link>
+                          <DropdownMenuItem onClick={handleSaveToggle}>
+                            <Heart className={cn("mr-2 h-4 w-4", saved && "fill-current")} /> {saved ? "Remove from saved" : "Save artist page"}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={handleShare}>
+                            <Share2 className="mr-2 h-4 w-4" /> Share page
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setRequestedGalleryView(true);
+                              setLocation(`/artists/${userId}?view=gallery`);
+                            }}
+                          >
+                            <ImageIcon className="mr-2 h-4 w-4" /> Open gallery
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <div className="px-2 py-1">
@@ -1883,56 +2319,106 @@ export default function ArtistProfile({ id }: { id: string }) {
                       )}
                     </DropdownMenuContent>
                   </DropdownMenu>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-2.5 border-y border-border/50 py-3.5 md:mt-6 md:grid-cols-7 md:gap-4 md:py-4">
+            {hhStatsRow.map((item) => (
+              <div key={item.label} className="rounded-[1rem] bg-background/18 p-3 md:rounded-none md:bg-transparent md:p-0 md:border-r md:border-border/30 md:pr-3 last:md:border-r-0">
+                <div className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{item.label}</div>
+                <div className={cn("mt-1 font-serif text-[1.2rem] leading-none tracking-[-0.02em] text-foreground md:text-[1.45rem]", item.accent && "italic text-primary")}>
+                  {item.value}
                 </div>
               </div>
-              {currentUser?.id !== userId ? (
-                <div className="flex flex-wrap items-center gap-3 pt-1">
-                  <div className="inline-flex items-center rounded-full border border-border/40 bg-background/20 px-4 py-2 text-sm text-foreground/75">
-                    <HeartHandshake className="mr-2 h-4 w-4 text-primary" />
-                    {profile.user.friendCount} friends
-                  </div>
-                  {profile.canInteract ? <ProfileReactionBar userId={userId} summary={profile.profileReactions} invalidateKeys={[["profile", userId], ["/api/users", userId]]} /> : null}
-                </div>
-              ) : null}
-              {currentUser?.id !== userId && !profile.canInteract ? (
-                <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-                  {profile.blockState?.hasBlockedUser
-                    ? "You blocked this creator. Follow, messaging, and inquiry actions are disabled until you unblock them."
-                    : "This creator has blocked you. Social actions and inquiries are unavailable."}
-                </div>
-              ) : null}
+            ))}
+          </div>
+
+          <div className="grid gap-4 py-4 md:grid-cols-[2fr_1fr_1fr] md:gap-10 md:py-6">
+            <div>
+              <p className="max-w-3xl font-serif text-[0.98rem] italic leading-7 text-foreground/90 md:text-[1.18rem]">
+                {artist.bio || heroTagline}
+              </p>
+              <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                {generalLinks.slice(0, 3).map((link) => (
+                  <a key={link.url} href={link.url} target="_blank" rel="noreferrer" className="hh-link">
+                    {link.label} ↗
+                  </a>
+                ))}
+                {pricingSummary ? <span>· Rate card on request</span> : null}
+              </div>
+            </div>
+            <div className="hidden md:block">
+              <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Practice</div>
+              <ul className="mt-2 space-y-1.5 text-sm leading-7 text-foreground/90">
+                {hhPracticeItems.map((item) => <li key={item}>{item}</li>)}
+              </ul>
+            </div>
+            <div className="hidden md:block">
+              <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Worked with</div>
+              <ul className="mt-2 space-y-1.5 text-sm leading-7 text-foreground/90">
+                {(hhWorkedWithItems.length ? hhWorkedWithItems : ["References available on request"]).map((item) => <li key={item}>{item}</li>)}
+              </ul>
+            </div>
+          </div>
+
+          <div className="grid gap-2 pb-4 md:grid-cols-5 md:pb-6">
+            {hhTrustStrip.map((item) => (
+              <div key={item.label} className="rounded-[1.2rem] border border-border/50 bg-background/16 px-4 py-3">
+                <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{item.label}</div>
+                <div className="mt-1 text-sm text-foreground/88">{item.value}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="hidden items-center justify-between border-y border-border/50 py-3 md:flex">
+            <div className="flex items-center gap-2">
+              {hhDesktopTabs.map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => scrollToArtistSection(tab.key)}
+                  className="inline-flex items-center gap-2 border-b border-transparent px-1 py-2 font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
+                >
+                  <span>{tab.label}</span>
+                  {tab.count !== null ? <span className="text-muted-foreground/70">{tab.count}</span> : null}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-4 font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+              <span>Sort: recent</span>
+              <span className="h-4 w-px bg-border/50" />
+              <span className="text-foreground">Mosaic</span>
             </div>
           </div>
         </div>
       </section>
 
-      <div className="mx-auto mt-10 max-w-7xl px-4 md:mt-12">
-        <div className="space-y-8 md:space-y-10">
-          <div id="artist-section-overview" className="hidden md:block">
-            {renderHeroRow()}
-          </div>
+      <div className="mx-auto mt-8 max-w-[88rem] px-4 sm:px-5 lg:px-8 md:mt-12">
+        <div className="space-y-8 md:space-y-12 xl:space-y-14">
           <div className="space-y-4 md:hidden">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-2xl border border-border/50 bg-background/35 p-4">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-[1.35rem] border border-border/50 bg-background/35 p-3.5">
                 <div className="text-xs text-muted-foreground">Completed shoots</div>
-                <div className="mt-1 text-3xl font-bold">{completedShoots}</div>
+                <div className="mt-1 text-2xl font-bold">{completedShoots}</div>
               </div>
-              <div className="rounded-2xl border border-border/50 bg-background/35 p-4">
+              <div className="rounded-[1.35rem] border border-border/50 bg-background/35 p-3.5">
                 <div className="text-xs text-muted-foreground">Verified collaborators</div>
-                <div className="mt-1 text-3xl font-bold">{verifiedCollaborators}</div>
+                <div className="mt-1 text-2xl font-bold">{verifiedCollaborators}</div>
               </div>
-              <div className="rounded-2xl border border-border/50 bg-background/35 p-4">
+              <div className="rounded-[1.35rem] border border-border/50 bg-background/35 p-3.5">
                 <div className="text-xs text-muted-foreground">Years active</div>
-                <div className="mt-1 text-3xl font-bold">{yearsActive}</div>
+                <div className="mt-1 text-2xl font-bold">{yearsActive}</div>
               </div>
-              <div className="rounded-2xl border border-border/50 bg-background/35 p-4">
+              <div className="rounded-[1.35rem] border border-border/50 bg-background/35 p-3.5">
                 <div className="text-xs text-muted-foreground">Recommendation status</div>
                 <div className="mt-1 text-sm font-semibold leading-6">{recommendationStatus}</div>
               </div>
             </div>
             {mobileHeaderTabs.length ? (
-              <div className="overflow-x-auto border-b border-border/50" role="tablist" aria-label="Artist page sections">
-                <div className="flex min-w-max items-center gap-1">
+              <div className="overflow-x-auto rounded-[1.4rem] border border-border/50 bg-background/30 p-1.5" role="tablist" aria-label="Artist page sections">
+                <div className="flex min-w-max items-center gap-1.5">
                   {mobileHeaderTabs.map((tab) => (
                     <button
                       key={tab.key}
@@ -1945,10 +2431,10 @@ export default function ArtistProfile({ id }: { id: string }) {
                         setRequestedGalleryView(tab.key === "gallery");
                       }}
                       className={cn(
-                        "border-b-2 px-4 py-3 text-sm font-medium transition-colors",
+                        "rounded-[1.1rem] px-4 py-2.5 text-sm font-medium transition-colors",
                         activeMobileTab === tab.key
-                          ? "border-primary text-foreground"
-                          : "border-transparent text-muted-foreground hover:text-foreground",
+                          ? "bg-primary/12 text-foreground"
+                          : "text-muted-foreground hover:text-foreground",
                       )}
                     >
                       {tab.label}
@@ -1957,28 +2443,24 @@ export default function ArtistProfile({ id }: { id: string }) {
                 </div>
               </div>
             ) : null}
+            {showHeroRowInActiveMobileTab ? renderMobileHeroMediaPreview() : null}
+            {currentUser?.id !== userId && !profile.canInteract ? (
+              <div className="rounded-[1.25rem] border border-amber-500/25 bg-amber-500/8 px-4 py-3">
+                <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-amber-200/80">Interaction restricted</div>
+                <div className="mt-1 text-sm leading-6 text-amber-100/90">
+                  {profile.blockState?.hasBlockedUser
+                    ? "You blocked this artist. Follow, messaging, and inquiry actions stay off until you unblock them."
+                    : "This artist has blocked you. Follow, messaging, and inquiry actions are unavailable."}
+                </div>
+              </div>
+            ) : null}
           </div>
           <div
-            className="space-y-8 md:hidden"
+            className="space-y-6 md:hidden"
             role="tabpanel"
             id={`artist-mobile-panel-${activeMobileTab}`}
             aria-label={`${activeMobileTab} section`}
           >
-            {showHeroRowInActiveMobileTab ? (
-              <div className="space-y-5">
-                <div className="space-y-2 px-1">
-                  <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
-                    {activeMobileTab === "gallery" ? "Gallery overview" : "Creator overview"}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    {activeMobileTab === "gallery"
-                      ? "Hero media and creator details live inside this tab on mobile."
-                      : "Core creator details for this page."}
-                  </div>
-                </div>
-                {renderHeroRow()}
-              </div>
-            ) : null}
             {activeMobileTab === "gallery" ? (
               <>
                 {renderCreatorGalleryTab()}

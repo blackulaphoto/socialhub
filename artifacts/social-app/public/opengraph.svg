@@ -1,0 +1,13 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" fill="#0F0F10"/>
+  <rect x="34" y="34" width="1132" height="562" rx="36" stroke="rgba(255,248,240,0.16)" stroke-width="2"/>
+  <path d="M156 144V486" stroke="#FFF8F0" stroke-width="10" stroke-linecap="square"/>
+  <path d="M156 316H280" stroke="#FFF8F0" stroke-width="8" stroke-linecap="square"/>
+  <path d="M280 144V486" stroke="#FFF8F0" stroke-width="10" stroke-linecap="square"/>
+  <path d="M430 144V486" stroke="#FFF8F0" stroke-width="10" stroke-linecap="square"/>
+  <path d="M280 316H430" stroke="#FFF8F0" stroke-width="8" stroke-linecap="square"/>
+  <text x="518" y="250" fill="#FFF8F0" font-family="'Cormorant Garamond', Georgia, serif" font-size="84" font-weight="300" letter-spacing="3">HollywoodHeartbeats</text>
+  <text x="522" y="312" fill="#BBAE9E" font-family="'Tenor Sans', 'Manrope', sans-serif" font-size="26" letter-spacing="12">.COM</text>
+  <text x="522" y="394" fill="#D8CEC2" font-family="'Manrope', Arial, sans-serif" font-size="30" font-weight="300">Artists, scenes, collaboration, and visual culture.</text>
+  <text x="522" y="448" fill="#8E8174" font-family="'Tenor Sans', 'Manrope', sans-serif" font-size="18" letter-spacing="6">THIN TYPOGRAPHY  ·  DARK LUXE  ·  NO HEART ICONOGRAPHY</text>
+</svg>

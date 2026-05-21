@@ -124,7 +124,7 @@ export default function Events() {
           setLocation("/settings?tab=creator");
           return;
         }
-        toast({ title: "Event created" });
+        toast({ title: "Happening created" });
       },
       onError: () => {
         toast({ title: "Could not create event", variant: "destructive" });
@@ -252,7 +252,7 @@ export default function Events() {
       if (returnTo === "creator") {
         setLocation("/settings?tab=creator");
       } else {
-        toast({ title: "Event updated" });
+        toast({ title: "Happening updated" });
       }
     } catch {
       toast({ title: "Could not update event", variant: "destructive" });
@@ -279,7 +279,7 @@ export default function Events() {
       if (returnTo === "creator") {
         setLocation("/settings?tab=creator");
       } else {
-        toast({ title: "Event deleted" });
+        toast({ title: "Happening deleted" });
       }
     } catch {
       toast({ title: "Could not delete event", variant: "destructive" });
@@ -293,12 +293,12 @@ export default function Events() {
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-3xl font-bold">Events</h1>
-          <p className="text-muted-foreground">Track lineups, appearances, and local creative happenings.</p>
+          <p className="text-muted-foreground">Track lineups, appearances, open nights, and the local happenings people are building around you.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {returnTo === "creator" ? (
             <Button type="button" variant="outline" onClick={() => setLocation("/settings?tab=creator")}>
-              Back to Editing
+              Back to Artist Page
             </Button>
           ) : null}
           <Dialog
@@ -312,7 +312,7 @@ export default function Events() {
             }}
           >
             <DialogTrigger asChild>
-              <Button onClick={openCreateComposer}><Plus className="mr-2 h-4 w-4" /> Add Event</Button>
+              <Button onClick={openCreateComposer}><Plus className="mr-2 h-4 w-4" /> Add Happening</Button>
             </DialogTrigger>
           <DialogContent className="max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>{editingEventId == null ? "Create Event" : "Edit Event"}</DialogTitle></DialogHeader>
@@ -334,12 +334,12 @@ export default function Events() {
               <div className="space-y-3 rounded-2xl border border-border/50 bg-card/40 p-4">
                 <div>
                   <div className="text-sm font-medium">Lineup artists</div>
-                  <div className="text-xs text-muted-foreground">Search creator profiles and add them to the lineup. No internal IDs needed.</div>
+                  <div className="text-xs text-muted-foreground">Search artist pages and add people to the lineup. No internal IDs needed.</div>
                 </div>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
-                    placeholder="Search creator profiles..."
+                    placeholder="Search artist pages..."
                     className="pl-9"
                     value={artistSearch}
                     onChange={(e) => setArtistSearch(e.target.value)}
@@ -378,7 +378,7 @@ export default function Events() {
                           <div className="min-w-0">
                             <div className="truncate font-medium">{artist.displayName || artist.user.username}</div>
                             <div className="truncate text-xs text-muted-foreground">
-                              {[artist.category, artist.location].filter(Boolean).join(" · ") || "Creator profile"}
+                              {[artist.category, artist.location].filter(Boolean).join(" · ") || "Artist page"}
                             </div>
                           </div>
                           <Badge variant="outline">Add</Badge>
@@ -386,7 +386,7 @@ export default function Events() {
                       ))
                   ) : (
                     <div className="rounded-xl border border-dashed border-border/50 bg-background/30 p-4 text-sm text-muted-foreground">
-                      {artistSearch.trim().length > 1 ? "No creator profiles matched that search." : "Suggested creator profiles will show up here."}
+                      {artistSearch.trim().length > 1 ? "No artist pages matched that search." : "Suggested artist pages will show up here."}
                     </div>
                   )}
                 </div>
@@ -472,7 +472,7 @@ export default function Events() {
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
-                            <AlertDialogTitle>Delete event?</AlertDialogTitle>
+                            <AlertDialogTitle>Delete this happening?</AlertDialogTitle>
                             <AlertDialogDescription>
                               This will permanently remove {event.title} and its lineup links.
                             </AlertDialogDescription>
@@ -496,7 +496,7 @@ export default function Events() {
         <Card className="border-dashed border-border/50 bg-card/40">
           <CardContent className="p-12 text-center text-muted-foreground">
             <Sparkles className="mx-auto mb-4 h-10 w-10 opacity-30" />
-            No events matched this filter yet.
+            No happenings matched this filter yet.
           </CardContent>
         </Card>
       )}

@@ -48,7 +48,7 @@ import { ArrowDown, ArrowUp, Check, CheckCircle2, Eye, EyeOff, Image as ImageIco
 const ACTION_OPTIONS = [
   "Book Me",
   "Hire Me",
-  "Contact Me",
+  "Reach Out",
   "Collaborate",
   "Shop My Work",
   "Visit Store",
@@ -396,6 +396,7 @@ export default function Settings() {
   const [showCreatorLaunchNotice, setShowCreatorLaunchNotice] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
   const [trustSettingsView, setTrustSettingsView] = useState<"references" | "vouches" | "history" | "verified" | "safety">("references");
+  const [collaborationCardSettingsView, setCollaborationCardSettingsView] = useState<"public" | "confirmed">("public");
   const [pageModules, setPageModules] = useState<{ enabledModules: string[]; moduleOrder: string[] }>({
     enabledModules: ["featured", "posts", "media", "about", "events", "contact"],
     moduleOrder: ["featured", "posts", "media", "about", "events", "contact"],
@@ -511,7 +512,7 @@ export default function Settings() {
       pageArchetype: profile.creatorSettings?.pageArchetype || getArchetypeKeyFromCategory(profile.artistProfile?.category),
       pageStatus: profile.creatorSettings?.pageStatus || "published",
       primaryActionType: profile.creatorSettings?.primaryActionType || "contact",
-      primaryActionLabel: profile.creatorSettings?.primaryActionLabel || "Contact Me",
+      primaryActionLabel: profile.creatorSettings?.primaryActionLabel || "Reach Out",
       primaryActionUrl: profile.creatorSettings?.primaryActionUrl || "",
       featuredTitle: profile.creatorSettings?.featuredTitle || "",
       featuredDescription: profile.creatorSettings?.featuredDescription || "",
@@ -1735,6 +1736,30 @@ export default function Settings() {
       "UI surface added now so the badge system has a stable home later.",
     ],
   } as const;
+  const collaborationCardTemplate = [
+    { label: "Who", detail: artist.displayName || user.username || "Lead collaborator name" },
+    { label: "Where", detail: artist.location || basic.city || basic.location || "Location or travel context" },
+    { label: "References", detail: "Reference count and trusted collaborators from the trust layer" },
+    { label: "Concept", detail: artist.tagline || "Creative brief, concept, or mood direction" },
+    { label: "Compensation", detail: creator.pricingSummary || "Paid, trade, or to be agreed" },
+    { label: "Call time", detail: linkedEvents[0]?.startsAt ? new Date(linkedEvents[0].startsAt).toLocaleString() : "To be confirmed" },
+    { label: "Duration", detail: creator.turnaroundInfo || "Shoot duration or turnaround window" },
+  ];
+  const collaborationRolesTemplate = [
+    { label: "Lead role", detail: artist.category || "Creative professional" },
+    { label: "Support roles", detail: String(artist.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean).slice(0, 3).join(", ") || "Styling, makeup, retouching, production" },
+    { label: "Booking contact", detail: artist.bookingEmail || "Shared on request" },
+  ];
+  const collaborationCompensationTemplate = [
+    creator.pricingSummary ? "Paid" : "Trade / to be agreed",
+    artist.openForCommissions ? "Open to paid bookings" : "Selective collaborations",
+    creator.turnaroundInfo ? `Turnaround: ${creator.turnaroundInfo}` : "Timing to confirm",
+  ];
+  const privateCollaborationCardTemplate = [
+    { label: "Emergency contact option", detail: "Private coordination field for confirmed productions" },
+    { label: "Call time", detail: linkedEvents[0]?.startsAt ? new Date(linkedEvents[0].startsAt).toLocaleString() : "To be confirmed after booking" },
+    { label: "Compensation type", detail: creator.pricingSummary ? "Paid" : "Trade / to be agreed" },
+  ];
   const builderSectionSummaries = {
     identity: `${identityCompletedCount}/${identityChecklist.length} core fields ready`,
     featured: hasFeaturedSelection ? `${featuredSelectionLabel} selected` : "No lead feature yet",
@@ -1915,7 +1940,7 @@ export default function Settings() {
           <Card className="border-border/50 bg-card/50">
             <CardHeader>
               <CardTitle>Profile Identity</CardTitle>
-              <CardDescription>Edit the public profile basics people expect to find first.</CardDescription>
+              <CardDescription>Edit the public basics people notice first when they land on your page.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="space-y-3">
@@ -2108,7 +2133,7 @@ export default function Settings() {
                 <div className="rounded-2xl border border-border/50 bg-background/30 p-5">
                   <div className="text-lg font-semibold">Create a linked artist page</div>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    Keep this personal profile for you, and add a separate artist page for your work, media, and booking info.
+                    Keep this personal profile for you, and add a separate artist page for your work, media, and contact info.
                   </p>
                   <Button
                     type="button"
@@ -2144,22 +2169,22 @@ export default function Settings() {
                   <div className="max-w-3xl space-y-3">
                     <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/80">
                       <Rocket className="h-3.5 w-3.5" />
-                      {isStarterCreatorSetup ? "Quick Launch" : "Creator Page Control Room"}
+                      {isStarterCreatorSetup ? "Quick Launch" : "Artist Page Studio"}
                     </div>
                     <div>
                       <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">
-                        {isStarterCreatorSetup ? "Launch the page with the essentials, then refine it in passes." : "Tune the public page like a live product surface."}
+                        {isStarterCreatorSetup ? "Launch the page with the essentials, then refine it in passes." : "Keep shaping the public page until it feels like your world."}
                       </h2>
                       <p className="mt-3 max-w-2xl text-sm text-white/72 md:text-base">
                         {isStarterCreatorSetup
-                          ? "Start with identity, contact, and discoverability. Once the page exists, the builder opens the heavier featured, media, event, and styling controls."
-                          : "The first pass is done. Now tighten what leads the page, what proves credibility, and where visitors should convert."}
+                          ? "Start with identity, contact, and enough context for people to understand the work. Once the page exists, the heavier featured, media, event, and styling controls open up."
+                          : "The first pass is done. Now tighten what leads the page, what gives it weight, and what makes people want to stay a little longer."}
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <Badge className="border border-white/15 bg-white/10 text-white hover:bg-white/10">{selectedArchetype.label}</Badge>
                       <Badge className="border border-white/15 bg-white/10 text-white hover:bg-white/10">{artist.category || "Creative Professional"}</Badge>
-                      <Badge className="border border-white/15 bg-white/10 text-white hover:bg-white/10">{creator.primaryActionLabel || "Contact Me"}</Badge>
+                      <Badge className="border border-white/15 bg-white/10 text-white hover:bg-white/10">{creator.primaryActionLabel || "Reach Out"}</Badge>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3 text-sm sm:min-w-[20rem]">
@@ -2178,7 +2203,7 @@ export default function Settings() {
                   <Card className="border-border/60 bg-card/70 shadow-sm">
                     <CardHeader>
                       <CardTitle>Starter Checklist</CardTitle>
-                      <CardDescription>These are the only things required to make the first publish feel credible.</CardDescription>
+                      <CardDescription>These are the only things you need to make the page feel real and worth exploring.</CardDescription>
                     </CardHeader>
                     <CardContent className="grid gap-3 sm:grid-cols-2">
                       {starterChecklistItems.map((item) => (
@@ -2195,19 +2220,19 @@ export default function Settings() {
                   <Card className="border-border/60 bg-card/70 shadow-sm">
                     <CardHeader>
                       <CardTitle>What Happens After Launch</CardTitle>
-                      <CardDescription>The builder gets deeper only after the page exists.</CardDescription>
+                      <CardDescription>The editing tools go deeper only after the page exists.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="rounded-2xl border border-border/50 bg-background/40 p-4 text-sm text-muted-foreground">
                         {starterCanLaunch
-                          ? "The page is ready to launch. Save once, then jump directly into featured work, media, and CTA refinement."
+                          ? "The page is ready to launch. Save once, then jump into featured work, media, and the details that make it feel alive."
                           : `Still missing: ${starterMissingItems.map((item) => item.label.toLowerCase()).join(", ")}.`}
                       </div>
                       <div className="grid gap-3">
                         {[
-                          "Pick the archetype that matches how the page should convert.",
-                          "Use a direct tagline and tags so discovery has something concrete to work with.",
-                          "Add contact email now; save featured content, media, and styling for the second pass.",
+                          "Pick the archetype that matches how the page should feel when someone lands on it.",
+                          "Use a direct tagline and tags so the page has a clear identity from the start.",
+                          "Add a contact path now; save featured media and styling tweaks for the second pass.",
                         ].map((tip) => (
                           <div key={tip} className="rounded-2xl border border-border/50 bg-background/30 px-4 py-3 text-sm text-muted-foreground">
                             {tip}
@@ -2246,7 +2271,7 @@ export default function Settings() {
               <Card className="border-border/60 bg-card/70 shadow-sm">
                 <CardHeader>
                   <CardTitle>Trust Layer Controls</CardTitle>
-                  <CardDescription>Manage the public trust and collaboration surfaces that now sit alongside the portfolio.</CardDescription>
+                  <CardDescription>Manage the public trust signals and collaboration context that sit alongside the work.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-5">
                   <div className="grid gap-3 md:grid-cols-4">
@@ -2293,8 +2318,86 @@ export default function Settings() {
                       ))}
                     </div>
                     <div className="mt-4 rounded-2xl border border-dashed border-border/50 bg-background/20 p-4 text-sm text-muted-foreground">
-                      Next backend phase can replace these placeholders with real reference requests, collaborator confirmations, verified shoot records, endorsements, and safety status management without changing this layout.
+                      A later backend phase can replace these placeholders with real references, collaborator confirmations, verified shoot records, endorsements, and safety states without changing this layout.
                     </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/60 bg-card/70 shadow-sm">
+                <CardHeader>
+                  <CardTitle>Pre-Shoot Collaboration Card</CardTitle>
+                  <CardDescription>Define the details people should have before they lock in a shoot or production.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCollaborationCardSettingsView("public")}
+                      className={cn(
+                        "rounded-full border px-4 py-2 text-sm font-medium transition-colors",
+                        collaborationCardSettingsView === "public"
+                          ? "border-primary/40 bg-primary/10 text-foreground"
+                          : "border-border/50 bg-background/35 text-muted-foreground hover:border-primary/30 hover:text-foreground",
+                      )}
+                    >
+                      Public preview
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCollaborationCardSettingsView("confirmed")}
+                      className={cn(
+                        "rounded-full border px-4 py-2 text-sm font-medium transition-colors",
+                        collaborationCardSettingsView === "confirmed"
+                          ? "border-primary/40 bg-primary/10 text-foreground"
+                          : "border-border/50 bg-background/35 text-muted-foreground hover:border-primary/30 hover:text-foreground",
+                      )}
+                    >
+                      Confirmed collaboration
+                    </button>
+                    {collaborationCompensationTemplate.map((item) => (
+                      <Badge key={item} variant="outline">{item}</Badge>
+                    ))}
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {collaborationRolesTemplate.map((item) => (
+                      <div key={item.label} className="rounded-2xl border border-border/50 bg-background/35 p-4">
+                        <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{item.label}</div>
+                        <div className="mt-2 text-sm font-medium">{item.detail}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {collaborationCardTemplate.map((item) => (
+                      <div key={item.label} className="rounded-2xl border border-border/50 bg-background/35 p-4">
+                        <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{item.label}</div>
+                        <div className="mt-2 text-sm font-medium">{item.detail}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {collaborationCardSettingsView === "public" ? (
+                    <div className="rounded-2xl border border-dashed border-border/50 bg-background/20 p-4 text-sm text-muted-foreground">
+                      Emergency contact details stay private and do not appear on the public collaboration preview.
+                    </div>
+                  ) : null}
+                  {collaborationCardSettingsView === "confirmed" ? (
+                    <div className="rounded-2xl border border-primary/25 bg-primary/5 p-5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="secondary">Private coordination</Badge>
+                        <Badge variant="outline">Only after confirmation</Badge>
+                      </div>
+                      <div className="mt-4 grid gap-3 md:grid-cols-3">
+                        {privateCollaborationCardTemplate.map((item) => (
+                          <div key={item.label} className="rounded-2xl border border-border/50 bg-background/35 p-4">
+                            <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{item.label}</div>
+                            <div className="mt-2 text-sm font-medium">{item.detail}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                  <div className="rounded-2xl border border-dashed border-border/50 bg-background/20 p-4 text-sm text-muted-foreground">
+                    This is a frontend planning surface for now. A later backend phase can turn it into a real collaboration card with private emergency-contact handling and confirmation workflows.
                   </div>
                 </CardContent>
               </Card>
@@ -2340,9 +2443,9 @@ export default function Settings() {
                         Build Your Page
                       </div>
                       <div>
-                        <h2 className="text-2xl font-bold tracking-tight">Build a public creator page section by section.</h2>
+                        <h2 className="text-2xl font-bold tracking-tight">Build your public artist page section by section.</h2>
                         <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-                          This is now a page builder, not a settings form. Choose a block on the canvas, edit only what belongs to it, and keep the live preview visible while you shape the page.
+                          Choose a block on the canvas, edit only what belongs to it, and keep the live preview visible while you shape the page.
                         </p>
                       </div>
                     </div>
@@ -2386,7 +2489,7 @@ export default function Settings() {
               <Card className={cn("border-border/50 bg-card/50", creatorBuilderView === "preview" && "hidden md:block")}>
                 <CardHeader>
                   <CardTitle>Page canvas</CardTitle>
-                  <CardDescription>These blocks represent the public page. Pick one to configure it in the inspector.</CardDescription>
+                  <CardDescription>These blocks represent the live page. Pick one to shape it in the inspector.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-5">
                   <div className="rounded-3xl border border-border/50 bg-background/35 p-4">
@@ -3539,13 +3642,13 @@ export default function Settings() {
                         </div>
                         <div className="mb-3 flex flex-wrap gap-2">
                           <Badge variant="secondary">{artist.category || "Creative Professional"}</Badge>
-                          <Badge>{creator.primaryActionLabel || "Contact Me"}</Badge>
+                  <Badge>{creator.primaryActionLabel || "Reach Out"}</Badge>
                           <Badge variant="outline">{creator.layoutTemplate || "portfolio"}</Badge>
                           <Badge variant="outline">{creator.fontPreset || "modern"}</Badge>
                         </div>
                         <div className={cn("text-2xl font-bold", creatorPreviewHeadingClass)}>{artist.displayName || "Artist page name"}</div>
                         <div className="mt-4 text-base font-medium">{artist.tagline || selectedArchetype.tagline}</div>
-                        <div className="mt-4 whitespace-pre-wrap text-sm text-white/75">{artist.bio || "Add a short bio later. Phase 2 is about making the first screen immediately credible."}</div>
+                        <div className="mt-4 whitespace-pre-wrap text-sm text-white/75">{artist.bio || "Add a short bio later. The first pass is about making the page feel immediate and real."}</div>
                         <div className="mt-4 flex flex-wrap gap-2">
                           {String(artist.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean).slice(0, 5).map((tag) => <Badge key={tag} variant="secondary">{tag}</Badge>)}
                         </div>
@@ -3571,7 +3674,7 @@ export default function Settings() {
                                             ? "Featured product, gallery, and shop CTA"
                                             : creator.layoutTemplate === "editorial"
                                               ? "Story-first hero with stronger reading flow"
-                                              : "Balanced featured content and creator story"}
+                                              : "Balanced featured content and artist story"}
                                   </div>
                                 </div>
                               </div>
@@ -3586,7 +3689,7 @@ export default function Settings() {
                                     <div className="text-xs uppercase tracking-[0.18em] text-white/60">Contact and action</div>
                                     <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">{contactPresentation.label}</div>
                                   </div>
-                                  <div className="text-sm font-medium text-white">{creator.primaryActionLabel || "Contact Me"}</div>
+                                  <div className="text-sm font-medium text-white">{creator.primaryActionLabel || "Reach Out"}</div>
                                   <div className="text-sm text-white/85">
                                     {creator.primaryActionUrl?.trim()
                                       ? `This CTA points to ${creator.primaryActionUrl}.`
@@ -3743,7 +3846,7 @@ export default function Settings() {
             <Card className="border-border/50 bg-card/50">
               <CardHeader>
                 <CardTitle>Personal Photo Gallery</CardTitle>
-                <CardDescription>Upload daily photos, selfies, behind-the-scenes shots, or anything people should see in your profile's Photos tab.</CardDescription>
+                <CardDescription>Upload daily photos, selfies, behind-the-scenes shots, or anything that adds texture to your public presence outside the main artist page.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
@@ -3897,7 +4000,7 @@ export default function Settings() {
               ) : (
                 <Card className="border-dashed border-border/50 bg-card/30 lg:col-span-2">
                   <CardContent className="p-10 text-center text-muted-foreground">
-                    No photos yet. Upload a few images here and they will appear on the profile Photos tab.
+                    No photos yet. Upload a few images here and they will appear in your profile photo stream.
                   </CardContent>
                 </Card>
               )}
@@ -3957,11 +4060,11 @@ export default function Settings() {
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               <Card className="border-border/50 bg-card/50">
                 <CardHeader>
-                  <CardTitle>{creatorPickerTarget ? `Add ${showcasePickerType === "video" ? "Videos" : showcasePickerType === "audio" ? "Audio" : "Images"} to ${pickerDestinationLabel}` : "Creator Showcase"}</CardTitle>
+                  <CardTitle>{creatorPickerTarget ? `Add ${showcasePickerType === "video" ? "Videos" : showcasePickerType === "audio" ? "Audio" : "Images"} to ${pickerDestinationLabel}` : "Artist Page Showcase"}</CardTitle>
                   <CardDescription>
                     {creatorPickerTarget
                       ? `You are in picker mode for ${pickerDestinationLabel}. Select existing ${showcasePickerType === "video" ? "videos" : showcasePickerType === "audio" ? "audio items" : "images"} or upload new ones and they will be assigned to that section.`
-                      : "This is separate from your personal photo gallery. Use it for portfolio media, videos, tracks, and polished showcase items on your creator page."}
+                      : "This is separate from your personal photo gallery. Use it for portfolio media, videos, tracks, and polished showcase items on your artist page."}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -4001,8 +4104,8 @@ export default function Settings() {
                         />
                         <div className="text-xs text-muted-foreground">
                           {gallery.type === GalleryItemRequestType.video
-                            ? "Choose one or many video files. They will upload into your creator showcase with saved thumbnails."
-                            : "Choose one or many images. They will upload directly into your creator showcase."}
+                            ? "Choose one or many video files. They will upload into your artist page showcase with saved thumbnails."
+                            : "Choose one or many images. They will upload directly into your artist page showcase."}
                         </div>
                       </>
                     )}

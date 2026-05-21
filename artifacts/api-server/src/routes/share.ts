@@ -49,12 +49,12 @@ router.get("/artists/:userId/share", async (req, res) => {
   const shareUrl = `${req.protocol}://${req.get("host")}${req.originalUrl}`;
   const previewImage =
     toAbsoluteUrl(artist.bannerUrl || artist.avatarUrl || null, webBaseUrl)
-    || `${webBaseUrl}/opengraph.png`;
-  const title = `${artist.displayName || artist.user.username} | ArtistHub`;
+    || `${webBaseUrl}/opengraph.svg`;
+  const title = `${artist.displayName || artist.user.username} | HollywoodHeartbeats.com`;
   const description = artist.tagline
     || artist.bio
     || [artist.category, artist.location].filter(Boolean).join(" · ")
-    || "Explore this creator page on ArtistHub.";
+    || "Explore this artist page on HollywoodHeartbeats.com.";
 
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.send(`<!DOCTYPE html>
@@ -65,7 +65,7 @@ router.get("/artists/:userId/share", async (req, res) => {
     <meta name="description" content="${escapeHtml(description)}" />
     <link rel="canonical" href="${escapeHtml(canonicalUrl)}" />
     <meta property="og:type" content="profile" />
-    <meta property="og:site_name" content="ArtistHub" />
+    <meta property="og:site_name" content="HollywoodHeartbeats.com" />
     <meta property="og:title" content="${escapeHtml(title)}" />
     <meta property="og:description" content="${escapeHtml(description)}" />
     <meta property="og:url" content="${escapeHtml(shareUrl)}" />
