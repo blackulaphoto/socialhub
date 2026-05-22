@@ -16,6 +16,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { FriendActionButton } from "@/components/friend-action-button";
 import { getTopicPath } from "@/lib/topics";
+import { summarizeBrowseDetails } from "@/lib/browse-details";
 
 type FriendshipState = {
   id?: number | null;
@@ -37,6 +38,7 @@ type DiscoverArtist = {
   bookingEmail?: string | null;
   pricingSummary?: string | null;
   turnaroundInfo?: string | null;
+  customFields?: Array<{ label: string; value: string }>;
   gallery?: Array<{ id: number; url: string }>;
   isFollowing?: boolean;
   user: {
@@ -63,6 +65,36 @@ function getCreatorSuggestionReason(artist: DiscoverArtist) {
   return artist.category;
 }
 
+const ROLE_OPTIONS = [
+  "Model",
+  "Photographer",
+  "Videographer",
+  "Makeup Artist",
+  "Stylist",
+  "Retoucher",
+  "Set Designer",
+  "Creative Director",
+  "Wardrobe Stylist",
+  "Hair Artist",
+  "Production Team",
+  "Creative Professional",
+] as const;
+
+const ROLE_SPECIALTY_HINTS: Record<string, string> = {
+  Model: "editorial, runway, beauty, swimwear, alt",
+  Photographer: "editorial, portraits, beauty, nightlife, campaign",
+  Videographer: "fashion film, BTS, music video, campaign",
+  "Makeup Artist": "beauty, bridal, editorial, SFX, body paint",
+  Stylist: "wardrobe, pulls, editorial, runway, vintage",
+  Retoucher: "beauty retouch, skin, fashion, compositing",
+  "Set Designer": "props, editorial sets, installation, production design",
+  "Creative Director": "concept, casting, campaign, visual direction",
+  "Wardrobe Stylist": "pulls, tailoring, editorial, lookbook",
+  "Hair Artist": "texture, color, editorial hair, wigs",
+  "Production Team": "producer, PA, lighting, grip, studio support",
+  "Creative Professional": "editorial, beauty, campaign, collaboration",
+};
+
 export default function Discover() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -70,16 +102,20 @@ export default function Discover() {
   const [location, setLocation] = useState("");
   const [category, setCategory] = useState("all");
   const [tags, setTags] = useState("");
+  const [availability, setAvailability] = useState("all");
+  const [collaboration, setCollaboration] = useState("all");
 
-  const filtersActive = Boolean(location.trim() || tags.trim() || category !== "all");
+  const filtersActive = Boolean(location.trim() || tags.trim() || category !== "all" || availability !== "all" || collaboration !== "all");
 
   const { data: artistDirectory, isLoading: isLoadingArtists, isError: isArtistsError, refetch: refetchArtists } = useQuery({
-    queryKey: ["/api/artists", "discover", location, category, tags],
+    queryKey: ["/api/artists", "discover", location, category, tags, availability, collaboration],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (location.trim()) params.set("location", location.trim());
       if (category !== "all") params.set("category", category);
       if (tags.trim()) params.set("tags", tags.trim());
+      if (availability !== "all") params.set("availability", availability);
+      if (collaboration !== "all") params.set("collaboration", collaboration);
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/artists${params.toString() ? `?${params.toString()}` : ""}`, {
         credentials: "include",
       });
@@ -152,6 +188,7 @@ export default function Discover() {
   const creatorCards = filtersActive
     ? (artistDirectory?.artists || [])
     : ((suggestedCreators?.artists?.length ? suggestedCreators.artists : artistDirectory?.artists) || []);
+  const specialtyPlaceholder = ROLE_SPECIALTY_HINTS[category] || "editorial, beauty, alt, runway, test shoot";
 
   return (
     <div className="space-y-6">
@@ -181,16 +218,7 @@ export default function Discover() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All roles</SelectItem>
-              <SelectItem value="Model">Model</SelectItem>
-              <SelectItem value="Photographer">Photographer</SelectItem>
-              <SelectItem value="Makeup Artist">Makeup Artist</SelectItem>
-              <SelectItem value="Stylist">Stylist</SelectItem>
-              <SelectItem value="Retoucher">Retoucher</SelectItem>
-              <SelectItem value="Set Designer">Set Designer</SelectItem>
-              <SelectItem value="Creative Director">Creative Director</SelectItem>
-              <SelectItem value="Wardrobe Stylist">Wardrobe Stylist</SelectItem>
-              <SelectItem value="Hair Artist">Hair Artist</SelectItem>
-              <SelectItem value="Production Team">Production Team</SelectItem>
+              {ROLE_OPTIONS.map((role) => <SelectItem key={role} value={role}>{role}</SelectItem>)}
             </SelectContent>
           </Select>
           <LocationInput
@@ -206,8 +234,26 @@ export default function Discover() {
             {location.trim() ? <button type="button" className="hh-filter-chip is-active"><strong>City</strong> {location.trim()}</button> : null}
             {category !== "all" ? <button type="button" className="hh-filter-chip is-active"><strong>Role</strong> {category}</button> : null}
             {tags.trim() ? <button type="button" className="hh-filter-chip is-active"><strong>Tags</strong> {tags.trim()}</button> : null}
-            {filtersActive ? <button type="button" className="hh-filter-chip" onClick={() => { setLocation(""); setCategory("all"); setTags(""); }}>Reset</button> : null}
+            {availability !== "all" ? <button type="button" className="hh-filter-chip is-active"><strong>Availability</strong> now</button> : null}
+            {collaboration !== "all" ? <button type="button" className="hh-filter-chip is-active"><strong>Collaboration</strong> open</button> : null}
+            {filtersActive ? <button type="button" className="hh-filter-chip" onClick={() => { setLocation(""); setCategory("all"); setTags(""); setAvailability("all"); setCollaboration("all"); }}>Reset</button> : null}
           </div>
+        </div>
+        <div className="grid gap-3 md:grid-cols-[1fr_1fr]">
+          <Select value={availability} onValueChange={setAvailability}>
+            <SelectTrigger className="rounded-none border-[var(--hh-rule)] bg-transparent"><SelectValue placeholder="Availability" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Any availability</SelectItem>
+              <SelectItem value="available">Available now</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={collaboration} onValueChange={setCollaboration}>
+            <SelectTrigger className="rounded-none border-[var(--hh-rule)] bg-transparent"><SelectValue placeholder="Collaboration" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All profiles</SelectItem>
+              <SelectItem value="open">Open to collaborate</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </section>
 
@@ -261,6 +307,21 @@ export default function Discover() {
                   {artist.acceptsCollaborations ? <Badge variant="outline" className="rounded-none">Open to collaborate</Badge> : null}
                 </div>
 
+                {(() => {
+                  const browseSummary = summarizeBrowseDetails(artist.customFields).slice(0, 2);
+                  if (!browseSummary.length) return null;
+                  return (
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {browseSummary.map((item) => (
+                        <div key={`${item.label}-${item.value}`} className="rounded-none border border-[var(--hh-rule-soft)] bg-[rgba(255,255,255,0.02)] px-3 py-2">
+                          <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--hh-ink-muted)]">{item.label}</div>
+                          <div className="mt-1 text-sm text-[var(--hh-ink)]">{item.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+
                 <div className="grid grid-cols-2 gap-3 border-t border-[var(--hh-rule-soft)] pt-3 text-xs uppercase tracking-[0.12em] text-[var(--hh-ink-muted)]">
                   <div>
                     <div>Signal</div>
@@ -273,10 +334,16 @@ export default function Discover() {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  <Link href={`/artists/${artist.userId}`}><Button variant="outline" size="sm" className="rounded-none">View page</Button></Link>
                   {artist.userId !== user?.id ? (
                     <>
-                      <Link href={`/artists/${artist.userId}?inquiry=1`}><Button size="sm" className="rounded-none"><Mail className="mr-2 h-4 w-4" />Inquiry</Button></Link>
+                      <Link href={`/artists/${artist.userId}?inquiry=1`} className="flex-1">
+                        <Button size="sm" className="w-full rounded-none">
+                          <Mail className="mr-2 h-4 w-4" />Reach Out
+                        </Button>
+                      </Link>
+                      <Link href={`/artists/${artist.userId}`} className="flex-1">
+                        <Button variant="outline" size="sm" className="w-full rounded-none">View Portfolio</Button>
+                      </Link>
                       <Button
                         size="sm"
                         variant={artist.isFollowing ? "outline" : "secondary"}
@@ -286,8 +353,11 @@ export default function Discover() {
                         {artist.isFollowing ? "Following" : "Follow"}
                       </Button>
                     </>
-                  ) : null}
-                  <Link href={`/artists/${artist.userId}`} className="ml-auto"><Button variant="ghost" size="sm" className="rounded-none">Open <ArrowRight className="ml-2 h-4 w-4" /></Button></Link>
+                  ) : (
+                    <Link href={`/artists/${artist.userId}`} className="flex-1">
+                      <Button variant="outline" size="sm" className="w-full rounded-none">View Your Page</Button>
+                    </Link>
+                  )}
                 </div>
               </div>
             </article>

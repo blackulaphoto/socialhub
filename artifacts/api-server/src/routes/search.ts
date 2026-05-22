@@ -88,6 +88,8 @@ async function searchArtistUserIds(input: {
   locationTerms: string[];
   category: string;
   tagList: string[];
+  availability: string;
+  collaborationOpenOnly: boolean;
   blockedUserIds: number[];
   limit: number;
 }) {
@@ -100,6 +102,9 @@ async function searchArtistUserIds(input: {
         ts_rank_cd(to_tsvector('english', coalesce(a.category, '')), websearch_to_tsquery('english', $1)) * 1.5 +
         ts_rank_cd(to_tsvector('english', coalesce(a.tagline, '')), websearch_to_tsquery('english', $1)) +
         ts_rank_cd(to_tsvector('english', coalesce(a.bio, '')), websearch_to_tsquery('english', $1)) +
+        ts_rank_cd(to_tsvector('english', coalesce(a.availability_status, '')), websearch_to_tsquery('english', $1)) +
+        ts_rank_cd(to_tsvector('english', coalesce(a.represented_by, '')), websearch_to_tsquery('english', $1)) +
+        ts_rank_cd(to_tsvector('english', coalesce(a.custom_fields::text, '')), websearch_to_tsquery('english', $1)) +
         ts_rank_cd(to_tsvector('simple', coalesce(a.location, '') || ' ' || coalesce(d.city, '') || ' ' || coalesce(d.location, '') || ' ' || array_to_string(coalesce(a.tags, '{}'), ' ')), websearch_to_tsquery('simple', $1))
       ) as rank,
       greatest(
@@ -107,6 +112,7 @@ async function searchArtistUserIds(input: {
         similarity(coalesce(u.username, ''), $1),
         similarity(coalesce(a.category, ''), $1),
         similarity(coalesce(a.tagline, ''), $1),
+        similarity(coalesce(a.availability_status, ''), $1),
         similarity(coalesce(a.location, ''), $1),
         similarity(coalesce(d.city, ''), $1),
         similarity(coalesce(d.location, ''), $1),
@@ -123,11 +129,15 @@ async function searchArtistUserIds(input: {
         to_tsvector('english', coalesce(a.category, '')) @@ websearch_to_tsquery('english', $1) or
         to_tsvector('english', coalesce(a.tagline, '')) @@ websearch_to_tsquery('english', $1) or
         to_tsvector('english', coalesce(a.bio, '')) @@ websearch_to_tsquery('english', $1) or
+        to_tsvector('english', coalesce(a.availability_status, '')) @@ websearch_to_tsquery('english', $1) or
+        to_tsvector('english', coalesce(a.represented_by, '')) @@ websearch_to_tsquery('english', $1) or
+        to_tsvector('english', coalesce(a.custom_fields::text, '')) @@ websearch_to_tsquery('english', $1) or
         to_tsvector('simple', coalesce(a.location, '') || ' ' || coalesce(d.city, '') || ' ' || coalesce(d.location, '') || ' ' || array_to_string(coalesce(a.tags, '{}'), ' ')) @@ websearch_to_tsquery('simple', $1) or
         similarity(coalesce(a.display_name, ''), $1) > 0.14 or
         similarity(coalesce(u.username, ''), $1) > 0.14 or
         similarity(coalesce(a.category, ''), $1) > 0.14 or
         similarity(coalesce(a.tagline, ''), $1) > 0.12 or
+        similarity(coalesce(a.availability_status, ''), $1) > 0.12 or
         similarity(coalesce(a.location, ''), $1) > 0.16 or
         similarity(coalesce(d.city, ''), $1) > 0.16 or
         similarity(coalesce(d.location, ''), $1) > 0.16 or
@@ -150,15 +160,23 @@ async function searchArtistUserIds(input: {
         coalesce(a.tags, '{}') && $4::text[]
       )
       and (
-        cardinality($5::int[]) = 0 or
-        not (a.user_id = any($5::int[]))
+        $5 = '' or
+        coalesce(a.availability_status, '') ilike ('%' || $5 || '%')
+      )
+      and (
+        not $6::boolean or
+        a.accepts_collaborations = true
+      )
+      and (
+        cardinality($7::int[]) = 0 or
+        not (a.user_id = any($7::int[]))
       )
     order by
       case when $1 = '' then 0 else 1 end desc,
       rank desc,
       fuzzy_score desc,
       a.updated_at desc
-    limit $6
+    limit $8
   `;
 
   const result = await pool.query<{ userId: number }>(query, [
@@ -166,6 +184,8 @@ async function searchArtistUserIds(input: {
     input.locationTerms,
     input.category,
     input.tagList,
+    input.availability,
+    input.collaborationOpenOnly,
     input.blockedUserIds,
     input.limit,
   ]);
@@ -247,6 +267,8 @@ router.get("/search", async (req, res) => {
     location = "",
     category = "",
     tags = "",
+    availability = "",
+    collaboration = "",
     limit,
   } = req.query as Record<string, string>;
 
@@ -254,6 +276,8 @@ router.get("/search", async (req, res) => {
   const normalizedLocation = location.trim();
   const locationTerms = expandLocationTerms(normalizedLocation);
   const normalizedCategory = category.trim();
+  const normalizedAvailability = availability.trim();
+  const collaborationOpenOnly = collaboration.trim().toLowerCase() === "open";
   const tagList = tags
     .split(",")
     .map((tag) => tag.trim())
@@ -283,6 +307,8 @@ router.get("/search", async (req, res) => {
       locationTerms,
       category: normalizedCategory,
       tagList,
+      availability: normalizedAvailability,
+      collaborationOpenOnly,
       blockedUserIds,
       limit: safeLimit,
     })

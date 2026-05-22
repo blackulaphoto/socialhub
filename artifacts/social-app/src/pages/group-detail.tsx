@@ -19,6 +19,46 @@ import { LoadMoreSentinel } from "@/components/load-more-sentinel";
 
 type SceneView = "all" | "discussion" | "requests" | "castings" | "showcase";
 
+function resolveSceneIdentity(group: { category?: string | null; tags?: string[] | null; postCount?: number | null }) {
+  const category = (group.category || "").trim();
+  const tags = (group.tags || []).map((tag) => tag.toLowerCase());
+  const normalized = category.toLowerCase();
+
+  if (normalized.includes("contest") || tags.some((tag) => tag.includes("contest") || tag.includes("challenge"))) {
+    return {
+      type: "Contest",
+      label: "Challenge / contest",
+      helper: "Submission threads, prompts, ranked drops, and competitive scene energy.",
+    };
+  }
+  if (normalized.includes("casting") || tags.some((tag) => tag.includes("casting") || tag.includes("open call") || tag.includes("model call"))) {
+    return {
+      type: "Casting Hub",
+      label: "Casting / open calls",
+      helper: "Role calls, crew searches, collaborator requests, and hiring threads.",
+    };
+  }
+  if (normalized.includes("collective") || normalized.includes("crew")) {
+    return {
+      type: "Collective",
+      label: "Collective / crew",
+      helper: "Shared group identity, recurring collaborators, and a stable internal scene.",
+    };
+  }
+  if (normalized.includes("event") || tags.some((tag) => tag.includes("event") || tag.includes("party"))) {
+    return {
+      type: "Event Group",
+      label: "Event / happening",
+      helper: "Planning, attendance, updates, and post-event memory in one place.",
+    };
+  }
+  return {
+    type: category || "Forum",
+    label: "Forum / group",
+    helper: "Discussion threads, references, local talk, and scene-based community posting.",
+  };
+}
+
 function classifyScenePost(content: string) {
   const normalized = content.toLowerCase();
   if (normalized.includes("casting") || normalized.includes("model call")) return "castings" as const;
@@ -125,6 +165,7 @@ export default function GroupDetail({ id }: { id: string }) {
 
   const isOwner = data.group.ownerId === user?.id;
   const canPost = Boolean(data.group.isMember || isOwner);
+  const sceneIdentity = resolveSceneIdentity(data.group);
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-8 p-4 md:py-8">
@@ -138,11 +179,13 @@ export default function GroupDetail({ id }: { id: string }) {
                 <Badge variant={data.group.visibility === "private" ? "secondary" : "outline"}>{data.group.visibility}</Badge>
                 {isOwner && <Badge>Owner</Badge>}
               </div>
+              <div className="mt-2 text-[11px] uppercase tracking-[0.18em] text-primary/80">{sceneIdentity.label}</div>
               <p className="mt-2 max-w-2xl text-muted-foreground">{data.group.description}</p>
               <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                <Badge variant="outline">Scene forum</Badge>
-                <Badge variant="outline">Planning threads</Badge>
-                <Badge variant="outline">Collaboration chatter</Badge>
+                <Badge variant="secondary">{sceneIdentity.type}</Badge>
+                <Badge variant="outline">Forums</Badge>
+                <Badge variant="outline">Groups</Badge>
+                <Badge variant="outline">{sceneIdentity.type === "Contest" ? "Submissions" : sceneIdentity.type === "Casting Hub" ? "Open calls" : "Threads"}</Badge>
               </div>
             </div>
             {isOwner ? (
@@ -165,7 +208,7 @@ export default function GroupDetail({ id }: { id: string }) {
             <span className="inline-flex items-center gap-1">{data.group.visibility === "private" ? <Lock className="h-4 w-4" /> : <Eye className="h-4 w-4" />}{data.group.visibility}</span>
           </div>
           <div className="flex flex-wrap gap-2">
-            {data.group.category && <Badge variant="secondary">{data.group.category}</Badge>}
+            <Badge variant="secondary">{sceneIdentity.type}</Badge>
             {data.group.tags?.map((tag) => <Badge key={tag} variant="outline">{tag}</Badge>)}
           </div>
         </div>
@@ -179,6 +222,7 @@ export default function GroupDetail({ id }: { id: string }) {
               {[
                 { label: "Members", value: String(data.group.memberCount) },
                 { label: "Posts", value: String(groupPosts.length) },
+                { label: "Format", value: sceneIdentity.type },
                 { label: "Visibility", value: data.group.visibility },
               ].map((item) => (
                 <div key={item.label} className="rounded-[1.2rem] border border-border/50 bg-background/28 p-3">
@@ -188,7 +232,7 @@ export default function GroupDetail({ id }: { id: string }) {
               ))}
             </div>
             <div className="rounded-[1.2rem] border border-border/50 bg-background/28 p-3 text-sm text-muted-foreground">
-              Use this scene for open calls, collaborator searches, local chatter, planning threads, and the kind of scene memory that usually gets lost in DMs.
+              {sceneIdentity.helper}
             </div>
             {data.group.owner && (
               <div className="flex items-center gap-3 rounded-[1.2rem] border border-border/50 bg-background/32 p-3">
@@ -219,14 +263,14 @@ export default function GroupDetail({ id }: { id: string }) {
 
         <div className="space-y-4 lg:col-span-2">
           <Card className="overflow-hidden rounded-[1.9rem] border border-border/50 bg-card/45 shadow-[0_24px_60px_-48px_rgba(0,0,0,0.82)] backdrop-blur-xl">
-            <CardHeader><CardTitle>Scene Forum</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{sceneIdentity.type} Forum</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-3 md:grid-cols-4">
                 {[
                   { label: "Discussion", detail: "General scene talk, planning, local updates, and loose conversation." },
                   { label: "Requests", detail: "Collaborator asks, crew needs, references, and production support." },
                   { label: "Castings", detail: "Model calls, role calls, and date-specific pull requests." },
-                  { label: "Showcase", detail: "BTS drops, test shoots, fresh edits, and scene recaps." },
+                  { label: sceneIdentity.type === "Contest" ? "Submissions" : "Showcase", detail: sceneIdentity.type === "Contest" ? "Entry drops, prompts, finalists, and challenge recaps." : "BTS drops, test shoots, fresh edits, and scene recaps." },
                 ].map((item) => (
                   <div key={item.label} className="rounded-[1.2rem] border border-border/50 bg-background/28 p-3">
                     <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{item.label}</div>

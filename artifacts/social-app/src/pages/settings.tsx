@@ -35,9 +35,12 @@ import { BuilderMediaGallery } from "@/components/page-builder-blocks/builder-me
 import { BuilderVideoPlaylist } from "@/components/page-builder-blocks/builder-video-playlist";
 import { CreatorPageBuilder } from "@/components/creator-page-builder";
 import { LocationInput } from "@/components/location-input";
+import { WorkTypePicker } from "@/components/work-type-picker";
 import { useToast } from "@/hooks/use-toast";
 import { useActiveIdentity } from "@/hooks/useActiveIdentity";
 import { deriveLegacyModuleState, readCreatorBuilderMeta, writeCreatorBuilderMeta } from "@/lib/creator-page-builder";
+import { applyCollaborationCard, extractCollaborationCard } from "@/lib/collaboration-card";
+import { applyBrowseDetails, extractBrowseDetails, filterPublicCustomFields, isBrowseDetailLabel, parseCustomFieldsText, serializeCustomFieldsText } from "@/lib/browse-details";
 import { getEmbedDescriptor } from "@/lib/embeds";
 import { formatCityRegion, parseCityRegion } from "@/lib/locations";
 import { groupItemsByFolder, readMediaFolderState, writeMediaFolderState } from "@/lib/media-folders";
@@ -59,6 +62,7 @@ const ACTION_OPTIONS = [
 const CREATOR_TYPES = [
   "Model",
   "Photographer",
+  "Videographer",
   "Makeup Artist",
   "Stylist",
   "Retoucher",
@@ -69,6 +73,21 @@ const CREATOR_TYPES = [
   "Production Team",
   "Creative Professional",
 ];
+
+const DISCOVERY_TAG_HINTS: Record<string, string> = {
+  Model: "editorial, runway, beauty, swimwear, fit, alt",
+  Photographer: "editorial, portraits, beauty, campaign, nightlife, BTS",
+  Videographer: "fashion film, BTS, music video, nightlife, campaign",
+  "Makeup Artist": "beauty, editorial, bridal, SFX, body paint",
+  Stylist: "wardrobe, pulls, editorial, runway, vintage",
+  Retoucher: "skin, beauty, fashion, campaign, compositing",
+  "Set Designer": "props, editorial build, installation, production design",
+  "Creative Director": "concept, casting, campaign, visual direction",
+  "Wardrobe Stylist": "pulls, tailoring, lookbook, runway, editorial",
+  "Hair Artist": "editorial hair, texture, color, wigs, styling",
+  "Production Team": "producer, PA, lighting, grip, studio support",
+  "Creative Professional": "editorial, campaign, beauty, collaboration",
+};
 
 const PAGE_ARCHETYPES = [
   {
@@ -989,39 +1008,27 @@ export default function Settings() {
     setServiceDraft({ title: "", description: "", price: "", turnaround: "" });
   };
 
-  const parseCustomFields = () => (
-    String(artist.customFields || "")
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line) => {
-        const [label, ...rest] = line.split("|");
-        return {
-          label: label?.trim() || "Detail",
-          value: rest.join("|").trim(),
-        };
-      })
-      .filter((item) => item.label || item.value)
-  );
+  const parseCustomFields = () => parseCustomFieldsText(String(artist.customFields || ""));
 
   const writeCustomFields = (items: Array<{ label: string; value: string }>) => {
     setArtist((current) => ({
       ...current,
-      customFields: items
-        .filter((item) => item.label?.trim() || item.value?.trim())
-        .map((item) => [item.label?.trim() || "Detail", item.value?.trim()].filter(Boolean).join("|"))
-        .join("\n"),
+      customFields: serializeCustomFieldsText(items),
     }));
   };
 
+  const parseVisibleCustomFields = () => filterPublicCustomFields(parseCustomFields());
+
   const updateCustomFieldAt = (index: number, patch: Partial<{ label: string; value: string }>) => {
-    const next = [...parseCustomFields()];
+    const next = [...parseVisibleCustomFields()];
     next[index] = { ...next[index], ...patch };
-    writeCustomFields(next);
+    const browseOnly = parseCustomFields().filter((field) => isBrowseDetailLabel(field.label));
+    writeCustomFields([...browseOnly, ...next]);
   };
 
   const removeCustomFieldAt = (index: number) => {
-    writeCustomFields(parseCustomFields().filter((_, itemIndex) => itemIndex !== index));
+    const browseOnly = parseCustomFields().filter((field) => isBrowseDetailLabel(field.label));
+    writeCustomFields([...browseOnly, ...parseVisibleCustomFields().filter((_, itemIndex) => itemIndex !== index)]);
   };
 
   const addCustomFieldFromDraft = () => {
@@ -1034,6 +1041,17 @@ export default function Settings() {
       },
     ]);
     setDetailDraft({ label: "", value: "" });
+  };
+
+  const browseDetails = useMemo(() => extractBrowseDetails(parseCustomFields()), [artist.customFields]);
+  const collaborationCardDetails = useMemo(() => extractCollaborationCard(parseCustomFields()), [artist.customFields]);
+
+  const updateBrowseDetails = (patch: Partial<typeof browseDetails>) => {
+    writeCustomFields(applyBrowseDetails(parseCustomFields(), { ...browseDetails, ...patch }));
+  };
+
+  const updateCollaborationCardDetails = (patch: Partial<typeof collaborationCardDetails>) => {
+    writeCustomFields(applyCollaborationCard(parseCustomFields(), { ...collaborationCardDetails, ...patch }));
   };
 
   const parseSectionConfigs = () => {
@@ -1600,6 +1618,25 @@ export default function Settings() {
     </div>
   );
 
+  const saveArtistDetails = async (toastTitle = "Artist page details saved") => {
+    if (!user) return;
+    setSaveState((current) => ({ ...current, artistPage: "saving" }));
+    try {
+      await saveArtist.mutateAsync({
+        userId: user.id,
+        data: buildArtistPayload(),
+      });
+      await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
+      markSaved("artistPage");
+      toast({
+        title: toastTitle,
+        description: "Your page qualifiers and public details were updated.",
+      });
+    } catch {
+      setSaveState((current) => ({ ...current, artistPage: "idle" }));
+    }
+  };
+
   if (isLoading || !profile || !user) return <div className="flex justify-center py-20"><Spinner size="lg" /></div>;
 
   const accent = creator.accentColor || basic.accentColor || "#8b5cf6";
@@ -1678,7 +1715,7 @@ export default function Settings() {
   const primaryShowcaseTag = showcaseItemCount > 0 ? `${showcaseItemCount} media item${showcaseItemCount === 1 ? "" : "s"}` : "No media yet";
   const previewLinkItems = parseLinkItems();
   const previewServiceItems = parseServiceItems();
-  const previewCustomDetails = parseCustomFields();
+  const previewCustomDetails = parseVisibleCustomFields();
   const upcomingEventsCount = (events || []).filter((event) => {
     const eventTime = new Date(event.startsAt).getTime();
     return eventTime >= Date.now() && (event.host?.id === user.id || event.artists?.some((artistItem) => artistItem.id === user.id));
@@ -1741,28 +1778,28 @@ export default function Settings() {
     ],
   } as const;
   const collaborationCardTemplate = [
-    { label: "Who", detail: artist.displayName || user.username || "Lead collaborator name" },
-    { label: "Where", detail: artist.location || basic.city || basic.location || "Location or travel context" },
-    { label: "References", detail: "Reference count and trusted collaborators from the trust layer" },
-    { label: "Concept", detail: artist.tagline || "Creative brief, concept, or mood direction" },
-    { label: "Compensation", detail: creator.pricingSummary || "Paid, trade, or to be agreed" },
-    { label: "Call time", detail: linkedEvents[0]?.startsAt ? new Date(linkedEvents[0].startsAt).toLocaleString() : "To be confirmed" },
-    { label: "Duration", detail: creator.turnaroundInfo || "Shoot duration or turnaround window" },
+    { label: "Who", detail: collaborationCardDetails.who || artist.displayName || user.username || "Lead collaborator name" },
+    { label: "Where", detail: collaborationCardDetails.where || artist.location || basic.city || basic.location || "Location or travel context" },
+    { label: "References", detail: collaborationCardDetails.references || "Reference count and trusted collaborators from the trust layer" },
+    { label: "Concept", detail: collaborationCardDetails.concept || artist.tagline || "Creative brief, concept, or mood direction" },
+    { label: "Compensation", detail: collaborationCardDetails.compensation || creator.pricingSummary || "Paid, trade, or to be agreed" },
+    { label: "Call time", detail: collaborationCardDetails.callTime || (linkedEvents[0]?.startsAt ? new Date(linkedEvents[0].startsAt).toLocaleString() : "To be confirmed") },
+    { label: "Duration", detail: collaborationCardDetails.duration || creator.turnaroundInfo || "Shoot duration or turnaround window" },
   ];
   const collaborationRolesTemplate = [
-    { label: "Lead role", detail: artist.category || "Creative professional" },
-    { label: "Support roles", detail: String(artist.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean).slice(0, 3).join(", ") || "Styling, makeup, retouching, production" },
-    { label: "Booking contact", detail: artist.bookingEmail || "Shared on request" },
+    { label: "Lead role", detail: collaborationCardDetails.leadRole || artist.category || "Creative professional" },
+    { label: "Support roles", detail: collaborationCardDetails.supportRoles || String(artist.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean).slice(0, 3).join(", ") || "Styling, makeup, retouching, production" },
+    { label: "Booking contact", detail: collaborationCardDetails.bookingContact || artist.bookingEmail || "Shared on request" },
   ];
   const collaborationCompensationTemplate = [
-    creator.pricingSummary ? "Paid" : "Trade / to be agreed",
+    collaborationCardDetails.compensationType || (creator.pricingSummary ? "Paid" : "Trade / to be agreed"),
     artist.openForCommissions ? "Open to paid bookings" : "Selective collaborations",
     creator.turnaroundInfo ? `Turnaround: ${creator.turnaroundInfo}` : "Timing to confirm",
   ];
   const privateCollaborationCardTemplate = [
-    { label: "Emergency contact option", detail: "Private coordination field for confirmed productions" },
-    { label: "Call time", detail: linkedEvents[0]?.startsAt ? new Date(linkedEvents[0].startsAt).toLocaleString() : "To be confirmed after booking" },
-    { label: "Compensation type", detail: creator.pricingSummary ? "Paid" : "Trade / to be agreed" },
+    { label: "Emergency contact option", detail: collaborationCardDetails.emergencyContactOption || "Private coordination field for confirmed productions" },
+    { label: "Call time", detail: collaborationCardDetails.callTime || (linkedEvents[0]?.startsAt ? new Date(linkedEvents[0].startsAt).toLocaleString() : "To be confirmed after booking") },
+    { label: "Compensation type", detail: collaborationCardDetails.compensationType || (creator.pricingSummary ? "Paid" : "Trade / to be agreed") },
   ];
   const builderSectionSummaries = {
     identity: `${identityCompletedCount}/${identityChecklist.length} core fields ready`,
@@ -1916,9 +1953,6 @@ export default function Settings() {
                   {showCreatorTools && creator.primaryActionLabel && <Badge>{creator.primaryActionLabel}</Badge>}
                 </div>
                 <div className="text-3xl font-bold md:text-4xl">{headerName}</div>
-                {showCreatorTools && artist.displayName && !useCreatorIdentityPreview ? (
-                  <div className="mt-1 text-sm font-medium text-foreground/80">Artist page name: {artist.displayName}</div>
-                ) : null}
                 <div className="mt-2 text-sm text-muted-foreground">
                   {headerLocation || "Location preview"}
                 </div>
@@ -1934,8 +1968,8 @@ export default function Settings() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="mb-8 border border-border/50 bg-card/50">
-          <TabsTrigger value="profile">Profile</TabsTrigger>
-          {showCreatorTools && <TabsTrigger value="creator">Creator Page</TabsTrigger>}
+          <TabsTrigger value="profile">Artist Page</TabsTrigger>
+          {showCreatorTools && <TabsTrigger value="creator">Page Studio</TabsTrigger>}
           <TabsTrigger value="photos">Photos</TabsTrigger>
           {showCreatorTools && <TabsTrigger value="gallery">Showcase</TabsTrigger>}
         </TabsList>
@@ -1943,14 +1977,14 @@ export default function Settings() {
         <TabsContent value="profile">
           <Card className="border-border/50 bg-card/50">
             <CardHeader>
-              <CardTitle>Profile Identity</CardTitle>
-              <CardDescription>Edit the public basics people notice first when they land on your page.</CardDescription>
+              <CardTitle>Artist Page Identity</CardTitle>
+              <CardDescription>Edit the actual public page people land on. This is the profile.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="space-y-3">
                 <div>
-                  <Label>Profile photo</Label>
-                  <p className="text-sm text-muted-foreground">Use a face photo, logo, or recognizable profile image.</p>
+                  <Label>Public page photo</Label>
+                  <p className="text-sm text-muted-foreground">Use the face, logo, or image people should recognize on your page.</p>
                 </div>
                 <div className="flex items-center gap-4">
                 <Avatar className="h-20 w-20">
@@ -1984,7 +2018,7 @@ export default function Settings() {
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="headline">Headline / short bio</Label>
+                  <Label htmlFor="headline">Short intro</Label>
                   <Input id="headline" placeholder="What should people understand about you immediately?" value={basic.bio || ""} onChange={(e) => setBasic({ ...basic, bio: e.target.value })} />
                 </div>
                 <div className="space-y-2">
@@ -2007,14 +2041,14 @@ export default function Settings() {
                   <Input id="age" type="number" min="13" max="120" placeholder="27" value={basic.age || ""} onChange={(e) => setBasic({ ...basic, age: e.target.value })} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="theme">Profile theme</Label>
+                  <Label htmlFor="theme">Page theme</Label>
                   <Select value={basic.themeName || "nocturne"} onValueChange={(value) => setBasic({ ...basic, themeName: value })}>
                     <SelectTrigger id="theme"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {THEME_OPTIONS.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                  <p className="text-sm text-muted-foreground">This changes the look of your public profile header and cards.</p>
+                  <p className="text-sm text-muted-foreground">This changes the look of your public page header and cards.</p>
                   <div className="grid gap-3 pt-2 md:grid-cols-3">
                     {THEME_OPTIONS.map((theme) => {
                       const preview = PROFILE_THEME_STYLES[theme.value];
@@ -2065,6 +2099,139 @@ export default function Settings() {
               <div className="space-y-2">
                 <Label htmlFor="featured-content">Featured note</Label>
                 <Textarea id="featured-content" placeholder="A short callout, announcement, or profile highlight." value={basic.featuredContent || ""} onChange={(e) => setBasic({ ...basic, featuredContent: e.target.value })} />
+              </div>
+
+              <div className="rounded-2xl border border-border/50 bg-background/30 p-5 space-y-4">
+                <div>
+                  <div className="text-lg font-semibold">Artist Page Details</div>
+                  <p className="mt-1 text-sm text-muted-foreground">These are the actual public page qualifiers and text signals people use to understand you and find you.</p>
+                </div>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Artist page name</Label>
+                    <Input placeholder="Public page name" value={artist.displayName || ""} onChange={(e) => setArtist({ ...artist, displayName: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Category</Label>
+                    <Select value={artist.category || "Creative Professional"} onValueChange={(value) => setArtist({ ...artist, category: value })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>{CREATOR_TYPES.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Base location</Label>
+                    <LocationInput value={artist.location || ""} placeholder="Los Angeles, California" onValueChange={(value) => setArtist({ ...artist, location: value })} onOptionSelect={(option) => setArtist({ ...artist, location: option.label })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Hero tagline</Label>
+                    <Input placeholder={selectedArchetype.tagline} value={artist.tagline || ""} onChange={(e) => setArtist({ ...artist, tagline: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Pronouns</Label>
+                    <Input placeholder="she/her" value={artist.pronouns || ""} onChange={(e) => setArtist({ ...artist, pronouns: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Years active</Label>
+                    <Input placeholder="4 years" value={artist.yearsActive || ""} onChange={(e) => setArtist({ ...artist, yearsActive: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Representation</Label>
+                    <Input placeholder="Represented by..." value={artist.representedBy || ""} onChange={(e) => setArtist({ ...artist, representedBy: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Booking or contact email</Label>
+                    <Input placeholder="bookings@example.com" value={artist.bookingEmail || ""} onChange={(e) => setArtist({ ...artist, bookingEmail: e.target.value })} />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Availability</Label>
+                    <Input placeholder="Available now / booking June / weekends only" value={artist.availabilityStatus || ""} onChange={(e) => setArtist({ ...artist, availabilityStatus: e.target.value })} />
+                  </div>
+                </div>
+                <WorkTypePicker
+                  category={artist.category || "Creative Professional"}
+                  value={artist.tags || ""}
+                  onChange={(next) => setArtist({ ...artist, tags: next })}
+                  label="Work types"
+                  helper="Pick the actual kinds of work and scenes you want to show up under."
+                />
+                <details className="rounded-2xl border border-border/50 bg-background/20 p-4">
+                  <summary className="cursor-pointer list-none text-sm font-medium">Browse qualifiers</summary>
+                  <div className="mt-3 grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Best for / shoot types</Label>
+                      <Input placeholder="runway, beauty, nightlife coverage, fashion film" value={browseDetails.bestFor} onChange={(e) => updateBrowseDetails({ bestFor: e.target.value })} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Travel</Label>
+                      <Input placeholder="LA based, open to travel / local only" value={browseDetails.travel} onChange={(e) => updateBrowseDetails({ travel: e.target.value })} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Compensation</Label>
+                      <Input placeholder="paid only / TFP selectively / rates on request" value={browseDetails.compensation} onChange={(e) => updateBrowseDetails({ compensation: e.target.value })} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Availability note</Label>
+                      <Input placeholder="late-night shoots okay / studio ready / quick turnaround" value={browseDetails.availabilityNote} onChange={(e) => updateBrowseDetails({ availabilityNote: e.target.value })} />
+                    </div>
+                  </div>
+                </details>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                  <label className="flex items-center gap-3 rounded-2xl border border-border/50 bg-background/30 px-4 py-3">
+                    <Checkbox checked={creator.openForCommissions === "true"} onCheckedChange={(checked) => setCreator({ ...creator, openForCommissions: checked ? "true" : "false" })} />
+                    <span className="text-sm">Open for commissions</span>
+                  </label>
+                  <label className="flex items-center gap-3 rounded-2xl border border-border/50 bg-background/30 px-4 py-3">
+                    <Checkbox checked={creator.touring === "true"} onCheckedChange={(checked) => setCreator({ ...creator, touring: checked ? "true" : "false" })} />
+                    <span className="text-sm">Touring</span>
+                  </label>
+                  <label className="flex items-center gap-3 rounded-2xl border border-border/50 bg-background/30 px-4 py-3">
+                    <Checkbox checked={creator.acceptsCollaborations !== "false"} onCheckedChange={(checked) => setCreator({ ...creator, acceptsCollaborations: checked ? "true" : "false" })} />
+                    <span className="text-sm">Accepts collaborations</span>
+                  </label>
+                </div>
+                <div className="space-y-2">
+                  <Label>Public page details</Label>
+                  <p className="text-sm text-muted-foreground">Optional labeled details that can appear in the dossier without cluttering the main profile header.</p>
+                  <div className="space-y-3 rounded-2xl border border-border/50 bg-background/20 p-3">
+                    {previewCustomDetails.length > 0 ? previewCustomDetails.map((item, index) => (
+                      <div key={`${item.label}-${index}`} className="grid gap-3 rounded-2xl border border-border/50 bg-background/30 p-3">
+                        <div className="grid gap-3 md:grid-cols-[0.9fr_1.3fr_auto]">
+                          <Input value={item.label} onChange={(e) => updateCustomFieldAt(index, { label: e.target.value })} placeholder="Agency" />
+                          <Input value={item.value} onChange={(e) => updateCustomFieldAt(index, { value: e.target.value })} placeholder="Night Office / Downtown LA / latex styling" />
+                          <Button type="button" variant="outline" size="icon" onClick={() => removeCustomFieldAt(index)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )) : (
+                      <div className="text-sm text-muted-foreground">No extra public details added yet.</div>
+                    )}
+                    <div className="grid gap-3 rounded-2xl border border-dashed border-border/60 bg-background/10 p-3 md:grid-cols-[0.9fr_1.3fr_auto]">
+                      <Input value={detailDraft.label} onChange={(e) => setDetailDraft((current) => ({ ...current, label: e.target.value }))} placeholder="Specialty" />
+                      <Input value={detailDraft.value} onChange={(e) => setDetailDraft((current) => ({ ...current, value: e.target.value }))} placeholder="Editorial latex styling / warehouse performance" />
+                      <Button type="button" onClick={addCustomFieldFromDraft} disabled={!detailDraft.label.trim() && !detailDraft.value.trim()}>
+                        <Plus className="mr-2 h-4 w-4" /> Add
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  onClick={() => { void saveArtistDetails(); }}
+                  disabled={saveArtist.isPending}
+                >
+                  {saveState.artistPage === "saving" ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
+                    </>
+                  ) : saveState.artistPage === "saved" ? (
+                    <>
+                      <Check className="mr-2 h-4 w-4" /> Saved
+                    </>
+                  ) : (
+                    "Save Artist Page Details"
+                  )}
+                </Button>
               </div>
 
               <div className="space-y-3 rounded-2xl border border-border/50 bg-background/30 p-4">
@@ -2129,37 +2296,9 @@ export default function Settings() {
                     <Check className="mr-2 h-4 w-4" /> Saved
                   </>
                 ) : (
-                  "Save Profile"
+                  "Save Public Page"
                 )}
               </Button>
-
-              {!hasArtistPage && (
-                <div className="rounded-2xl border border-border/50 bg-background/30 p-5">
-                  <div className="text-lg font-semibold">Create a linked artist page</div>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Keep this personal profile for you, and add a separate artist page for your work, media, and contact info.
-                  </p>
-                  <Button
-                    type="button"
-                    className="mt-4"
-                    onClick={() => {
-                      setIsCreatingArtistPage(true);
-                      setCreatorSetupStage("starter");
-                      setActiveTab("creator");
-                      setArtist((current) => ({
-                        ...current,
-                        category: current.category || "Creative Professional",
-                        location: current.location || basic.location || "",
-                        bio: current.bio || basic.about || basic.bio || "",
-                        avatarUrl: current.avatarUrl || "",
-                        bannerUrl: current.bannerUrl || "",
-                      }));
-                    }}
-                  >
-                    Create Artist Page
-                  </Button>
-                </div>
-              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -2334,6 +2473,56 @@ export default function Settings() {
                   <CardDescription>Define the details people should have before they lock in a shoot or production.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Lead role</Label>
+                      <Input value={collaborationCardDetails.leadRole} onChange={(e) => updateCollaborationCardDetails({ leadRole: e.target.value })} placeholder="Photographer / Model / MUA" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Support roles</Label>
+                      <Input value={collaborationCardDetails.supportRoles} onChange={(e) => updateCollaborationCardDetails({ supportRoles: e.target.value })} placeholder="Styling, makeup, retouching, production" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Booking contact</Label>
+                      <Input value={collaborationCardDetails.bookingContact} onChange={(e) => updateCollaborationCardDetails({ bookingContact: e.target.value })} placeholder="email@example.com" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Who</Label>
+                      <Input value={collaborationCardDetails.who} onChange={(e) => updateCollaborationCardDetails({ who: e.target.value })} placeholder="Public facing collaborator name or lead contact" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Where</Label>
+                      <Input value={collaborationCardDetails.where} onChange={(e) => updateCollaborationCardDetails({ where: e.target.value })} placeholder="Los Angeles / studio / willing to travel" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>References</Label>
+                      <Input value={collaborationCardDetails.references} onChange={(e) => updateCollaborationCardDetails({ references: e.target.value })} placeholder="Trusted collaborators, references, or vouch context" />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label>Concept</Label>
+                      <Input value={collaborationCardDetails.concept} onChange={(e) => updateCollaborationCardDetails({ concept: e.target.value })} placeholder="Creative brief, mood, or direction" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Compensation</Label>
+                      <Input value={collaborationCardDetails.compensation} onChange={(e) => updateCollaborationCardDetails({ compensation: e.target.value })} placeholder="Paid, TFP, trade, or custom rate" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Compensation type</Label>
+                      <Input value={collaborationCardDetails.compensationType} onChange={(e) => updateCollaborationCardDetails({ compensationType: e.target.value })} placeholder="Paid / Trade / To be agreed" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Call time</Label>
+                      <Input value={collaborationCardDetails.callTime} onChange={(e) => updateCollaborationCardDetails({ callTime: e.target.value })} placeholder="4/30/2026 9:00 PM" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Duration</Label>
+                      <Input value={collaborationCardDetails.duration} onChange={(e) => updateCollaborationCardDetails({ duration: e.target.value })} placeholder="2 hours / half-day / full day" />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label>Emergency contact option</Label>
+                      <Input value={collaborationCardDetails.emergencyContactOption} onChange={(e) => updateCollaborationCardDetails({ emergencyContactOption: e.target.value })} placeholder="Shared after confirmation / private production contact" />
+                    </div>
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
@@ -2403,6 +2592,19 @@ export default function Settings() {
                   <div className="rounded-2xl border border-dashed border-border/50 bg-background/20 p-4 text-sm text-muted-foreground">
                     This is a frontend planning surface for now. A later backend phase can turn it into a real collaboration card with private emergency-contact handling and confirmation workflows.
                   </div>
+                  <Button type="button" onClick={() => { void saveArtistDetails("Collaboration card saved"); }} disabled={saveArtist.isPending}>
+                    {saveState.artistPage === "saving" ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
+                      </>
+                    ) : saveState.artistPage === "saved" ? (
+                      <>
+                        <Check className="mr-2 h-4 w-4" /> Saved
+                      </>
+                    ) : (
+                      "Save Collaboration Card"
+                    )}
+                  </Button>
                 </CardContent>
               </Card>
             </div>
@@ -2781,9 +2983,96 @@ export default function Settings() {
                           <Label>Hero tagline</Label>
                           <Input placeholder={selectedArchetype.tagline} value={artist.tagline || ""} onChange={(e) => setArtist({ ...artist, tagline: e.target.value })} />
                         </div>
-                        <div className="space-y-2">
-                          <Label>Discovery tags</Label>
-                          <Input placeholder="techno, darkwave, latex, portraits" value={artist.tags || ""} onChange={(e) => setArtist({ ...artist, tags: e.target.value })} />
+                        <WorkTypePicker
+                          category={artist.category || "Creative Professional"}
+                          value={artist.tags || ""}
+                          onChange={(next) => setArtist({ ...artist, tags: next })}
+                          label="Work types"
+                          helper="Pick the work you do from the list, then add anything niche or emerging."
+                        />
+                        <details className="rounded-2xl border border-border/50 bg-background/30 p-4">
+                          <summary className="cursor-pointer list-none text-sm font-medium">Browse details</summary>
+                          <div className="mt-3 space-y-4">
+                            <p className="text-xs text-muted-foreground">
+                              These details help people find the right fit in browse and search. They stay tucked into discovery instead of taking over the public page.
+                            </p>
+                            <div className="grid gap-4 md:grid-cols-2">
+                              <div className="space-y-2">
+                                <Label>Best for / shoot types</Label>
+                                <Input
+                                  placeholder="runway, beauty, nightlife coverage, fashion film, e-comm"
+                                  value={browseDetails.bestFor}
+                                  onChange={(e) => updateBrowseDetails({ bestFor: e.target.value })}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Travel</Label>
+                                <Input
+                                  placeholder="LA based, open to travel / local only / West Coast"
+                                  value={browseDetails.travel}
+                                  onChange={(e) => updateBrowseDetails({ travel: e.target.value })}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Compensation</Label>
+                                <Input
+                                  placeholder="paid only / TFP selectively / rates on request"
+                                  value={browseDetails.compensation}
+                                  onChange={(e) => updateBrowseDetails({ compensation: e.target.value })}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Availability note</Label>
+                                <Input
+                                  placeholder="late-night shoots okay / fast turnaround / studio ready"
+                                  value={browseDetails.availabilityNote}
+                                  onChange={(e) => updateBrowseDetails({ availabilityNote: e.target.value })}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </details>
+                        <div className="rounded-2xl border border-border/50 bg-background/30 p-4 space-y-4">
+                          <div>
+                            <div className="text-sm font-semibold">Profile qualifiers</div>
+                            <div className="mt-1 text-sm text-muted-foreground">The artist page edit flow also controls your public text details, not just the look.</div>
+                          </div>
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-2">
+                              <Label>Pronouns</Label>
+                              <Input placeholder="she/her" value={artist.pronouns || ""} onChange={(e) => setArtist({ ...artist, pronouns: e.target.value })} />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Years active</Label>
+                              <Input placeholder="4 years" value={artist.yearsActive || ""} onChange={(e) => setArtist({ ...artist, yearsActive: e.target.value })} />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Representation</Label>
+                              <Input placeholder="Represented by..." value={artist.representedBy || ""} onChange={(e) => setArtist({ ...artist, representedBy: e.target.value })} />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Booking email</Label>
+                              <Input placeholder="bookings@example.com" value={artist.bookingEmail || ""} onChange={(e) => setArtist({ ...artist, bookingEmail: e.target.value })} />
+                            </div>
+                            <div className="space-y-2 md:col-span-2">
+                              <Label>Availability</Label>
+                              <Input placeholder="Available now / booking summer / nights only" value={artist.availabilityStatus || ""} onChange={(e) => setArtist({ ...artist, availabilityStatus: e.target.value })} />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                            <label className="flex items-center gap-3 rounded-2xl border border-border/50 bg-background/30 px-4 py-3">
+                              <Checkbox checked={creator.openForCommissions === "true"} onCheckedChange={(checked) => setCreator({ ...creator, openForCommissions: checked ? "true" : "false" })} />
+                              <span className="text-sm">Open for commissions</span>
+                            </label>
+                            <label className="flex items-center gap-3 rounded-2xl border border-border/50 bg-background/30 px-4 py-3">
+                              <Checkbox checked={creator.touring === "true"} onCheckedChange={(checked) => setCreator({ ...creator, touring: checked ? "true" : "false" })} />
+                              <span className="text-sm">Touring</span>
+                            </label>
+                            <label className="flex items-center gap-3 rounded-2xl border border-border/50 bg-background/30 px-4 py-3">
+                              <Checkbox checked={creator.acceptsCollaborations !== "false"} onCheckedChange={(checked) => setCreator({ ...creator, acceptsCollaborations: checked ? "true" : "false" })} />
+                              <span className="text-sm">Accepts collaborations</span>
+                            </label>
+                          </div>
                         </div>
                         {isStarterCreatorSetup && (
                           <div className="rounded-2xl border border-border/50 bg-background/30 p-4">

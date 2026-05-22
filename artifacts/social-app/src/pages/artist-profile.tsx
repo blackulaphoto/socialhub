@@ -72,6 +72,8 @@ import { useToast } from "@/hooks/use-toast";
 import { MediaEmbed } from "@/components/media-embed";
 import { QueryErrorState } from "@/components/query-error-state";
 import { ReportDialog } from "@/components/report-dialog";
+import { extractCollaborationCard } from "@/lib/collaboration-card";
+import { filterPublicCustomFields } from "@/lib/browse-details";
 import { cn } from "@/lib/utils";
 import { FriendActionButton } from "@/components/friend-action-button";
 import { ProfileReactionBar } from "@/components/profile-reaction-bar";
@@ -459,6 +461,8 @@ export default function ArtistProfile({ id }: { id: string }) {
 
   const creator = profile.creatorSettings;
   const artist = profile.artistProfile;
+  const publicCustomFields = filterPublicCustomFields(artist.customFields);
+  const collaborationCardDetails = extractCollaborationCard(artist.customFields);
   const actionType = creator?.primaryActionType || "contact";
   const actionLabel = creator?.primaryActionLabel || "Reach Out";
   const actionMeta = ACTION_HELPERS[actionType] || ACTION_HELPERS.contact;
@@ -687,29 +691,29 @@ export default function ArtistProfile({ id }: { id: string }) {
     { label: "Collaboration readiness", detail: profile.canInteract ? "Profile is open to contact and visible collaboration requests." : "Direct interaction is currently restricted on this profile." },
   ];
   const collaborationRoles = [
-    { role: "Lead creative", name: artist.displayName || artistPageName, helper: artist.category || "Creative professional" },
-    { role: "Support roles", name: heroTags.length ? heroTags.slice(0, 3).join(", ") : "Styling, makeup, retouching, production as needed", helper: "Core collaborators usually involved in the work" },
-    { role: "Booking contact", name: artist.bookingEmail || "Shared on request", helper: "Moves to direct production coordination after fit is confirmed" },
+    { role: "Lead creative", name: collaborationCardDetails.leadRole || artist.displayName || artistPageName, helper: artist.category || "Creative professional" },
+    { role: "Support roles", name: collaborationCardDetails.supportRoles || (heroTags.length ? heroTags.slice(0, 3).join(", ") : "Styling, makeup, retouching, production as needed"), helper: "Core collaborators usually involved in the work" },
+    { role: "Booking contact", name: collaborationCardDetails.bookingContact || artist.bookingEmail || "Shared on request", helper: "Moves to direct production coordination after fit is confirmed" },
   ];
   const collaborationCompensationType = pricingSummary ? "Paid" : artist.openForCommissions ? "Paid / commission" : "Trade / to be agreed";
   const collaborationCompensationChips = [
-    collaborationCompensationType,
+    collaborationCardDetails.compensationType || collaborationCompensationType,
     artist.openForCommissions ? "Open to paid bookings" : "Selective collaborations",
     turnaroundInfo ? `Turnaround: ${turnaroundInfo}` : "Timing to confirm",
   ];
   const collaborationCardItems = [
-    { label: "Who", value: artist.displayName || artistPageName, helper: artist.category || "Creative professional" },
-    { label: "Where", value: artist.location || profile.user.city || profile.user.location || "Location to confirm", helper: "Shoot base or travel context" },
-    { label: "References", value: `${referenceCount} visible references`, helper: "Trust layer and collaborator history" },
-    { label: "Concept", value: heroTagline || "Concept to define", helper: "Creative direction or project brief" },
-    { label: "Compensation", value: pricingSummary || collaborationCompensationType, helper: "Rates, trade, or paid production" },
-    { label: "Call time", value: upcomingEvents[0] ? new Date(upcomingEvents[0].startsAt).toLocaleString() : "To be confirmed", helper: "Shared publicly only when the timing can be stated clearly" },
-    { label: "Duration", value: turnaroundInfo || "Half-day / full-day to confirm", helper: "Shoot length or expected production window" },
+    { label: "Who", value: collaborationCardDetails.who || artist.displayName || artistPageName, helper: artist.category || "Creative professional" },
+    { label: "Where", value: collaborationCardDetails.where || artist.location || profile.user.city || profile.user.location || "Location to confirm", helper: "Shoot base or travel context" },
+    { label: "References", value: collaborationCardDetails.references || `${referenceCount} visible references`, helper: "Trust layer and collaborator history" },
+    { label: "Concept", value: collaborationCardDetails.concept || heroTagline || "Concept to define", helper: "Creative direction or project brief" },
+    { label: "Compensation", value: collaborationCardDetails.compensation || pricingSummary || collaborationCompensationType, helper: "Rates, trade, or paid production" },
+    { label: "Call time", value: collaborationCardDetails.callTime || (upcomingEvents[0] ? new Date(upcomingEvents[0].startsAt).toLocaleString() : "To be confirmed"), helper: "Shared publicly only when the timing can be stated clearly" },
+    { label: "Duration", value: collaborationCardDetails.duration || turnaroundInfo || "Half-day / full-day to confirm", helper: "Shoot length or expected production window" },
   ];
   const privateCoordinationItems = [
-    { label: "Emergency contact option", value: "Shared after confirmation", helper: "Private coordination field for confirmed productions only" },
-    { label: "Call time", value: upcomingEvents[0] ? new Date(upcomingEvents[0].startsAt).toLocaleString() : "To be confirmed", helper: "Final call time appears once the collaboration is confirmed" },
-    { label: "Compensation type", value: collaborationCompensationType, helper: "Displayed as a private planning confirmation when needed" },
+    { label: "Emergency contact option", value: collaborationCardDetails.emergencyContactOption || "Shared after confirmation", helper: "Private coordination field for confirmed productions only" },
+    { label: "Call time", value: collaborationCardDetails.callTime || (upcomingEvents[0] ? new Date(upcomingEvents[0].startsAt).toLocaleString() : "To be confirmed"), helper: "Final call time appears once the collaboration is confirmed" },
+    { label: "Compensation type", value: collaborationCardDetails.compensationType || collaborationCompensationType, helper: "Displayed as a private planning confirmation when needed" },
   ];
   const friendPlaceholderImages = [
     artistPageAvatar,
@@ -1028,7 +1032,7 @@ export default function ArtistProfile({ id }: { id: string }) {
       label: event.title,
       value: `${new Date(event.startsAt).toLocaleDateString()} · ${event.location || "Location pending"}`,
     })),
-    ...(artist.customFields?.slice(0, 3).map((field) => ({
+    ...(publicCustomFields.slice(0, 3).map((field) => ({
       label: field.label,
       value: field.value,
     })) || []),
@@ -1072,9 +1076,9 @@ export default function ArtistProfile({ id }: { id: string }) {
             </div>
           )}
 
-          {artist.customFields?.length > 0 && (
+          {publicCustomFields.length > 0 && (
             <div className="grid gap-3 md:grid-cols-2">
-              {artist.customFields.map((field) => (
+              {publicCustomFields.map((field) => (
                 <div key={`${field.label}-${field.value}`} className="rounded-2xl border border-border/50 bg-background/40 p-4">
                   <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{field.label}</div>
                   <div className="mt-1 text-sm">{field.value}</div>
@@ -1162,7 +1166,7 @@ export default function ArtistProfile({ id }: { id: string }) {
 
   const renderAbout = () => {
     // Check if About section has any meaningful content
-    const hasAboutContent = artist.bio || artist.influences || (artist.customFields && artist.customFields.length > 0) || serviceItems.length > 0 || pricingSummary || turnaroundInfo;
+    const hasAboutContent = artist.bio || artist.influences || publicCustomFields.length > 0 || serviceItems.length > 0 || pricingSummary || turnaroundInfo;
 
     if (!hasAboutContent) {
       return null;

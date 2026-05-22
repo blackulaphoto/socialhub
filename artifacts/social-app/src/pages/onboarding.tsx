@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LocationInput } from "@/components/location-input";
+import { WorkTypePicker } from "@/components/work-type-picker";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -19,12 +20,14 @@ import { Spinner } from "@/components/ui/spinner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { formatCityRegion, parseCityRegion } from "@/lib/locations";
+import { applyBrowseDetails, extractBrowseDetails } from "@/lib/browse-details";
 import { Palette, Sparkles } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const CREATOR_TYPES = [
   "Model",
   "Photographer",
+  "Videographer",
   "Makeup Artist",
   "Stylist",
   "Retoucher",
@@ -60,6 +63,12 @@ export default function Onboarding() {
     tags: "",
     bio: "",
     bookingEmail: "",
+    availabilityStatus: "",
+    bestFor: "",
+    travel: "",
+    compensation: "",
+    availabilityNote: "",
+    acceptsCollaborations: true,
   });
 
   const { data: profile, isLoading } = useGetUser(user?.id || 0, {
@@ -88,6 +97,12 @@ export default function Onboarding() {
       tags: profile.artistProfile?.tags?.join(", ") || "",
       bio: profile.artistProfile?.bio || profile.user.about || profile.user.bio || "",
       bookingEmail: profile.artistProfile?.bookingEmail || "",
+      availabilityStatus: profile.artistProfile?.availabilityStatus || "",
+      bestFor: extractBrowseDetails(profile.artistProfile?.customFields).bestFor,
+      travel: extractBrowseDetails(profile.artistProfile?.customFields).travel,
+      compensation: extractBrowseDetails(profile.artistProfile?.customFields).compensation,
+      availabilityNote: extractBrowseDetails(profile.artistProfile?.customFields).availabilityNote,
+      acceptsCollaborations: profile.artistProfile?.acceptsCollaborations !== false,
     });
     if (profile.user.onboardingCompleted) {
       setLocation("/");
@@ -147,6 +162,12 @@ export default function Onboarding() {
   };
 
   const saveArtistStep = () => {
+    const customFields = applyBrowseDetails([], {
+      bestFor: artistForm.bestFor,
+      travel: artistForm.travel,
+      compensation: artistForm.compensation,
+      availabilityNote: artistForm.availabilityNote,
+    });
     updateArtist.mutate({
       userId: user.id,
       data: {
@@ -156,6 +177,9 @@ export default function Onboarding() {
         tags: artistForm.tags.split(",").map((item) => item.trim()).filter(Boolean),
         bio: artistForm.bio || undefined,
         bookingEmail: artistForm.bookingEmail || undefined,
+        availabilityStatus: artistForm.availabilityStatus || undefined,
+        acceptsCollaborations: artistForm.acceptsCollaborations,
+        customFields,
       },
     }, {
       onSuccess: () => {
@@ -391,8 +415,13 @@ export default function Onboarding() {
                 <Input value={artistForm.tagline} onChange={(e) => setArtistForm((current) => ({ ...current, tagline: e.target.value }))} placeholder="Editorial model available for fashion, beauty, and concept shoots." />
               </div>
               <div className="space-y-2">
-                <Label>Tags</Label>
-                <Input value={artistForm.tags} onChange={(e) => setArtistForm((current) => ({ ...current, tags: e.target.value }))} placeholder="editorial, beauty, test shoot, studio, retouching" />
+                <WorkTypePicker
+                  category={artistForm.category}
+                  value={artistForm.tags}
+                  onChange={(next) => setArtistForm((current) => ({ ...current, tags: next }))}
+                  label="Work types"
+                  helper="Choose the kinds of shoots and work you want to be found for."
+                />
               </div>
               <div className="space-y-2">
                 <Label>Artist page bio</Label>
@@ -402,6 +431,64 @@ export default function Onboarding() {
                 <Label>Booking or contact email</Label>
                 <Input value={artistForm.bookingEmail} onChange={(e) => setArtistForm((current) => ({ ...current, bookingEmail: e.target.value }))} placeholder="bookings@example.com" />
               </div>
+              <details className="rounded-2xl border border-border/50 bg-background/30 p-4">
+                <summary className="cursor-pointer list-none text-sm font-medium">Optional browse details</summary>
+                <div className="mt-3 space-y-4">
+                  <p className="text-xs text-muted-foreground">
+                    These help people find you in browse and search. They are meant for discovery, not to overload your public page.
+                  </p>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Availability</Label>
+                      <Input
+                        value={artistForm.availabilityStatus}
+                        onChange={(e) => setArtistForm((current) => ({ ...current, availabilityStatus: e.target.value }))}
+                        placeholder="Available now / booking June / weekends"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Best for / shoot types</Label>
+                      <Input
+                        value={artistForm.bestFor}
+                        onChange={(e) => setArtistForm((current) => ({ ...current, bestFor: e.target.value }))}
+                        placeholder="editorial, runway, beauty, campaigns, BTS"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Travel</Label>
+                      <Input
+                        value={artistForm.travel}
+                        onChange={(e) => setArtistForm((current) => ({ ...current, travel: e.target.value }))}
+                        placeholder="LA-based, open to travel / local only"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Compensation</Label>
+                      <Input
+                        value={artistForm.compensation}
+                        onChange={(e) => setArtistForm((current) => ({ ...current, compensation: e.target.value }))}
+                        placeholder="paid, TFP selectively, rates on request"
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label>Availability note</Label>
+                      <Input
+                        value={artistForm.availabilityNote}
+                        onChange={(e) => setArtistForm((current) => ({ ...current, availabilityNote: e.target.value }))}
+                        placeholder="Late-night shoots okay / studio-ready / quick turnaround"
+                      />
+                    </div>
+                  </div>
+                  <label className="flex items-center gap-3 rounded-2xl border border-border/50 bg-background/30 px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={artistForm.acceptsCollaborations}
+                      onChange={(e) => setArtistForm((current) => ({ ...current, acceptsCollaborations: e.target.checked }))}
+                    />
+                    <span className="text-sm">Open to collaborations</span>
+                  </label>
+                </div>
+              </details>
               <div className="flex justify-between gap-3">
                 <Button variant="outline" onClick={() => setStep("finish")}>Skip for now</Button>
                 <Button onClick={saveArtistStep} disabled={updateArtist.isPending}>Save artist page</Button>

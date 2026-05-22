@@ -67,10 +67,12 @@ async function resolveContributorUserIds(input: unknown) {
 }
 
 router.get("/artists", async (req, res) => {
-  const { location, category, tags, q } = req.query as Record<string, string>;
+  const { location, category, tags, q, availability, collaboration } = req.query as Record<string, string>;
   const blockedUserIds = await getBlockedUserIds(req.session.userId);
   const conditions = [];
   const locationTerms = expandLocationTerms(location);
+  const normalizedAvailability = availability?.trim().toLowerCase() || "";
+  const openToCollaborateOnly = collaboration?.trim().toLowerCase() === "open";
 
   if (q) {
     conditions.push(or(
@@ -78,6 +80,9 @@ router.get("/artists", async (req, res) => {
       ilike(artistProfilesTable.displayName, `%${q}%`),
       ilike(artistProfilesTable.category, `%${q}%`),
       ilike(artistProfilesTable.location, `%${q}%`),
+      ilike(artistProfilesTable.tagline, `%${q}%`),
+      ilike(artistProfilesTable.bio, `%${q}%`),
+      sql`${artistProfilesTable.tags}::text ilike ${`%${q}%`}`,
       ilike(userProfileDetailsTable.city, `%${q}%`),
       ilike(userProfileDetailsTable.location, `%${q}%`),
     ));
@@ -97,6 +102,12 @@ router.get("/artists", async (req, res) => {
     if (tagList.length > 0) {
       conditions.push(sql`${artistProfilesTable.tags} && ARRAY[${sql.join(tagList.map((tag) => sql`${tag}`), sql`, `)}]::text[]`);
     }
+  }
+  if (normalizedAvailability) {
+    conditions.push(ilike(artistProfilesTable.availabilityStatus, `%${normalizedAvailability}%`));
+  }
+  if (openToCollaborateOnly) {
+    conditions.push(eq(artistProfilesTable.acceptsCollaborations, true));
   }
 
   const results = await db.select().from(artistProfilesTable)

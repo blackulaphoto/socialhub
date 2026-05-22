@@ -479,6 +479,12 @@ export default function Home() {
               <div className="mt-2 max-w-2xl text-sm leading-6 text-[var(--hh-ink-muted)]">
                 Follow a few artists and your scenes will start to speak. Discovery is where you roam; Home is where the people you chose show up.
               </div>
+              <Link href="/discover" className="mt-4 inline-block">
+                <Button className="hh-solid-btn rounded-none">
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Find Artists to Follow
+                </Button>
+              </Link>
             </div>
           ) : null}
 

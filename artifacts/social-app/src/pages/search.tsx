@@ -14,10 +14,13 @@ import { QueryErrorState } from "@/components/query-error-state";
 import { FriendActionButton } from "@/components/friend-action-button";
 import { LocationInput } from "@/components/location-input";
 import { getTopicPath } from "@/lib/topics";
+import { summarizeBrowseDetails } from "@/lib/browse-details";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 
 type SearchType = "all" | "users" | "artists" | "groups" | "events";
+type AvailabilityFilter = "all" | "available";
+type CollaborationFilter = "all" | "open";
 type FriendshipState = {
   id?: number | null;
   status: "self" | "none" | "outgoing" | "incoming" | "friends";
@@ -51,12 +54,14 @@ type SearchArtist = {
   bookingEmail?: string | null;
   pricingSummary?: string | null;
   turnaroundInfo?: string | null;
+  customFields?: Array<{ label: string; value: string }>;
   isFollowing?: boolean;
   user: {
     username: string;
     avatarUrl?: string | null;
     bannerUrl?: string | null;
   };
+  gallery?: Array<{ id: number; url: string }>;
 };
 
 type SearchGroup = {
@@ -67,6 +72,36 @@ type SearchGroup = {
   visibility: string;
   memberCount?: number;
   tags?: string[];
+};
+
+const ROLE_OPTIONS = [
+  "Model",
+  "Photographer",
+  "Videographer",
+  "Makeup Artist",
+  "Stylist",
+  "Retoucher",
+  "Set Designer",
+  "Creative Director",
+  "Wardrobe Stylist",
+  "Hair Artist",
+  "Production Team",
+  "Creative Professional",
+] as const;
+
+const ROLE_SPECIALTY_HINTS: Record<string, string> = {
+  Model: "editorial, runway, beauty, swimwear, fit, alt",
+  Photographer: "editorial, portraits, beauty, campaign, nightlife, BTS",
+  Videographer: "music video, BTS, campaign, fashion film, nightlife",
+  "Makeup Artist": "beauty, editorial, bridal, SFX, body paint",
+  Stylist: "wardrobe, editorial, pulls, runway, lookbook",
+  Retoucher: "skin, beauty, fashion, campaign, compositing",
+  "Set Designer": "editorial build, props, production design, installation",
+  "Creative Director": "concept, casting, brand, editorial, campaign",
+  "Wardrobe Stylist": "pulls, vintage, editorial, tailoring, runway",
+  "Hair Artist": "editorial hair, color, texture, wigs, styling",
+  "Production Team": "producer, PA, lighting, grip, studio support",
+  "Creative Professional": "editorial, campaign, beauty, collaboration",
 };
 
 type SearchEvent = {
@@ -101,6 +136,8 @@ export default function Search() {
   const [location, setLocation] = useState("");
   const [category, setCategory] = useState("");
   const [tags, setTags] = useState("");
+  const [availability, setAvailability] = useState<AvailabilityFilter>("all");
+  const [collaboration, setCollaboration] = useState<CollaborationFilter>("all");
   const activeTopics = tags
     .split(",")
     .map((tag) => tag.trim())
@@ -116,18 +153,22 @@ export default function Search() {
     const locationParam = params.get("location") || "";
     const categoryParam = params.get("category") || "";
     const tagsParam = params.get("tags") || "";
+    const availabilityParam = params.get("availability") || "all";
+    const collaborationParam = params.get("collaboration") || "all";
 
     setQuery(queryParam);
     setType(["all", "users", "artists", "groups", "events"].includes(typeParam) ? typeParam as SearchType : "all");
     setLocation(locationParam);
     setCategory(categoryParam);
     setTags(tagsParam);
+    setAvailability(availabilityParam === "available" ? "available" : "all");
+    setCollaboration(collaborationParam === "open" ? "open" : "all");
   }, [locationPath]);
 
-  const enabled = query.length > 0 || location.length > 0 || category.length > 0 || tags.length > 0;
+  const enabled = query.length > 0 || location.length > 0 || category.length > 0 || tags.length > 0 || availability !== "all" || collaboration !== "all";
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["site-search", query, type, location, category, tags],
+    queryKey: ["site-search", query, type, location, category, tags, availability, collaboration],
     enabled,
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -136,6 +177,8 @@ export default function Search() {
       if (location.trim()) params.set("location", location.trim());
       if (category.trim()) params.set("category", category.trim());
       if (tags.trim()) params.set("tags", tags.trim());
+      if (availability !== "all") params.set("availability", availability);
+      if (collaboration !== "all") params.set("collaboration", collaboration);
       params.set("limit", "30");
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/search?${params.toString()}`, {
         credentials: "include",
@@ -144,6 +187,8 @@ export default function Search() {
       return response.json() as Promise<SearchResponse>;
     },
   });
+
+  const specialtyPlaceholder = ROLE_SPECIALTY_HINTS[category] || "editorial, beauty, alt, runway, test shoot";
 
   const follow = useFollowUser({
     mutation: {
@@ -173,7 +218,7 @@ export default function Search() {
     <div className="max-w-6xl mx-auto p-4 md:py-8 w-full space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Search</h1>
-        <p className="text-muted-foreground">Search artists, scenes, happenings, and people across the whole app.</p>
+        <p className="text-muted-foreground">Browse artists by role, city, specialty, availability, and collaboration readiness.</p>
       </div>
 
       {activeTopics.length > 0 ? (
@@ -256,10 +301,24 @@ export default function Search() {
       ) : null}
 
       <Card className="bg-card/50 border-border/50">
-        <CardContent className="p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+        <CardContent className="space-y-4 p-4">
+          <div className="flex flex-wrap gap-2">
+            {ROLE_OPTIONS.map((role) => (
+              <Button
+                key={role}
+                type="button"
+                variant={category === role ? "default" : "outline"}
+                size="sm"
+                onClick={() => setCategory((current) => current === role ? "" : role)}
+              >
+                {role}
+              </Button>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-6">
           <div className="md:col-span-2 relative">
             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input className="pl-9" placeholder="Search artists, scenes, events, people..." value={query} onChange={(e) => setQuery(e.target.value)} />
+            <Input className="pl-9" placeholder="Search name, role, bio, scene, specialty..." value={query} onChange={(e) => setQuery(e.target.value)} />
           </div>
           <Select value={type} onValueChange={(value) => setType(value as SearchType)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
@@ -272,8 +331,46 @@ export default function Search() {
             </SelectContent>
           </Select>
           <LocationInput placeholder="City / state" value={location} onValueChange={setLocation} />
-          <Input placeholder="Category" value={category} onChange={(e) => setCategory(e.target.value)} />
-          <Input placeholder="Tags, comma separated" value={tags} onChange={(e) => setTags(e.target.value)} />
+          <Select value={category || "__all__"} onValueChange={(value) => setCategory(value === "__all__" ? "" : value)}>
+            <SelectTrigger><SelectValue placeholder="Role" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All roles</SelectItem>
+              {ROLE_OPTIONS.map((role) => <SelectItem key={role} value={role}>{role}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={availability} onValueChange={(value) => setAvailability(value as AvailabilityFilter)}>
+            <SelectTrigger><SelectValue placeholder="Availability" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Any availability</SelectItem>
+              <SelectItem value="available">Available now</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={collaboration} onValueChange={(value) => setCollaboration(value as CollaborationFilter)}>
+            <SelectTrigger><SelectValue placeholder="Collaboration" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All profiles</SelectItem>
+              <SelectItem value="open">Open to collaborate</SelectItem>
+            </SelectContent>
+          </Select>
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto]">
+            <Input placeholder={`Specialties: ${specialtyPlaceholder}`} value={tags} onChange={(e) => setTags(e.target.value)} />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setQuery("");
+                setType("all");
+                setLocation("");
+                setCategory("");
+                setTags("");
+                setAvailability("all");
+                setCollaboration("all");
+              }}
+            >
+              Reset filters
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -291,6 +388,9 @@ export default function Search() {
                 <Badge variant="outline">{data.artistsTotal} portfolios</Badge>
                 <Badge variant="outline">{data.groupsTotal} scenes</Badge>
                 <Badge variant="outline">{data.eventsTotal} events</Badge>
+                {category ? <Badge variant="outline">Role: {category}</Badge> : null}
+                {availability !== "all" ? <Badge variant="outline">Available now</Badge> : null}
+                {collaboration !== "all" ? <Badge variant="outline">Open to collaborate</Badge> : null}
               </div>
             ) : null}
           </CardContent>
@@ -305,47 +405,94 @@ export default function Search() {
         <div className="space-y-8">
           {data.artists?.length > 0 && (
             <section className="space-y-4">
-              <h2 className="text-xl font-bold">Portfolios</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+              <div className="flex items-end justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-bold">Artist Directory</h2>
+                  <p className="text-sm text-muted-foreground">Browse by role, base location, specialties, and booking readiness.</p>
+                </div>
+                <Badge variant="secondary">{data.artists.length} matches</Badge>
+              </div>
+              <div className="space-y-4">
                 {data.artists.map((artist) => (
-                  <Card key={artist.id} className="bg-card/60 border-border/50 overflow-hidden">
-                    <div className="h-28 bg-gradient-to-r from-primary/15 via-background to-cyan-500/10" style={(artist.bannerUrl || artist.user.bannerUrl) ? { backgroundImage: `url(${artist.bannerUrl || artist.user.bannerUrl})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined} />
-                    <CardContent className="p-4 space-y-4">
-                      <div className="flex gap-4">
-                        <Avatar className="w-14 h-14 -mt-10 border-4 border-background">
-                          <AvatarImage src={artist.avatarUrl || artist.user.avatarUrl || ""} />
-                          <AvatarFallback>{(artist.displayName || artist.user.username).slice(0, 2).toUpperCase()}</AvatarFallback>
-                        </Avatar>
-                        <div className="min-w-0 flex-1">
-                          <div className="font-semibold truncate">{artist.displayName || artist.user.username}</div>
-                          <div className="text-sm text-primary">{artist.category}</div>
-                          {artist.location && <div className="text-xs text-muted-foreground flex items-center mt-1"><MapPin className="w-3 h-3 mr-1" /> {artist.location}</div>}
+                  <Card key={artist.id} className="overflow-hidden border-border/50 bg-card/60">
+                    <CardContent className="grid gap-4 p-4 md:grid-cols-[10rem_minmax(0,1fr)_13rem] md:items-start">
+                      <div className="overflow-hidden rounded-xl border border-border/50 bg-background/30">
+                        {artist.gallery?.[0]?.url ? (
+                          <img
+                            src={artist.gallery[0].url}
+                            alt={artist.displayName || artist.user.username}
+                            loading="lazy"
+                            decoding="async"
+                            className="aspect-[4/5] w-full object-cover"
+                          />
+                        ) : (
+                          <div className="aspect-[4/5] w-full bg-gradient-to-br from-primary/10 via-background to-cyan-500/10" />
+                        )}
+                      </div>
+                      <div className="space-y-3">
+                        <div className="flex items-start gap-3">
+                          <Avatar className="h-12 w-12 border border-border/50">
+                            <AvatarImage src={artist.avatarUrl || artist.user.avatarUrl || ""} />
+                            <AvatarFallback>{(artist.displayName || artist.user.username).slice(0, 2).toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-lg font-semibold">{artist.displayName || artist.user.username}</div>
+                            <div className="text-sm text-primary">{artist.category}</div>
+                            {artist.location ? <div className="mt-1 flex items-center text-xs text-muted-foreground"><MapPin className="mr-1 h-3 w-3" /> {artist.location}</div> : null}
+                          </div>
+                        </div>
+                        {artist.tagline ? <div className="text-sm text-muted-foreground">{artist.tagline}</div> : null}
+                        <div className="flex flex-wrap gap-2">
+                          {artist.tags?.slice(0, 6).map((tag) => <Badge key={tag} variant="secondary">{tag}</Badge>)}
+                        </div>
+                        {(() => {
+                          const browseSummary = summarizeBrowseDetails(artist.customFields).slice(0, 2);
+                          if (!browseSummary.length) return null;
+                          return (
+                            <div className="grid gap-2 sm:grid-cols-2">
+                              {browseSummary.map((item) => (
+                                <div key={`${item.label}-${item.value}`} className="rounded-xl border border-border/40 bg-background/25 p-3">
+                                  <div className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">{item.label}</div>
+                                  <div className="mt-1 text-sm font-medium">{item.value}</div>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                      <div className="grid gap-3 text-sm md:grid-cols-2">
+                        <div className="rounded-xl border border-border/50 bg-background/35 p-3">
+                          <div className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Availability</div>
+                          <div className="mt-1 font-medium">{artist.availabilityStatus || "Ask directly"}</div>
+                        </div>
+                        <div className="rounded-xl border border-border/50 bg-background/35 p-3">
+                          <div className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Collaboration</div>
+                          <div className="mt-1 font-medium">{artist.acceptsCollaborations ? "Open to collaborate" : "Limited / private"}</div>
+                        </div>
+                        <div className="rounded-xl border border-border/50 bg-background/35 p-3">
+                          <div className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Rates / booking</div>
+                          <div className="mt-1 font-medium">{artist.pricingSummary || (artist.bookingEmail ? "Booking available" : "Message first")}</div>
+                        </div>
+                        <div className="rounded-xl border border-border/50 bg-background/35 p-3">
+                          <div className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Turnaround</div>
+                          <div className="mt-1 font-medium">{artist.turnaroundInfo || "Not listed"}</div>
                         </div>
                       </div>
-                      {artist.tagline ? <div className="text-xs text-muted-foreground line-clamp-2">{artist.tagline}</div> : null}
-                      <div className="flex flex-wrap gap-2">
-                        {artist.tags?.slice(0, 3).map((tag) => <Badge key={tag} variant="secondary">{tag}</Badge>)}
-                        {artist.availabilityStatus ? <Badge variant="outline">{artist.availabilityStatus}</Badge> : null}
-                        {artist.acceptsCollaborations ? <Badge variant="outline">Open to collaborate</Badge> : null}
-                      </div>
-                      {(artist.pricingSummary || artist.turnaroundInfo || artist.bookingEmail) ? (
-                        <div className="rounded-2xl border border-border/50 bg-background/35 px-3 py-2 text-xs text-muted-foreground">
-                          {artist.pricingSummary ? `Rates: ${artist.pricingSummary}` : artist.turnaroundInfo ? `Turnaround: ${artist.turnaroundInfo}` : "Booking available"}
-                        </div>
-                      ) : null}
-                      <div className="flex flex-wrap gap-2">
-                        <Link href={`/artists/${artist.userId}`}><Button variant="outline" size="sm">View Dossier</Button></Link>
+                      <div className="flex flex-col gap-2 md:items-end">
+                        <Link href={`/artists/${artist.userId}`}><Button variant="outline" size="sm" className="w-full md:w-36">View page</Button></Link>
                         {artist.userId !== user?.id ? (
-                          <Link href={`/artists/${artist.userId}?inquiry=1`}>
-                            <Button variant="secondary" size="sm">
-                              <Mail className="mr-2 h-4 w-4" />
-                              Inquiry
+                          <>
+                            <Link href={`/artists/${artist.userId}?inquiry=1`}>
+                              <Button variant="secondary" size="sm" className="w-full md:w-36">
+                                <Mail className="mr-2 h-4 w-4" />
+                                Inquiry
+                              </Button>
+                            </Link>
+                            <Button size="sm" className="w-full md:w-36" onClick={() => (artist.isFollowing ? unfollow : follow).mutate({ userId: artist.userId })}>
+                              {artist.isFollowing ? "Following" : "Follow"}
                             </Button>
-                          </Link>
+                          </>
                         ) : null}
-                        <Button size="sm" onClick={() => (artist.isFollowing ? unfollow : follow).mutate({ userId: artist.userId })}>
-                          {artist.isFollowing ? "Following" : "Follow"}
-                        </Button>
                       </div>
                     </CardContent>
                   </Card>
