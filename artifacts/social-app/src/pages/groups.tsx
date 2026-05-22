@@ -53,7 +53,7 @@ export default function Groups() {
       onSuccess: (_data, variables) => {
         queryClient.invalidateQueries({ queryKey: ["groups"] });
         queryClient.invalidateQueries({ queryKey: ["group", variables.groupId] });
-        toast({ title: "Joined group" });
+        toast({ title: "Joined scene" });
       },
       onError: () => {
         toast({ title: "Could not join group", variant: "destructive" });
@@ -66,7 +66,7 @@ export default function Groups() {
       onSuccess: (_data, variables) => {
         queryClient.invalidateQueries({ queryKey: ["groups"] });
         queryClient.invalidateQueries({ queryKey: ["group", variables.groupId] });
-        toast({ title: "Left group" });
+        toast({ title: "Left scene" });
       },
       onError: () => {
         toast({ title: "Could not leave group", variant: "destructive" });
@@ -93,21 +93,22 @@ export default function Groups() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-4 md:py-8 w-full space-y-6">
-      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Groups</h1>
-          <p className="text-muted-foreground">Join scenes, collectives, and local creative circles.</p>
+    <div className="max-w-6xl mx-auto w-full space-y-5 p-4 md:space-y-6 md:py-8">
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="space-y-2">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary">Hollywood Heartbeats</div>
+          <h1 className="text-[2rem] font-bold leading-none md:text-3xl">Scenes</h1>
+          <p className="max-w-2xl text-sm text-muted-foreground md:text-base">Forums, collectives, and local creative circles where people talk, trade ideas, and pull each other into the next thing.</p>
         </div>
         <Dialog>
           <DialogTrigger asChild>
-            <Button><Plus className="w-4 h-4 mr-2" /> New Group</Button>
+            <Button className="w-full sm:w-auto"><Plus className="w-4 h-4 mr-2" /> New Scene</Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>Create Group</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>Create Scene</DialogTitle></DialogHeader>
             <div className="space-y-3">
-              <Input placeholder="Group name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-              <Textarea placeholder="What is this group for?" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+              <Input placeholder="Scene name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              <Textarea placeholder="What is this scene for?" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <Input placeholder="Category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
                 <LocationInput
@@ -145,16 +146,32 @@ export default function Groups() {
                 }
                 disabled={createGroup.isPending || isUploadingCover}
               >
-                Create Group
+                Create Scene
               </Button>
             </div>
           </DialogContent>
         </Dialog>
       </div>
 
-      <Card className="bg-card/50 border-border/50">
-        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-3 p-4">
-          <Input placeholder="Search groups..." value={search} onChange={(e) => setSearch(e.target.value)} className="bg-card/50" />
+      <Card className="overflow-hidden rounded-[1.9rem] border border-border/50 bg-card/40 shadow-[0_24px_60px_-48px_rgba(0,0,0,0.82)] backdrop-blur-xl">
+        <CardContent className="grid grid-cols-2 gap-3 p-3.5 md:grid-cols-4 md:p-4">
+          {[
+            { label: "Why scenes matter", detail: "This is where the culture lives: local talk, shoot planning, recaps, references, and creative pull." },
+            { label: "Typical use", detail: "Open calls, local shoots, wardrobe pulls, retoucher asks, after-hours chatter, and scene notes." },
+            { label: "Who joins", detail: "Models, photographers, makeup artists, stylists, set designers, performers, and nightlife creatives." },
+            { label: "Current phase", detail: "Keeping scenes social and visible now, without turning them into formal forum software." },
+          ].map((item) => (
+            <div key={item.label} className={`rounded-[1.45rem] border border-border/50 bg-background/28 p-4 ${item.label === "Current phase" ? "col-span-2 md:col-span-1" : ""}`}>
+              <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{item.label}</div>
+              <div className="mt-2 text-sm text-muted-foreground">{item.detail}</div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <Card className="overflow-hidden rounded-[1.9rem] border border-border/50 bg-card/42 shadow-[0_24px_60px_-48px_rgba(0,0,0,0.82)] backdrop-blur-xl">
+        <CardContent className="grid grid-cols-1 gap-3 p-3.5 md:grid-cols-2 md:p-4">
+          <Input placeholder="Search scenes, forums, and collectives..." value={search} onChange={(e) => setSearch(e.target.value)} className="bg-card/50" />
           <LocationInput
             placeholder="Filter by city / state..."
             value={location}
@@ -167,12 +184,12 @@ export default function Groups() {
       {isLoading ? (
         <div className="flex justify-center py-10"><Spinner size="lg" /></div>
       ) : isError ? (
-        <QueryErrorState title="Could not load groups" description="The groups request failed. Check the API and retry." onRetry={() => refetch()} />
+        <QueryErrorState title="Could not load scenes" description="The scenes request failed. Check the API and retry." onRetry={() => refetch()} />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {data?.map((group) => (
             <Link key={group.id} href={`/groups/${group.id}`}>
-              <Card className="cursor-pointer bg-card/60 border-border/50 hover:border-primary/40 transition-colors overflow-hidden">
+              <Card className="cursor-pointer overflow-hidden rounded-[1.9rem] border border-border/50 bg-card/45 shadow-[0_24px_60px_-48px_rgba(0,0,0,0.82)] backdrop-blur-xl transition-colors hover:border-primary/35">
                 <div className="h-32 bg-gradient-to-br from-primary/20 via-background to-cyan-500/10" style={group.coverImageUrl ? { backgroundImage: `url(${group.coverImageUrl})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined} />
                 <CardHeader className="space-y-3">
                   <CardTitle className="flex items-center justify-between gap-3">
@@ -225,7 +242,7 @@ export default function Groups() {
                             }
                           }}
                         >
-                          {group.isMember ? "Leave Group" : "Join Group"}
+                          {group.isMember ? "Leave Scene" : "Join Scene"}
                         </Button>
                       )
                     ) : null}

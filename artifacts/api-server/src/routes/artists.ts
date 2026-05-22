@@ -1,8 +1,8 @@
 import { Router } from "express";
-import { artistProfilesTable, creatorProfileSettingsTable, db, followsTable, galleryItemsTable, userProfileDetailsTable, usersTable } from "@workspace/db";
-import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { artistProfilesTable, creatorProfileSettingsTable, db, followsTable, galleryItemCommentsTable, galleryItemLikesTable, galleryItemsTable, userProfileDetailsTable, usersTable } from "@workspace/db";
+import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth.js";
-import { formatArtistProfile, getBlockState, getBlockedUserIds } from "./helpers.js";
+import { canUsersInteract, ensureArtistProfileRecord, formatArtistProfile, getBlockState, getBlockedUserIds, getUserSummary } from "./helpers.js";
 import { expandLocationTerms } from "../lib/locations.js";
 
 const router = Router();
@@ -46,6 +46,24 @@ async function getVimeoThumbnailUrl(rawUrl?: string | null) {
 
 async function resolveVideoThumbnailUrl(rawUrl?: string | null) {
   return getYouTubeThumbnailUrl(rawUrl) || await getVimeoThumbnailUrl(rawUrl);
+}
+
+async function resolveContributorUserIds(input: unknown) {
+  if (!Array.isArray(input) || input.length === 0) return [];
+
+  const contributorUsernames = [...new Set(
+    input
+      .map((value) => typeof value === "string" ? value.trim().replace(/^@/, "") : "")
+      .filter(Boolean),
+  )];
+
+  if (contributorUsernames.length === 0) return [];
+
+  const rows = await db.select({ id: usersTable.id, username: usersTable.username })
+    .from(usersTable)
+    .where(inArray(usersTable.username, contributorUsernames));
+
+  return rows.map((row) => row.id);
 }
 
 router.get("/artists", async (req, res) => {
@@ -113,7 +131,8 @@ router.get("/artists/:userId", async (req, res) => {
   }
 
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
-  const [profile] = await db.select().from(artistProfilesTable).where(eq(artistProfilesTable.userId, userId)).limit(1);
+  const [details] = await db.select().from(userProfileDetailsTable).where(eq(userProfileDetailsTable.userId, userId)).limit(1);
+  const profile = user ? await ensureArtistProfileRecord(user, details) : null;
 
   if (!user || !profile) {
     res.status(404).json({ error: "Not found", message: "Artist profile not found" });
@@ -298,17 +317,21 @@ router.post("/artists/:userId/gallery", requireAuth, async (req, res) => {
     return;
   }
 
-  const [profile] = await db.select().from(artistProfilesTable).where(eq(artistProfilesTable.userId, userId)).limit(1);
-  if (!profile) {
-    res.status(404).json({ error: "Artist profile not found" });
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
     return;
   }
+  const [details] = await db.select().from(userProfileDetailsTable).where(eq(userProfileDetailsTable.userId, userId)).limit(1);
+  const profile = await ensureArtistProfileRecord(user, details);
 
-  const { type, url, caption, thumbnailUrl } = req.body;
+  const { type, url, caption, thumbnailUrl, contributorUsernames } = req.body;
   if (!type || !url) {
     res.status(400).json({ error: "type and url are required" });
     return;
   }
+
+  const contributorUserIds = await resolveContributorUserIds(contributorUsernames);
 
   const resolvedThumbnailUrl = type === "video"
     ? (typeof thumbnailUrl === "string" && thumbnailUrl.trim()
@@ -322,6 +345,7 @@ router.post("/artists/:userId/gallery", requireAuth, async (req, res) => {
     url,
     thumbnailUrl: resolvedThumbnailUrl,
     caption: caption || null,
+    contributorUserIds,
   } as any).returning();
 
   res.status(201).json(item);
@@ -337,6 +361,138 @@ router.delete("/artists/:userId/gallery/:itemId", requireAuth, async (req, res) 
 
   await db.delete(galleryItemsTable).where(eq(galleryItemsTable.id, itemId));
   res.json({ success: true, message: "Gallery item deleted" });
+});
+
+router.get("/artists/:userId/gallery/:itemId/comments", async (req, res) => {
+  const userId = Number(req.params.userId);
+  const itemId = Number(req.params.itemId);
+  if (Number.isNaN(userId) || Number.isNaN(itemId)) {
+    res.status(400).json({ error: "Invalid ID" });
+    return;
+  }
+
+  const [item] = await db.select().from(galleryItemsTable)
+    .innerJoin(artistProfilesTable, eq(galleryItemsTable.artistId, artistProfilesTable.id))
+    .where(and(eq(galleryItemsTable.id, itemId), eq(artistProfilesTable.userId, userId)))
+    .limit(1);
+
+  if (!item) {
+    res.status(404).json({ error: "Gallery item not found" });
+    return;
+  }
+
+  if (!(await canUsersInteract(req.session.userId, userId))) {
+    res.status(403).json({ error: "You cannot view this gallery item" });
+    return;
+  }
+
+  const comments = await db.select().from(galleryItemCommentsTable)
+    .where(eq(galleryItemCommentsTable.galleryItemId, itemId))
+    .orderBy(asc(galleryItemCommentsTable.createdAt));
+
+  const authorIds = [...new Set(comments.map((comment) => comment.userId))];
+  const authors = authorIds.length
+    ? await db.select().from(usersTable).where(inArray(usersTable.id, authorIds))
+    : [];
+  const authorMap = new Map<number, any>();
+  for (const author of authors) {
+    authorMap.set(author.id, await getUserSummary(author, req.session.userId));
+  }
+
+  res.json(comments.map((comment) => ({
+    ...comment,
+    author: authorMap.get(comment.userId) ?? null,
+  })));
+});
+
+router.post("/artists/:userId/gallery/:itemId/comments", requireAuth, async (req, res) => {
+  const userId = Number(req.params.userId);
+  const itemId = Number(req.params.itemId);
+  const content = typeof req.body?.content === "string" ? req.body.content.trim() : "";
+
+  if (Number.isNaN(userId) || Number.isNaN(itemId)) {
+    res.status(400).json({ error: "Invalid ID" });
+    return;
+  }
+  if (!content) {
+    res.status(400).json({ error: "Comment content is required" });
+    return;
+  }
+
+  const [item] = await db.select().from(galleryItemsTable)
+    .innerJoin(artistProfilesTable, eq(galleryItemsTable.artistId, artistProfilesTable.id))
+    .where(and(eq(galleryItemsTable.id, itemId), eq(artistProfilesTable.userId, userId)))
+    .limit(1);
+
+  if (!item) {
+    res.status(404).json({ error: "Gallery item not found" });
+    return;
+  }
+  if (!(await canUsersInteract(req.session.userId, userId))) {
+    res.status(403).json({ error: "You cannot comment on this gallery item" });
+    return;
+  }
+
+  const [comment] = await db.insert(galleryItemCommentsTable).values({
+    galleryItemId: itemId,
+    userId: req.session.userId!,
+    content,
+  }).returning();
+
+  const [author] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!)).limit(1);
+
+  res.status(201).json({
+    ...comment,
+    author: author ? await getUserSummary(author, req.session.userId) : null,
+  });
+});
+
+router.post("/artists/:userId/gallery/:itemId/like", requireAuth, async (req, res) => {
+  const userId = Number(req.params.userId);
+  const itemId = Number(req.params.itemId);
+
+  if (Number.isNaN(userId) || Number.isNaN(itemId)) {
+    res.status(400).json({ error: "Invalid ID" });
+    return;
+  }
+
+  const [item] = await db.select().from(galleryItemsTable)
+    .innerJoin(artistProfilesTable, eq(galleryItemsTable.artistId, artistProfilesTable.id))
+    .where(and(eq(galleryItemsTable.id, itemId), eq(artistProfilesTable.userId, userId)))
+    .limit(1);
+
+  if (!item) {
+    res.status(404).json({ error: "Gallery item not found" });
+    return;
+  }
+  if (!(await canUsersInteract(req.session.userId, userId))) {
+    res.status(403).json({ error: "You cannot like this gallery item" });
+    return;
+  }
+
+  await db.insert(galleryItemLikesTable).values({
+    galleryItemId: itemId,
+    userId: req.session.userId!,
+  }).onConflictDoNothing();
+
+  res.json({ success: true, message: "Liked" });
+});
+
+router.post("/artists/:userId/gallery/:itemId/unlike", requireAuth, async (req, res) => {
+  const userId = Number(req.params.userId);
+  const itemId = Number(req.params.itemId);
+
+  if (Number.isNaN(userId) || Number.isNaN(itemId)) {
+    res.status(400).json({ error: "Invalid ID" });
+    return;
+  }
+
+  await db.delete(galleryItemLikesTable).where(and(
+    eq(galleryItemLikesTable.galleryItemId, itemId),
+    eq(galleryItemLikesTable.userId, req.session.userId!),
+  ));
+
+  res.json({ success: true, message: "Unliked" });
 });
 
 export default router;

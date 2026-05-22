@@ -13,7 +13,6 @@ import { AppLayout } from "@/components/layout";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
 import Home from "@/pages/home";
-import Profile from "@/pages/profile";
 import ArtistProfile from "@/pages/artist-profile";
 import Discover from "@/pages/discover";
 import Search from "@/pages/search";
@@ -72,10 +71,10 @@ function SiteBranding() {
   useEffect(() => {
     if (typeof document === "undefined") return;
 
-    const siteName = data?.siteName || "ArtistHub";
+    const siteName = data?.siteName || "HollywoodHeartbeats.com";
     document.title = siteName;
 
-    const faviconHref = data?.faviconUrl || "/favicon.png";
+    const faviconHref = data?.faviconUrl || "/favicon.svg";
     let link = document.querySelector("link[rel='icon']") as HTMLLinkElement | null;
     if (!link) {
       link = document.createElement("link");
@@ -102,7 +101,7 @@ function Router() {
         <AppLayout><Home /></AppLayout>
       </Route>
       <Route path="/profile/:id">
-        {params => <AppLayout><Profile id={params.id} /></AppLayout>}
+        {params => <AppLayout><ArtistProfile id={params.id} /></AppLayout>}
       </Route>
       <Route path="/artists/:id">
         {params => <AppLayout><ArtistProfile id={params.id} /></AppLayout>}
@@ -161,7 +160,7 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
         <TooltipProvider>
           <ApiClientConfig />
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>

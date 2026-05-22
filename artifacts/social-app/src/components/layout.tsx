@@ -2,36 +2,22 @@ import { Link, useLocation } from "wouter";
 import {
   Bell,
   CalendarRange,
-  Compass,
-  Menu,
   ChevronDown,
-  Palette,
+  Compass,
   Home,
   LogOut,
+  Menu,
   MessageSquare,
   Moon,
+  Palette,
   Plus,
   Search,
   Settings,
   ShieldAlert,
   Sun,
-  TrendingUp,
   User as UserIcon,
   Users,
 } from "lucide-react";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,143 +43,46 @@ import { useActiveIdentity } from "@/hooks/useActiveIdentity";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 function getPageMeta(location: string) {
-  if (location === "/") return { title: "ArtistHub", subtitle: "Following, local, discovery, and custom collections." };
-  if (location.startsWith("/messages")) return { title: "Messages", subtitle: "Direct conversations and creator inquiries." };
-  if (location.startsWith("/notifications")) return { title: "Notifications", subtitle: "Recent follows, likes, messages, and inquiries." };
-  if (location.startsWith("/artists")) return { title: "Discover", subtitle: "Browse artists, creator pages, and scenes." };
-  if (location.startsWith("/groups")) return { title: "Groups", subtitle: "Creative circles, collectives, and communities." };
-  if (location.startsWith("/events")) return { title: "Events", subtitle: "Local happenings, appearances, and lineups." };
-  if (location.startsWith("/search")) return { title: "Search", subtitle: "Find people, creators, tags, and cities." };
-  if (location.startsWith("/settings")) return { title: "Settings", subtitle: "Profile, creator page, and showcase controls." };
-  if (location.startsWith("/insights")) return { title: "Insights", subtitle: "Track page views, followers, and inquiries." };
-  if (location.startsWith("/admin")) return { title: "Admin", subtitle: "Moderation and platform operations." };
-  if (location.startsWith("/profile")) return { title: "Profile", subtitle: "Identity, posts, and public presence." };
-  return { title: "ArtistHub", subtitle: "Creative social networking." };
+  if (location === "/") return { title: "Following Feed", subtitle: "Recent updates from people you follow, in chronological order." };
+  if (location.startsWith("/messages")) return { title: "Messages", subtitle: "Direct conversation, inquiries, and collaboration threads." };
+  if (location.startsWith("/notifications")) return { title: "Activity", subtitle: "Fresh follows, replies, scene movement, and collaboration notes." };
+  if (location.startsWith("/artists/")) return null;
+  if (location.startsWith("/artists")) return { title: "Discover", subtitle: "Browse artists, portfolios, scenes, and creative circles." };
+  if (location.startsWith("/groups")) return { title: "Scenes", subtitle: "Scene-based forums, collective chatter, and open creative threads." };
+  if (location.startsWith("/events")) return { title: "Happenings", subtitle: "Appearances, local events, and public creative gatherings." };
+  if (location.startsWith("/search")) return { title: "Search", subtitle: "Find artists, scenes, tags, projects, and cities." };
+  if (location.startsWith("/settings")) return { title: "Artist Page Settings", subtitle: "Shape your page, story, and public creative presence." };
+  if (location.startsWith("/insights")) return { title: "Insights", subtitle: "Track visits, follows, and responses to your work." };
+  if (location.startsWith("/admin")) return { title: "Admin", subtitle: "Platform moderation and operational controls." };
+  return { title: "HollywoodHeartbeats.com", subtitle: "A creative social network for artists, scenes, and collaboration." };
 }
 
-function ActivityTypeBadge({ type }: { type: string }) {
-  const label = type === "inquiry"
-    ? "Inquiry"
-    : type === "message"
-      ? "Message"
-      : type === "follow"
-        ? "Follow"
-        : type === "mention"
-          ? "Mention"
-          : type === "event_tag"
-            ? "Event Tag"
-            : type === "event_reminder"
-              ? "Reminder"
-              : type === "comment"
-                ? "Comment"
-                : "Like";
-  return <Badge variant="outline" className="text-[10px] uppercase tracking-[0.18em]">{label}</Badge>;
-}
-
-export function AppSidebar() {
-  const [location] = useLocation();
-  const { user } = useAuth();
-  const { setActiveIdentity } = useActiveIdentity();
-  const { data: siteSettings } = useSiteSettings();
-
-  const navItems = [
-    { title: "Home", url: "/", icon: Home },
-    { title: "Discover", url: "/artists", icon: Compass },
-    { title: "Groups", url: "/groups", icon: Users },
-    { title: "Events", url: "/events", icon: CalendarRange },
-    { title: "Search", url: "/search", icon: Search },
-    { title: "Messages", url: "/messages", icon: MessageSquare },
-    { title: "Profile", url: `/profile/${user?.id}`, icon: UserIcon },
-    { title: user?.hasArtistPage ? "Artist Page" : "Create Artist Page", url: user?.hasArtistPage ? `/artists/${user?.id}` : "/settings?tab=creator", icon: Palette },
-    ...(user?.hasArtistPage ? [{ title: "Insights", url: "/insights", icon: TrendingUp }] : []),
-    { title: "Settings", url: "/settings", icon: Settings },
+function topNavItems(userId?: number) {
+  return [
+    { title: "Home", href: "/", match: (location: string) => location === "/", icon: Home },
+    { title: "Discover", href: "/artists", match: (location: string) => location.startsWith("/artists") && !location.startsWith(`/artists/${userId}`), icon: Compass },
+    { title: "Scenes", href: "/groups", match: (location: string) => location.startsWith("/groups"), icon: Users },
+    { title: "Messages", href: "/messages", match: (location: string) => location.startsWith("/messages"), icon: MessageSquare },
+    { title: "Events", href: "/events", match: (location: string) => location.startsWith("/events"), icon: CalendarRange },
   ];
+}
 
-  if (user?.isAdmin) {
-    navItems.push({ title: "Admin", url: "/admin", icon: ShieldAlert });
-  }
-
+function BrandWordmark({ siteName }: { siteName?: string | null }) {
+  const brand = (siteName || "HollywoodHeartbeats.com").replace(".com", "");
   return (
-    <Sidebar className="border-r border-sidebar-border">
-      <SidebarHeader className="p-4">
-        <div className="rounded-[1.75rem] border border-sidebar-border bg-[linear-gradient(145deg,rgba(255,255,255,0.96),rgba(248,250,252,0.86))] p-4 shadow-[0_20px_60px_-48px_rgba(15,23,42,0.55)] dark:bg-[linear-gradient(145deg,rgba(15,23,42,0.86),rgba(17,24,39,0.82))]">
-          <div className="flex items-center gap-3">
-            {siteSettings?.logoUrl ? (
-              <img
-                src={siteSettings.logoUrl}
-                alt={siteSettings.siteName || "Site logo"}
-                className="h-11 w-11 rounded-2xl object-cover ring-1 ring-border/60"
-              />
-            ) : (
-              <span className="rounded-2xl bg-primary p-2 text-primary-foreground shadow-sm">
-                <Compass className="h-5 w-5" />
-              </span>
-            )}
-            <div className="min-w-0">
-              <h1 className="truncate text-xl font-bold tracking-tight text-primary">{siteSettings?.siteName || "ArtistHub"}</h1>
-              <p className="mt-1 text-xs text-muted-foreground">Creator pages, local scenes, and direct activity.</p>
-            </div>
-          </div>
-          <div className="mt-4 grid gap-2">
-            <Link href="/?compose=1" className="w-full">
-              <Button className="h-9 w-full justify-start rounded-full px-4">
-                <Plus className="mr-2 h-4 w-4" />
-                Create
-              </Button>
-            </Link>
-            <Link href={user?.hasArtistPage ? `/artists/${user?.id}` : "/settings?tab=creator"} className="w-full">
-              <Button variant="outline" className="h-9 w-full justify-start rounded-full px-4">
-                <Palette className="mr-2 h-4 w-4" />
-                {user?.hasArtistPage ? "Artist Page" : "Start Page"}
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </SidebarHeader>
-
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {navItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={location === item.url || (item.url !== "/" && location.startsWith(item.url))}
-                    tooltip={item.title}
-                  >
-                    <Link
-                      href={item.url}
-                      onClick={() => {
-                        if (item.title === "Profile") setActiveIdentity("personal");
-                        if (item.title === "Artist Page") setActiveIdentity("artist");
-                      }}
-                    >
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-
-      <SidebarFooter className="p-4">
-        <div className="rounded-2xl border border-sidebar-border bg-sidebar-accent/40 p-4 text-xs text-muted-foreground">
-          <div className="font-medium text-foreground">Workspace shell</div>
-          <div className="mt-1">Home and Discover handle momentum. Messages, alerts, and identity switching stay in the header.</div>
-        </div>
-      </SidebarFooter>
-    </Sidebar>
+    <div className="hh-brand-lockup">
+      <span className="hh-brand-wordmark">
+        <span>Hollywood</span>
+        <span className="hh-brand-wordmark-accent">Heartbeats</span>
+      </span>
+      <span className="hh-brand-caption">{brand}.com</span>
+    </div>
   );
 }
 
 function HeaderActions() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
-  const { activeIdentity, setActiveIdentity, canUseArtistIdentity } = useActiveIdentity();
   const { theme, setTheme } = useTheme();
   const { mutate: logout } = useLogout();
   const { mutate: readNotification } = useReadNotification();
@@ -237,17 +126,17 @@ function HeaderActions() {
   return (
     <div className="flex items-center gap-2">
       <Link href="/?compose=1">
-        <Button variant="ghost" size="sm" className="hidden rounded-full px-4 lg:inline-flex">
+        <Button className="hh-solid-btn hidden h-10 rounded-none px-5 md:inline-flex">
           <Plus className="mr-2 h-4 w-4" />
-          Create
+          Publish
         </Button>
       </Link>
 
       <Link href="/messages">
-        <Button variant="ghost" size="icon" className="relative rounded-full transition-colors hover:bg-accent/70">
-          <MessageSquare className="w-4 h-4" />
+        <Button variant="ghost" size="icon" className="hh-icon-btn relative">
+          <MessageSquare className="h-4 w-4" />
           {(activity?.unreadMessages || 0) > 0 && (
-            <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-primary text-primary-foreground text-[11px] font-bold grid place-items-center">
+            <span className="hh-count-badge">
               {activity!.unreadMessages > 9 ? "9+" : activity!.unreadMessages}
             </span>
           )}
@@ -256,23 +145,23 @@ function HeaderActions() {
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="relative rounded-full transition-colors hover:bg-accent/70">
-            <Bell className="w-4 h-4" />
+          <Button variant="ghost" size="icon" className="hh-icon-btn relative">
+            <Bell className="h-4 w-4" />
             {(activity?.unreadNotifications || 0) > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-primary text-primary-foreground text-[11px] font-bold grid place-items-center">
+              <span className="hh-count-badge">
                 {activity!.unreadNotifications > 9 ? "9+" : activity!.unreadNotifications}
               </span>
             )}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-[22rem] p-0">
-          <div className="px-4 py-3 border-b border-border">
-            <div className="font-semibold">Notifications</div>
-            <div className="text-xs text-muted-foreground">Messages, follows, likes, and inquiries.</div>
+          <div className="border-b border-border/60 px-4 py-3">
+            <div className="font-semibold">Activity</div>
+            <div className="text-xs text-muted-foreground">Fresh follows, replies, scene movement, and messages.</div>
           </div>
           <div className="max-h-[24rem] overflow-y-auto p-2">
             {notifications?.length ? notifications.map((item) => (
-              <DropdownMenuItem key={item.id} asChild className="items-start rounded-xl p-3">
+              <DropdownMenuItem key={item.id} asChild className="items-start rounded-none px-3 py-3">
                 <Link
                   href={item.href}
                   onClick={() => {
@@ -288,107 +177,64 @@ function HeaderActions() {
                     );
                   }}
                 >
-                  <Avatar className="w-9 h-9 mt-0.5">
+                  <Avatar className="mt-0.5 h-9 w-9">
                     <AvatarImage src={item.actor?.avatarUrl || ""} />
-                    <AvatarFallback>{item.actor?.username?.slice(0, 2).toUpperCase() || "AH"}</AvatarFallback>
+                    <AvatarFallback>{item.actor?.username?.slice(0, 2).toUpperCase() || "HH"}</AvatarFallback>
                   </Avatar>
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex items-center gap-2">
-                      <ActivityTypeBadge type={item.type} />
-                      {item.isUnread && <Badge className="text-[10px]">New</Badge>}
+                      <Badge variant="outline" className="text-[10px] uppercase tracking-[0.16em]">{item.type}</Badge>
+                      {item.isUnread ? <Badge className="text-[10px]">New</Badge> : null}
                     </div>
                     <div className="text-sm font-medium">{item.actor?.username || "Platform"} · {item.title}</div>
-                    <div className="text-xs text-muted-foreground line-clamp-2">{item.body}</div>
+                    <div className="line-clamp-2 text-xs text-muted-foreground">{item.body}</div>
                   </div>
                 </Link>
               </DropdownMenuItem>
             )) : (
-              <div className="px-3 py-8 text-center text-sm text-muted-foreground">No notifications yet.</div>
+              <div className="px-3 py-8 text-center text-sm text-muted-foreground">No activity yet.</div>
             )}
-          </div>
-          <DropdownMenuSeparator />
-          <div className="p-2">
-            <DropdownMenuItem asChild className="justify-center rounded-xl">
-              <Link href="/notifications">Open Notification Center</Link>
-            </DropdownMenuItem>
           </div>
         </DropdownMenuContent>
       </DropdownMenu>
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="h-11 rounded-full px-2 transition-colors hover:bg-accent/70">
-            <Avatar className="w-9 h-9 border border-border">
+          <Button variant="ghost" className="hh-profile-trigger">
+            <Avatar className="h-9 w-9 border border-border/60">
               <AvatarImage src={user?.avatarUrl || ""} />
               <AvatarFallback>{user?.username?.substring(0, 2).toUpperCase()}</AvatarFallback>
             </Avatar>
-            <div className="hidden md:block text-left ml-2">
+            <div className="hidden text-left md:block">
               <div className="text-sm font-medium leading-none">{user?.username}</div>
-              <div className="text-[11px] text-muted-foreground mt-1">{user?.hasArtistPage ? "Personal + artist page" : "Personal profile"}</div>
+              <div className="mt-1 text-[11px] text-muted-foreground">Public artist page</div>
             </div>
-            <ChevronDown className="ml-2 hidden h-4 w-4 text-muted-foreground md:block" />
+            <ChevronDown className="hidden h-4 w-4 text-muted-foreground md:block" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuLabel>
             <div className="font-medium">{user?.username}</div>
-            <div className="text-xs text-muted-foreground mt-1">{user?.email}</div>
+            <div className="mt-1 text-xs text-muted-foreground">{user?.email}</div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild>
-            <Link href={`/profile/${user?.id}`}>Profile</Link>
+            <Link href={`/artists/${user?.id}`}>Artist Page</Link>
           </DropdownMenuItem>
-          {canUseArtistIdentity ? (
-            activeIdentity === "artist" ? (
-              <DropdownMenuItem asChild>
-                <Link href={`/artists/${user?.id}`}>Edit Artist Page</Link>
-              </DropdownMenuItem>
-            ) : (
-              <DropdownMenuItem asChild>
-                <Link href={`/profile/${user?.id}`}>Edit Profile</Link>
-              </DropdownMenuItem>
-            )
-          ) : (
-            <DropdownMenuItem asChild>
-              <Link href={`/profile/${user?.id}`}>Edit Profile</Link>
-            </DropdownMenuItem>
-          )}
-          {canUseArtistIdentity ? (
-            activeIdentity === "artist" ? (
-              <DropdownMenuItem
-                onClick={() => {
-                  setActiveIdentity("personal");
-                  setLocation(`/profile/${user?.id}`);
-                }}
-              >
-                Switch To Personal
-              </DropdownMenuItem>
-            ) : (
-              <DropdownMenuItem
-                onClick={() => {
-                  setActiveIdentity("artist");
-                  setLocation(`/artists/${user?.id}`);
-                }}
-              >
-                Switch To Artist Page
-              </DropdownMenuItem>
-            )
-          ) : null}
-          {!user?.hasArtistPage ? (
-            <DropdownMenuItem asChild>
-              <Link href="/settings?tab=creator">Create Artist Page</Link>
-            </DropdownMenuItem>
-          ) : null}
+          <DropdownMenuItem asChild>
+            <Link href="/settings?tab=creator">Edit Artist Page</Link>
+          </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <Link href="/settings">Settings</Link>
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
-            {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             {theme === "dark" ? "Light mode" : "Dark mode"}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
-            <LogOut className="w-4 h-4" /> Logout
+            <LogOut className="h-4 w-4" />
+            Logout
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -396,73 +242,70 @@ function HeaderActions() {
   );
 }
 
-function AppHeader() {
-  const [location, setLocation] = useLocation();
+function TopNav() {
+  const [location] = useLocation();
   const { user } = useAuth();
-  const { activeIdentity, setActiveIdentity, canUseArtistIdentity } = useActiveIdentity();
   const { data: siteSettings } = useSiteSettings();
-  const meta = getPageMeta(location);
+  const navItems = topNavItems(user?.id);
 
   return (
-    <header className="sticky top-0 z-30 border-b border-border/60 bg-background/80 backdrop-blur-xl">
-      <div className="px-4 md:px-6 h-16 flex items-center gap-3 md:gap-6">
-        <div className="flex min-w-0 flex-1 items-center gap-3 md:flex-none">
-          <SidebarTrigger>
-            <Menu className="w-5 h-5" />
-          </SidebarTrigger>
-          <Link href="/" className="min-w-0 max-w-[10rem] md:max-w-none">
-            <div className="truncate text-lg font-semibold leading-none">{siteSettings?.siteName || "ArtistHub"}</div>
-            <div className="hidden text-xs text-muted-foreground md:block">{location === "/" ? meta.subtitle : meta.title}</div>
+    <header className="hh-topnav">
+      <div className="hh-topnav-inner">
+        <div className="flex min-w-0 items-center gap-4">
+          <Button variant="ghost" size="icon" className="hh-icon-btn md:hidden">
+            <Menu className="h-4 w-4" />
+          </Button>
+          <Link href="/" className="shrink-0">
+            <BrandWordmark siteName={siteSettings?.siteName} />
           </Link>
         </div>
 
-        <div className="hidden flex-1 justify-center md:flex">
-          <div className="flex items-center gap-3 rounded-full border border-border/60 bg-card/70 px-3 py-2 shadow-sm">
-            <div className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary">
-              {meta.title}
-            </div>
-            <div className="max-w-[24rem] truncate text-sm text-muted-foreground">{meta.subtitle}</div>
-            {canUseArtistIdentity ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="h-9 rounded-full px-4 transition-colors hover:border-primary/35 hover:bg-accent/60">
-                    {activeIdentity === "artist" ? "Artist Page" : "Personal"}
-                    <ChevronDown className="ml-2 h-4 w-4 text-muted-foreground" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="center" className="w-52">
-                  <DropdownMenuLabel>Viewing as</DropdownMenuLabel>
-                  <div className="px-2 pb-2 text-xs text-muted-foreground">
-                    Switching identity changes the name and avatar used when you publish a post.
-                  </div>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => {
-                      setActiveIdentity("personal");
-                      setLocation(`/profile/${user?.id}`);
-                    }}
-                  >
-                    Personal
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => {
-                      setActiveIdentity("artist");
-                      setLocation(`/artists/${user?.id}`);
-                    }}
-                  >
-                    Artist Page
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : null}
-          </div>
+        <nav className="hh-primary-nav">
+          {navItems.map((item) => {
+            const isActive = item.match(location);
+            return (
+              <Link key={item.title} href={item.href} className={isActive ? "hh-nav-link is-active" : "hh-nav-link"}>
+                {item.title}
+              </Link>
+            );
+          })}
+          {user?.isAdmin ? (
+            <Link href="/admin" className={location.startsWith("/admin") ? "hh-nav-link is-active" : "hh-nav-link"}>
+              Admin
+            </Link>
+          ) : null}
+        </nav>
+
+        <div className="hidden min-w-0 flex-1 items-center justify-center lg:flex">
+          <Link href="/search" className="hh-search-shell">
+            <Search className="h-4 w-4 text-muted-foreground" />
+            <span className="truncate text-sm text-muted-foreground">Search artists, scenes, tags, cities…</span>
+            <span className="hh-search-kbd">/</span>
+          </Link>
         </div>
 
-        <div className="shrink-0">
-          <HeaderActions />
-        </div>
+        <HeaderActions />
       </div>
     </header>
+  );
+}
+
+function PageHeaderBand() {
+  const [location] = useLocation();
+  const meta = getPageMeta(location);
+
+  if (!meta) return null;
+
+  return (
+    <div className="hh-page-band">
+      <div className="hh-page-band-inner">
+        <div className="min-w-0">
+          <div className="hh-page-kicker">Hollywood Heartbeats</div>
+          <div className="hh-page-title">{meta.title}</div>
+        </div>
+        <div className="hh-page-subtitle">{meta.subtitle}</div>
+      </div>
+    </div>
   );
 }
 
@@ -478,23 +321,23 @@ function MobileBottomNav() {
     { title: "Home", href: "/", icon: Home, onClick: () => undefined },
     { title: "Discover", href: "/artists", icon: Compass, onClick: () => undefined },
     { title: "Create", href: "/?compose=1", icon: Plus, onClick: () => undefined },
-    { title: "Messages", href: "/messages", icon: MessageSquare, onClick: () => undefined },
-    { title: "Profile", href: `/profile/${user.id}`, icon: UserIcon, onClick: () => setActiveIdentity("personal") },
+    { title: "Scenes", href: "/groups", icon: Users, onClick: () => undefined },
+    { title: "Profile", href: `/artists/${user.id}`, icon: UserIcon, onClick: () => setActiveIdentity("artist") },
   ];
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border/70 bg-background/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 backdrop-blur-xl md:hidden">
+    <nav className="hh-mobile-nav md:hidden">
       <div className="grid grid-cols-5 gap-1">
         {items.map((item) => {
           const isActive = item.title === "Create"
             ? isComposeIntentActive
             : item.href === "/"
-            ? location === "/"
-            : location.startsWith(item.href.replace("?compose=1", ""));
+              ? location === "/"
+              : location.startsWith(item.href.replace("?compose=1", ""));
 
           return (
             <Link key={item.title} href={item.href} onClick={item.onClick}>
-              <div className={`flex min-h-14 flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-medium transition-colors ${isActive ? "bg-primary/12 text-primary" : "text-muted-foreground"}`}>
+              <div className={isActive ? "hh-mobile-nav-item is-active" : "hh-mobile-nav-item"}>
                 <item.icon className="mb-1 h-4 w-4" />
                 <span>{item.title}</span>
               </div>
@@ -513,23 +356,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     return <div className="min-h-screen bg-background text-foreground">{children}</div>;
   }
 
-  const style = {
-    "--sidebar-width": "16rem",
-    "--sidebar-width-icon": "4rem",
-  } as React.CSSProperties;
-
   return (
-    <SidebarProvider style={style}>
-      <div className="flex min-h-screen w-full bg-background text-foreground">
-        <AppSidebar />
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          <AppHeader />
-          <main className="flex-1 overflow-y-auto pb-24 md:pb-0">
-            {children}
-          </main>
-        </div>
-        <MobileBottomNav />
-      </div>
-    </SidebarProvider>
+    <div className="hh-app hh-auth-shell min-h-screen bg-background text-foreground">
+      <TopNav />
+      <PageHeaderBand />
+      <main className="hh-main-shell">
+        {children}
+      </main>
+      <MobileBottomNav />
+    </div>
   );
 }

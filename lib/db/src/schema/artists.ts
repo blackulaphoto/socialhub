@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, timestamp, pgEnum, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, timestamp, pgEnum, boolean, jsonb, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
@@ -37,7 +37,24 @@ export const galleryItemsTable = pgTable("gallery_items", {
   url: text("url").notNull(),
   thumbnailUrl: text("thumbnail_url"),
   caption: text("caption"),
+  contributorUserIds: integer("contributor_user_ids").array().notNull().default([]),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const galleryItemLikesTable = pgTable("gallery_item_likes", {
+  id: serial("id").primaryKey(),
+  galleryItemId: integer("gallery_item_id").notNull().references(() => galleryItemsTable.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [unique().on(table.galleryItemId, table.userId)]);
+
+export const galleryItemCommentsTable = pgTable("gallery_item_comments", {
+  id: serial("id").primaryKey(),
+  galleryItemId: integer("gallery_item_id").notNull().references(() => galleryItemsTable.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 export const insertArtistProfileSchema = createInsertSchema(artistProfilesTable).omit({ id: true, createdAt: true, updatedAt: true });
@@ -47,3 +64,5 @@ export type InsertArtistProfile = z.infer<typeof insertArtistProfileSchema>;
 export type InsertGalleryItem = z.infer<typeof insertGalleryItemSchema>;
 export type ArtistProfile = typeof artistProfilesTable.$inferSelect;
 export type GalleryItem = typeof galleryItemsTable.$inferSelect;
+export type GalleryItemLike = typeof galleryItemLikesTable.$inferSelect;
+export type GalleryItemComment = typeof galleryItemCommentsTable.$inferSelect;

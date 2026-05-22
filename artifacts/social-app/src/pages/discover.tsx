@@ -1,20 +1,20 @@
+import { useState } from "react";
 import { Link } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useFollowUser, useUnfollowUser } from "@workspace/api-client-react";
-import { useState } from "react";
-import { ArrowRight, MapPin, Mic2, Palette, Search, Sparkles, Users } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { ArrowRight, Mail, Search, Sparkles, Users } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Spinner } from "@/components/ui/spinner";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { LocationInput } from "@/components/location-input";
 import { QueryErrorState } from "@/components/query-error-state";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { FriendActionButton } from "@/components/friend-action-button";
-import { LocationInput } from "@/components/location-input";
 import { getTopicPath } from "@/lib/topics";
 
 type FriendshipState = {
@@ -28,11 +28,15 @@ type DiscoverArtist = {
   userId: number;
   displayName?: string | null;
   avatarUrl?: string | null;
-  bannerUrl?: string | null;
   category: string;
   location?: string | null;
   tagline?: string | null;
   tags?: string[];
+  availabilityStatus?: string | null;
+  acceptsCollaborations?: boolean;
+  bookingEmail?: string | null;
+  pricingSummary?: string | null;
+  turnaroundInfo?: string | null;
   gallery?: Array<{ id: number; url: string }>;
   isFollowing?: boolean;
   user: {
@@ -48,16 +52,15 @@ type DiscoverPerson = {
   about?: string | null;
   location?: string | null;
   city?: string | null;
-  hasArtistPage?: boolean;
   mutualFriendCount?: number;
   friendship?: FriendshipState;
 };
 
 function getCreatorSuggestionReason(artist: DiscoverArtist) {
-  if (artist.location?.trim()) return `Active in ${artist.location.trim()}`;
-  if (artist.tags?.[0]) return `Matches the ${artist.tags[0]} scene`;
-  if (artist.tagline?.trim()) return "Strong public page signal";
-  return "Suggested from creator discovery activity";
+  if (artist.location?.trim()) return artist.location.trim();
+  if (artist.tags?.[0]) return artist.tags[0];
+  if (artist.tagline?.trim()) return artist.tagline.trim();
+  return artist.category;
 }
 
 export default function Discover() {
@@ -108,6 +111,7 @@ export default function Discover() {
       return response.json() as Promise<{ users: DiscoverPerson[]; total: number }>;
     },
   });
+
   const { data: trendingTopics } = useQuery({
     queryKey: ["trending-topics"],
     queryFn: async () => {
@@ -126,9 +130,9 @@ export default function Discover() {
         queryClient.invalidateQueries({ queryKey: ["suggested-creators", "discover", user?.id] });
         queryClient.invalidateQueries({ queryKey: ["/api/users", user?.id, "following"] });
         queryClient.invalidateQueries({ queryKey: ["feed"] });
-        toast({ title: "Following creator" });
+        toast({ title: "Following artist" });
       },
-      onError: () => toast({ title: "Could not follow creator", variant: "destructive" }),
+      onError: () => toast({ title: "Could not follow artist", variant: "destructive" }),
     },
   });
 
@@ -139,9 +143,9 @@ export default function Discover() {
         queryClient.invalidateQueries({ queryKey: ["suggested-creators", "discover", user?.id] });
         queryClient.invalidateQueries({ queryKey: ["/api/users", user?.id, "following"] });
         queryClient.invalidateQueries({ queryKey: ["feed"] });
-        toast({ title: "Unfollowed creator" });
+        toast({ title: "Unfollowed artist" });
       },
-      onError: () => toast({ title: "Could not unfollow creator", variant: "destructive" }),
+      onError: () => toast({ title: "Could not unfollow artist", variant: "destructive" }),
     },
   });
 
@@ -150,278 +154,191 @@ export default function Discover() {
     : ((suggestedCreators?.artists?.length ? suggestedCreators.artists : artistDirectory?.artists) || []);
 
   return (
-    <div className="max-w-6xl mx-auto p-4 md:py-8 w-full space-y-8">
-      <section className="relative overflow-hidden rounded-[2rem] border border-border/60 bg-[linear-gradient(135deg,rgba(255,255,255,0.97),rgba(248,250,252,0.94),rgba(224,242,254,0.9))] p-6 shadow-[0_28px_80px_-60px_rgba(15,23,42,0.6)] dark:bg-[linear-gradient(135deg,rgba(15,23,42,0.96),rgba(17,24,39,0.94),rgba(22,78,99,0.88))] md:p-8">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.18),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(14,165,233,0.16),transparent_30%)]" />
-        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-primary">
-              <Sparkles className="h-3.5 w-3.5" />
-              Discovery Surface
-            </div>
-            <h1 className="mt-4 text-3xl font-bold tracking-tight md:text-4xl">Find creators with enough context to decide fast.</h1>
-            <p className="mt-3 max-w-2xl text-sm text-muted-foreground md:text-base">
-              Browse by city, medium, and tags, then jump directly into the public page. This should feel like scouting a scene, not digging through a directory.
-            </p>
-          </div>
-          <div className="grid grid-cols-2 gap-3 text-sm md:min-w-[20rem]">
-            <div className="rounded-2xl border border-border/50 bg-background/70 p-4">
-              <div className="text-muted-foreground">Creator results</div>
-              <div className="mt-1 text-lg font-semibold">{artistDirectory?.total ?? creatorCards.length}</div>
-            </div>
-            <div className="rounded-2xl border border-border/50 bg-background/70 p-4">
-              <div className="text-muted-foreground">Suggested people</div>
-              <div className="mt-1 text-lg font-semibold">{suggestedPeople?.users?.length ?? 0}</div>
-            </div>
-            <div className="rounded-2xl border border-border/50 bg-background/70 p-4">
-              <div className="text-muted-foreground">Current city filter</div>
-              <div className="mt-1 text-lg font-semibold">{location.trim() || "Any city"}</div>
-            </div>
-            <div className="rounded-2xl border border-border/50 bg-background/70 p-4">
-              <div className="text-muted-foreground">Category</div>
-              <div className="mt-1 text-lg font-semibold">{category === "all" ? "All creators" : category}</div>
-            </div>
+    <div className="space-y-6">
+      <section>
+        <div className="hh-page-kicker">Discover · Search the network</div>
+        <h1 className="hh-page-title mt-3 !text-[clamp(2.4rem,6vw,4.4rem)]">
+          Find the right people <span className="hh-brand-wordmark-accent">for the shoot.</span>
+        </h1>
+      </section>
+
+      <section className="hh-search-stage">
+        <div className="hh-discover-input">
+          <Search className="h-5 w-5 text-[var(--hh-ink-muted)]" />
+          <Input
+            placeholder="latex stylist · LA · weekend availability"
+            className="border-0 bg-transparent px-0 font-serif text-lg italic text-foreground shadow-none focus-visible:ring-0"
+            value={tags}
+            onChange={(e) => setTags(e.target.value)}
+          />
+          <Button variant="ghost" size="sm" onClick={() => setTags("")}>Clear</Button>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-[180px_220px_1fr]">
+          <Select value={category} onValueChange={setCategory}>
+            <SelectTrigger className="rounded-none border-[var(--hh-rule)] bg-transparent">
+              <SelectValue placeholder="Role" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All roles</SelectItem>
+              <SelectItem value="Model">Model</SelectItem>
+              <SelectItem value="Photographer">Photographer</SelectItem>
+              <SelectItem value="Makeup Artist">Makeup Artist</SelectItem>
+              <SelectItem value="Stylist">Stylist</SelectItem>
+              <SelectItem value="Retoucher">Retoucher</SelectItem>
+              <SelectItem value="Set Designer">Set Designer</SelectItem>
+              <SelectItem value="Creative Director">Creative Director</SelectItem>
+              <SelectItem value="Wardrobe Stylist">Wardrobe Stylist</SelectItem>
+              <SelectItem value="Hair Artist">Hair Artist</SelectItem>
+              <SelectItem value="Production Team">Production Team</SelectItem>
+            </SelectContent>
+          </Select>
+          <LocationInput
+            placeholder="Los Angeles"
+            className="rounded-none border-[var(--hh-rule)] bg-transparent"
+            value={location}
+            onValueChange={setLocation}
+          />
+          <div className="hh-filter-row">
+            <button type="button" className={`hh-filter-chip ${filtersActive ? "is-active" : ""}`}>
+              <strong>Filters</strong> {filtersActive ? "active" : "all open"}
+            </button>
+            {location.trim() ? <button type="button" className="hh-filter-chip is-active"><strong>City</strong> {location.trim()}</button> : null}
+            {category !== "all" ? <button type="button" className="hh-filter-chip is-active"><strong>Role</strong> {category}</button> : null}
+            {tags.trim() ? <button type="button" className="hh-filter-chip is-active"><strong>Tags</strong> {tags.trim()}</button> : null}
+            {filtersActive ? <button type="button" className="hh-filter-chip" onClick={() => { setLocation(""); setCategory("all"); setTags(""); }}>Reset</button> : null}
           </div>
         </div>
       </section>
 
-      {!user?.hasArtistPage && (
-        <Card className="overflow-hidden border-border/50 bg-card/40">
-          <CardContent className="relative p-6 md:p-7">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(139,92,246,0.14),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(14,165,233,0.12),transparent_32%)]" />
-            <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div className="space-y-2">
-                <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[10px] uppercase tracking-[0.24em] text-primary">
-                  <Sparkles className="h-3.5 w-3.5" />
-                  Creator Upgrade
-                </div>
-                <div className="text-2xl font-bold">Turn your profile into a real artist page.</div>
-                <p className="max-w-2xl text-sm text-muted-foreground">
-                  Add a media-rich creator homepage with gallery, booking button, featured work, and event presence, all linked to your personal account.
-                </p>
+      <section className="hh-tabstrip">
+        <button type="button" className="hh-tabstrip-item is-active">
+          Artists
+          <span className="hh-tabstrip-badge">{artistDirectory?.total ?? creatorCards.length}</span>
+        </button>
+        <button type="button" className="hh-tabstrip-item">
+          Scenes
+          {trendingTopics?.topics?.length ? <span className="hh-tabstrip-badge">{trendingTopics.topics.length}</span> : null}
+        </button>
+        <button type="button" className="hh-tabstrip-item">
+          People
+          {suggestedPeople?.users?.length ? <span className="hh-tabstrip-badge">{suggestedPeople.users.length}</span> : null}
+        </button>
+      </section>
+
+      {isLoadingArtists || (!filtersActive && isLoadingSuggestedCreators) ? (
+        <div className="flex justify-center py-10"><Spinner size="lg" /></div>
+      ) : isArtistsError ? (
+        <QueryErrorState title="Could not load discovery" description="The artist directory request failed." onRetry={() => refetchArtists()} />
+      ) : creatorCards.length ? (
+        <section className="hh-result-grid">
+          {creatorCards.map((artist) => (
+            <article key={artist.id} className="hh-result-card">
+              <div className="hh-result-media">
+                {artist.gallery?.[0]?.url ? (
+                  <img src={artist.gallery[0].url} alt={artist.displayName || artist.user.username} loading="lazy" decoding="async" />
+                ) : null}
               </div>
-              <Link href="/settings?tab=creator">
-                <Button className="rounded-full">
-                  <Palette className="mr-2 h-4 w-4" />
-                  Create Artist Page
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
+              <div className="hh-result-card-body">
+                <div className="flex items-start gap-3">
+                  <Avatar className="h-10 w-10 border border-border/50">
+                    <AvatarImage src={artist.avatarUrl || artist.user.avatarUrl || ""} />
+                    <AvatarFallback>{(artist.displayName || artist.user.username).slice(0, 2).toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-serif text-xl text-[var(--hh-ink)]">{artist.displayName || artist.user.username}</div>
+                    <div className="mt-1 text-xs uppercase tracking-[0.12em] text-[var(--hh-ink-muted)]">
+                      {[artist.category, artist.location].filter(Boolean).join(" · ")}
+                    </div>
+                  </div>
+                </div>
+
+                {artist.tagline ? <p className="text-sm leading-6 text-[var(--hh-ink-muted)]">{artist.tagline}</p> : null}
+
+                <div className="flex flex-wrap gap-2">
+                  {artist.tags?.slice(0, 4).map((tag) => <Badge key={tag} variant="outline" className="rounded-none">{tag}</Badge>)}
+                  {artist.availabilityStatus ? <Badge variant="outline" className="rounded-none">{artist.availabilityStatus}</Badge> : null}
+                  {artist.acceptsCollaborations ? <Badge variant="outline" className="rounded-none">Open to collaborate</Badge> : null}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 border-t border-[var(--hh-rule-soft)] pt-3 text-xs uppercase tracking-[0.12em] text-[var(--hh-ink-muted)]">
+                  <div>
+                    <div>Signal</div>
+                    <div className="mt-1 text-[var(--hh-ink)]">{getCreatorSuggestionReason(artist)}</div>
+                  </div>
+                  <div>
+                    <div>Booking</div>
+                    <div className="mt-1 text-[var(--hh-ink)]">{artist.pricingSummary || artist.turnaroundInfo || (artist.bookingEmail ? "Available" : "Message first")}</div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Link href={`/artists/${artist.userId}`}><Button variant="outline" size="sm" className="rounded-none">View page</Button></Link>
+                  {artist.userId !== user?.id ? (
+                    <>
+                      <Link href={`/artists/${artist.userId}?inquiry=1`}><Button size="sm" className="rounded-none"><Mail className="mr-2 h-4 w-4" />Inquiry</Button></Link>
+                      <Button
+                        size="sm"
+                        variant={artist.isFollowing ? "outline" : "secondary"}
+                        className="rounded-none"
+                        onClick={() => (artist.isFollowing ? unfollow : follow).mutate({ userId: artist.userId })}
+                      >
+                        {artist.isFollowing ? "Following" : "Follow"}
+                      </Button>
+                    </>
+                  ) : null}
+                  <Link href={`/artists/${artist.userId}`} className="ml-auto"><Button variant="ghost" size="sm" className="rounded-none">Open <ArrowRight className="ml-2 h-4 w-4" /></Button></Link>
+                </div>
+              </div>
+            </article>
+          ))}
+        </section>
+      ) : (
+        <Card className="hh-panel rounded-none border-dashed border-[var(--hh-rule)] bg-transparent shadow-none">
+          <CardContent className="p-12 text-center text-[var(--hh-ink-muted)]">No matching artists yet. Try another city, tag, or role.</CardContent>
         </Card>
       )}
 
-      <Card className="border-border/50 bg-card/30 backdrop-blur-sm">
-        <CardContent className="p-4 flex flex-col md:flex-row gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Refine creators by tags"
-              className="pl-9 bg-background/50 border-border/50"
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-            />
-          </div>
-          <div className="w-full md:w-48">
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className="bg-background/50 border-border/50">
-                <SelectValue placeholder="Category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="Musician / Band / DJ">Music</SelectItem>
-                <SelectItem value="Visual Artist">Visual Arts</SelectItem>
-                <SelectItem value="Photographer">Photography</SelectItem>
-                <SelectItem value="Designer">Design</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="w-full md:w-64">
-            <LocationInput
-              placeholder="City / state"
-              className="bg-background/50 border-border/50"
-              value={location}
-              onValueChange={setLocation}
-            />
-          </div>
-        </CardContent>
-      </Card>
+      <section className="grid gap-4 md:grid-cols-2">
+        <Card className="hh-panel rounded-none border-[var(--hh-rule)] bg-transparent shadow-none">
+          <CardContent className="space-y-4 p-5">
+            <div className="hh-display-title text-[1.25rem]">Trending scenes</div>
+            {trendingTopics?.topics?.length ? trendingTopics.topics.slice(0, 4).map((topic) => (
+              <Link key={topic.tag} href={getTopicPath(topic.tag, "artists")} className="flex items-center justify-between border-t border-[var(--hh-rule-soft)] pt-3 first:border-t-0 first:pt-0">
+                <span className="font-serif text-lg text-[var(--hh-ink)]">{topic.tag}</span>
+                <span className="hh-rail-count">{topic.count} posts</span>
+              </Link>
+            )) : <div className="text-sm text-[var(--hh-ink-muted)]">Scene tags will appear here as posting grows.</div>}
+          </CardContent>
+        </Card>
 
-      <Card className="border-border/50 bg-card/40">
-        <CardContent className="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <div className="text-sm font-semibold">Trending Topics</div>
-            <div className="mt-1 text-sm text-muted-foreground">Use current hashtag momentum as another way into the graph.</div>
-          </div>
-          {trendingTopics?.topics?.length ? (
-            <div className="grid w-full gap-3 md:grid-cols-2 xl:grid-cols-4">
-              {trendingTopics.topics.map((topic) => (
-                <div key={topic.tag} className="rounded-2xl border border-border/60 bg-background/70 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-semibold">{topic.tag}</div>
-                      <div className="mt-1 text-xs text-muted-foreground">{topic.count} recent public posts</div>
-                    </div>
-                    <Badge variant="outline">Live topic</Badge>
+        <Card className="hh-panel rounded-none border-[var(--hh-rule)] bg-transparent shadow-none">
+          <CardContent className="space-y-4 p-5">
+            <div className="hh-display-title text-[1.25rem]">People around your orbit</div>
+            {isLoadingSuggestedPeople ? (
+              <div className="flex justify-center py-8"><Spinner /></div>
+            ) : suggestedPeople?.users?.length ? suggestedPeople.users.slice(0, 3).map((person) => (
+              <div key={person.id} className="flex items-start gap-3 border-t border-[var(--hh-rule-soft)] pt-3 first:border-t-0 first:pt-0">
+                <Avatar className="h-10 w-10 border border-border/50">
+                  <AvatarImage src={person.avatarUrl || ""} />
+                  <AvatarFallback>{person.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium text-[var(--hh-ink)]">{person.username}</div>
+                  <div className="mt-1 text-xs uppercase tracking-[0.12em] text-[var(--hh-ink-muted)]">
+                    {[person.city || person.location, "artist page"].filter(Boolean).join(" · ")}
                   </div>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <Button type="button" size="sm" variant="outline" onClick={() => setTags(topic.tag.slice(1))}>
-                      Filter here
-                    </Button>
-                    <Link href={getTopicPath(topic.tag, "artists")}>
-                      <Button size="sm" variant="ghost">Creators</Button>
-                    </Link>
-                    <Link href={getTopicPath(topic.tag, "events")}>
-                      <Button size="sm" variant="ghost">Events</Button>
-                    </Link>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-sm text-muted-foreground">Trending topics will appear here as public posts adopt hashtags.</div>
-          )}
-        </CardContent>
-      </Card>
-
-      <section className="space-y-4">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-bold">{filtersActive ? "Browse creators" : "Featured creators for your graph"}</h2>
-            <p className="text-sm text-muted-foreground">
-              {filtersActive ? "Filtered creator pages based on your current browse settings." : "Suggested from your interests, city, and recent activity."}
-            </p>
-          </div>
-          {filtersActive && (
-            <Button variant="outline" onClick={() => { setLocation(""); setCategory("all"); setTags(""); }}>
-              Clear filters
-            </Button>
-          )}
-        </div>
-
-        {isLoadingArtists || (!filtersActive && isLoadingSuggestedCreators) ? (
-          <div className="flex justify-center py-10"><Spinner size="lg" /></div>
-        ) : isArtistsError ? (
-          <QueryErrorState title="Could not load discovery" description="The creator directory request failed." onRetry={() => refetchArtists()} />
-        ) : creatorCards.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-            {creatorCards.map((artist) => (
-              <Card key={artist.id} className="overflow-hidden border-border/50 bg-card/75 shadow-[0_16px_40px_-30px_rgba(15,23,42,0.5)]">
-                <div className="relative h-48 overflow-hidden bg-muted">
-                  {artist.gallery && artist.gallery[0] ? (
-                    <img
-                      src={artist.gallery[0].url}
-                      alt={artist.displayName || artist.user.username}
-                      loading="lazy"
-                      decoding="async"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-secondary/50">
-                      <Mic2 className="w-12 h-12 text-muted-foreground/50" />
-                    </div>
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
-                  <div className="absolute left-4 top-4 inline-flex items-center rounded-full border border-white/15 bg-black/45 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/85">
-                    Why it matches
-                  </div>
-                  <div className="absolute bottom-4 left-4 right-4 text-sm font-medium text-white">
-                    {getCreatorSuggestionReason(artist)}
-                  </div>
-                </div>
-                <CardContent className="space-y-4 p-5">
-                  <div className="flex items-start gap-3">
-                    <Avatar className="w-12 h-12 border border-border">
-                      <AvatarImage src={artist.avatarUrl || artist.user.avatarUrl || ""} />
-                      <AvatarFallback>{(artist.displayName || artist.user.username).slice(0, 2).toUpperCase()}</AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-semibold">{artist.displayName || artist.user.username}</div>
-                      <div className="text-sm text-primary">{artist.category}</div>
-                      {artist.location ? <div className="mt-1 flex items-center text-xs text-muted-foreground"><MapPin className="mr-1 h-3 w-3" /> {artist.location}</div> : null}
-                    </div>
-                  </div>
-                  {artist.tagline ? <p className="line-clamp-2 text-sm text-muted-foreground">{artist.tagline}</p> : null}
-                  <div className="rounded-2xl border border-border/50 bg-background/40 px-3 py-2 text-xs text-muted-foreground">
-                    {artist.tags?.length
-                      ? `Signals: ${artist.tags.slice(0, 3).join(", ")}`
-                      : "Signals: public creator page, category, and location context"}
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {artist.tags?.slice(0, 4).map((tag) => <Badge key={tag} variant="secondary">{tag}</Badge>)}
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Link href={`/artists/${artist.userId}`}><Button variant="outline" size="sm">View Page</Button></Link>
-                    <Button
-                      size="sm"
-                      onClick={() => (artist.isFollowing ? unfollow : follow).mutate({ userId: artist.userId })}
-                    >
-                      {artist.isFollowing ? "Following" : "Follow"}
-                    </Button>
-                    <Link href={`/artists/${artist.userId}`} className="ml-auto">
-                      <Button variant="ghost" size="sm">
-                        Open
-                        <ArrowRight className="ml-2 h-4 w-4" />
-                      </Button>
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <Card className="border-dashed border-border/50 bg-card/10">
-            <CardContent className="p-12 text-center text-muted-foreground">
-              No creator matches yet. Try a different city, tag, or category.
-            </CardContent>
-          </Card>
-        )}
-      </section>
-
-      <section className="space-y-4">
-        <div>
-          <h2 className="text-xl font-bold">People you may know</h2>
-          <p className="text-sm text-muted-foreground">Suggested from mutual friends, location, and overlapping interests.</p>
-        </div>
-        {isLoadingSuggestedPeople ? (
-          <div className="flex justify-center py-10"><Spinner size="lg" /></div>
-        ) : suggestedPeople?.users?.length ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-            {suggestedPeople.users.map((person) => (
-              <Card key={person.id} className="border-border/50 bg-card/60">
-                <CardContent className="space-y-4 p-5">
-                  <div className="flex items-start gap-3">
-                    <Avatar className="w-12 h-12 border border-border">
-                      <AvatarImage src={person.avatarUrl || ""} />
-                      <AvatarFallback>{person.username.slice(0, 2).toUpperCase()}</AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-semibold">{person.username}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {[person.city || person.location, person.hasArtistPage ? "Personal + artist page" : "Personal profile"].filter(Boolean).join(" · ")}
-                      </div>
-                    </div>
-                  </div>
-                  {person.about ? <p className="line-clamp-2 text-sm text-muted-foreground">{person.about}</p> : null}
-                  <div className="flex flex-wrap gap-2">
-                    {!!person.mutualFriendCount && <Badge variant="secondary"><Users className="mr-1 h-3 w-3" /> {person.mutualFriendCount} mutual</Badge>}
-                    {person.location ? <Badge variant="outline">{person.location}</Badge> : null}
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Link href={`/profile/${person.id}`}><Button variant="outline" size="sm">View Profile</Button></Link>
+                  {person.about ? <div className="mt-2 text-sm text-[var(--hh-ink-muted)]">{person.about}</div> : null}
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {!!person.mutualFriendCount && <Badge variant="outline" className="rounded-none"><Users className="mr-1 h-3 w-3" />{person.mutualFriendCount} mutual</Badge>}
+                    <Link href={`/artists/${person.id}?inquiry=1`}><Button size="sm" className="rounded-none">Inquiry</Button></Link>
                     <FriendActionButton userId={person.id} friendship={person.friendship} invalidateKeys={[["suggested-people", user?.id], ["/api/users", person.id]]} />
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <Card className="border-dashed border-border/50 bg-card/10">
-            <CardContent className="p-12 text-center text-muted-foreground">
-              Friend suggestions will appear here as the social graph grows.
-            </CardContent>
-          </Card>
-        )}
+                </div>
+              </div>
+            )) : <div className="text-sm text-[var(--hh-ink-muted)]">More people will surface here as your scenes grow.</div>}
+          </CardContent>
+        </Card>
       </section>
     </div>
   );

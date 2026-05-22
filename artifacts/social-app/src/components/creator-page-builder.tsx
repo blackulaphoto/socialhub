@@ -344,7 +344,7 @@ export function CreatorPageBuilder({
           </div>
           <div className="space-y-2">
             <Label>Category</Label>
-            <Input value={artist.category || ""} placeholder="Photographer, musician, designer..." onChange={(event) => setArtist((current) => ({ ...current, category: event.target.value }))} />
+            <Input value={artist.category || ""} placeholder="Photographer, model, makeup artist, stylist..." onChange={(event) => setArtist((current) => ({ ...current, category: event.target.value }))} />
           </div>
           <div className="space-y-2">
             <Label>Tagline</Label>
@@ -362,7 +362,7 @@ export function CreatorPageBuilder({
         </div>
         <div className="space-y-2">
           <Label>Tags</Label>
-          <Input value={artist.tags || ""} placeholder="portrait, club, editorial" onChange={(event) => setArtist((current) => ({ ...current, tags: event.target.value }))} />
+          <Input value={artist.tags || ""} placeholder="editorial, beauty, fashion, test shoot, studio" onChange={(event) => setArtist((current) => ({ ...current, tags: event.target.value }))} />
         </div>
       </div>
     </div>

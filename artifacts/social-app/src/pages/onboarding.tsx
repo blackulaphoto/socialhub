@@ -17,21 +17,23 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { formatCityRegion, parseCityRegion } from "@/lib/locations";
 import { Palette, Sparkles } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const CREATOR_TYPES = [
-  "Musician / Band / DJ",
   "Model",
   "Photographer",
-  "Designer",
-  "Painter",
-  "Jewelry Maker",
-  "Visual Artist",
-  "General Creator",
+  "Makeup Artist",
+  "Stylist",
+  "Retoucher",
+  "Set Designer",
+  "Creative Director",
+  "Wardrobe Stylist",
+  "Hair Artist",
+  "Production Team",
+  "Creative Professional",
 ];
 
 export default function Onboarding() {
@@ -40,7 +42,6 @@ export default function Onboarding() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [step, setStep] = useState<"profile" | "artist" | "finish">("profile");
-  const [wantsArtistPage, setWantsArtistPage] = useState(false);
   const [showProfileDetails, setShowProfileDetails] = useState(false);
   const [profileForm, setProfileForm] = useState({
     bio: "",
@@ -53,7 +54,7 @@ export default function Onboarding() {
     interests: "",
   });
   const [artistForm, setArtistForm] = useState({
-    category: "General Creator",
+    category: "Creative Professional",
     location: "",
     tagline: "",
     tags: "",
@@ -81,14 +82,13 @@ export default function Onboarding() {
       interests: (profile.user.interests || []).join(", "),
     });
     setArtistForm({
-      category: profile.artistProfile?.category || "General Creator",
+      category: profile.artistProfile?.category || "Creative Professional",
       location: profile.artistProfile?.location || profile.user.location || "",
       tagline: profile.artistProfile?.tagline || "",
       tags: profile.artistProfile?.tags?.join(", ") || "",
       bio: profile.artistProfile?.bio || profile.user.about || profile.user.bio || "",
       bookingEmail: profile.artistProfile?.bookingEmail || "",
     });
-    setWantsArtistPage(!!profile.artistProfile);
     if (profile.user.onboardingCompleted) {
       setLocation("/");
       return;
@@ -138,10 +138,10 @@ export default function Onboarding() {
         about: profileForm.about || undefined,
         interests: profileForm.interests.split(",").map((item) => item.trim()).filter(Boolean),
         onboardingCompleted: false,
-        onboardingStep: wantsArtistPage ? "artist" : "finish",
+        onboardingStep: "artist",
       },
     }, {
-      onSuccess: () => setStep(wantsArtistPage ? "artist" : "finish"),
+      onSuccess: () => setStep("artist"),
       onError: () => toast({ title: "Could not save profile step", variant: "destructive" }),
     });
   };
@@ -162,13 +162,13 @@ export default function Onboarding() {
         updateCreatorSettings.mutate({
           userId: user.id,
           data: {
-            primaryActionLabel: "Contact Me",
+            primaryActionLabel: "Reach Out",
             primaryActionType: "contact",
           },
         });
         setStep("finish");
       },
-      onError: () => toast({ title: "Could not create artist page", variant: "destructive" }),
+      onError: () => toast({ title: "Could not save creator profile", variant: "destructive" }),
     });
   };
 
@@ -190,7 +190,7 @@ export default function Onboarding() {
     }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-        toast({ title: "Setup complete", description: "Your profile is ready." });
+        toast({ title: "Setup complete", description: "Your artist page is ready." });
         setLocation("/");
       },
       onError: () => toast({ title: "Could not finish onboarding", variant: "destructive" }),
@@ -210,7 +210,7 @@ export default function Onboarding() {
           <Card className="border-border/50 bg-card/60">
             <CardHeader>
               <CardTitle>Set up your profile</CardTitle>
-              <CardDescription>Start with a few quick details. Everything here is optional and can be changed later.</CardDescription>
+              <CardDescription>Start with a few quick details. Everything here is optional and easy to change later.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
@@ -229,7 +229,7 @@ export default function Onboarding() {
                   </div>
                   <div className="space-y-2">
                     <Label className="flex items-center gap-2">Short bio <span className="text-xs text-muted-foreground">Optional</span></Label>
-                    <Textarea value={profileForm.bio} onChange={(e) => setProfileForm((current) => ({ ...current, bio: e.target.value }))} placeholder="A quick one-line intro." />
+                    <Textarea value={profileForm.bio} onChange={(e) => setProfileForm((current) => ({ ...current, bio: e.target.value }))} placeholder="A quick line that feels like you." />
                   </div>
                   <div className="space-y-2">
                     <Label className="flex items-center gap-2">Interests <span className="text-xs text-muted-foreground">Optional</span></Label>
@@ -267,7 +267,7 @@ export default function Onboarding() {
                             id="onboarding-work"
                             value={profileForm.work}
                             onChange={(e) => setProfileForm((current) => ({ ...current, work: e.target.value }))}
-                            placeholder="Photographer, promoter, developer, producer"
+                            placeholder="Photographer, makeup artist, stylist, retoucher"
                           />
                         </div>
                         <div className="space-y-2">
@@ -286,7 +286,7 @@ export default function Onboarding() {
                       </div>
                     ) : (
                       <div className="mt-3 text-xs text-muted-foreground">
-                        Add age, work, school, and a longer bio anytime.
+                        Add age, work, school, and a longer story anytime.
                       </div>
                     )}
                   </div>
@@ -294,7 +294,7 @@ export default function Onboarding() {
                 <Card className="border-border/60 bg-background/60">
                   <CardHeader>
                     <CardTitle className="text-base">Live preview</CardTitle>
-                    <CardDescription>See how your profile intro will look.</CardDescription>
+                    <CardDescription>See how your intro will land on the page.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="flex items-center gap-3">
@@ -313,7 +313,7 @@ export default function Onboarding() {
                     </div>
                     <div className="rounded-2xl border border-border/50 bg-card/60 p-4">
                       <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">About</div>
-                      <div className="mt-2 text-sm text-muted-foreground">{profileForm.about.trim() || "Add a longer story, links to your work, or what you’re into."}</div>
+                      <div className="mt-2 text-sm text-muted-foreground">{profileForm.about.trim() || "Add a longer story, what you make, or the scenes you move through."}</div>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {(profileForm.interests || "")
@@ -336,27 +336,23 @@ export default function Onboarding() {
                   </CardContent>
                 </Card>
               </div>
-              <div className={`rounded-3xl border px-5 py-5 transition-colors ${wantsArtistPage ? "border-primary bg-primary/10" : "border-border/50 bg-background/30"}`}>
+              <div className="rounded-3xl border border-primary/20 bg-primary/10 px-5 py-5 transition-colors">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                   <div className="space-y-2">
                     <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[10px] uppercase tracking-[0.24em] text-primary">
                       <Sparkles className="h-3.5 w-3.5" />
-                      Recommended Next Step
+                      Included In Setup
                     </div>
-                    <div className="text-lg font-semibold">Create a linked artist page too</div>
+                      <div className="text-lg font-semibold">Your artist page comes with every account</div>
                     <p className="max-w-2xl text-sm text-muted-foreground">
-                      Keep one account, but unlock a separate creator homepage for your work, media, booking button, events, and discovery profile.
+                      Next you will shape the public page people see for your work, images, voice, and how they reach you.
                     </p>
                   </div>
-                  <Button type="button" variant={wantsArtistPage ? "default" : "outline"} onClick={() => setWantsArtistPage((current) => !current)}>
+                  <div className="inline-flex items-center rounded-full border border-primary/20 bg-background/50 px-4 py-2 text-sm font-medium">
                     <Palette className="mr-2 h-4 w-4" />
-                    {wantsArtistPage ? "Artist Page Included" : "Yes, Add Artist Page"}
-                  </Button>
+                    Artist page tools enabled
+                  </div>
                 </div>
-                <label className="mt-4 flex items-center gap-3 rounded-2xl border border-border/50 bg-background/40 px-4 py-3">
-                  <Checkbox checked={wantsArtistPage} onCheckedChange={(checked) => setWantsArtistPage(Boolean(checked))} />
-                  <span className="text-sm">I want a linked artist / creator page during setup</span>
-                </label>
               </div>
               <div className="flex justify-end gap-3">
                 <Button onClick={saveProfileStep} disabled={updateProfile.isPending}>Continue</Button>
@@ -368,8 +364,8 @@ export default function Onboarding() {
         {step === "artist" ? (
           <Card className="border-border/50 bg-card/60">
             <CardHeader>
-              <CardTitle>Create your artist page</CardTitle>
-              <CardDescription>Start simple. You can fine-tune media modules, featured content, and page style later in settings.</CardDescription>
+              <CardTitle>Set up your artist page</CardTitle>
+              <CardDescription>Start simple. You can fine-tune media, featured work, and page style later in settings.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="grid gap-4 md:grid-cols-2">
@@ -392,15 +388,15 @@ export default function Onboarding() {
               </div>
               <div className="space-y-2">
                 <Label>Hero tagline</Label>
-                <Input value={artistForm.tagline} onChange={(e) => setArtistForm((current) => ({ ...current, tagline: e.target.value }))} placeholder="Industrial techno DJ for warehouse nights." />
+                <Input value={artistForm.tagline} onChange={(e) => setArtistForm((current) => ({ ...current, tagline: e.target.value }))} placeholder="Editorial model available for fashion, beauty, and concept shoots." />
               </div>
               <div className="space-y-2">
                 <Label>Tags</Label>
-                <Input value={artistForm.tags} onChange={(e) => setArtistForm((current) => ({ ...current, tags: e.target.value }))} placeholder="techno, darkwave, latex, portraiture" />
+                <Input value={artistForm.tags} onChange={(e) => setArtistForm((current) => ({ ...current, tags: e.target.value }))} placeholder="editorial, beauty, test shoot, studio, retouching" />
               </div>
               <div className="space-y-2">
-                <Label>Creator bio</Label>
-                <Textarea value={artistForm.bio} onChange={(e) => setArtistForm((current) => ({ ...current, bio: e.target.value }))} placeholder="Give people a quick sense of your work." />
+                <Label>Artist page bio</Label>
+                <Textarea value={artistForm.bio} onChange={(e) => setArtistForm((current) => ({ ...current, bio: e.target.value }))} placeholder="Give people a quick sense of your work and energy." />
               </div>
               <div className="space-y-2">
                 <Label>Booking or contact email</Label>
@@ -408,7 +404,7 @@ export default function Onboarding() {
               </div>
               <div className="flex justify-between gap-3">
                 <Button variant="outline" onClick={() => setStep("finish")}>Skip for now</Button>
-                <Button onClick={saveArtistStep} disabled={updateArtist.isPending}>Create artist page</Button>
+                <Button onClick={saveArtistStep} disabled={updateArtist.isPending}>Save artist page</Button>
               </div>
             </CardContent>
           </Card>
@@ -418,13 +414,13 @@ export default function Onboarding() {
           <Card className="border-border/50 bg-card/60">
             <CardHeader>
               <CardTitle>You are ready</CardTitle>
-              <CardDescription>Your personal profile is set. {wantsArtistPage ? "Your linked artist page can keep growing in settings." : "You can always add a linked artist page later."}</CardDescription>
+              <CardDescription>Your account and public artist page are set. You can keep shaping the page in settings anytime.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="text-sm text-muted-foreground">
-                Next best steps: upload a profile photo, make a first post, and follow a few creators so the feed gets useful fast.
+                Next best steps: upload a profile photo, make a first post, and follow a few artists so the feed starts feeling alive fast.
               </div>
-              <Button onClick={finishOnboarding} disabled={updateProfile.isPending}>Enter ArtistHub</Button>
+              <Button onClick={finishOnboarding} disabled={updateProfile.isPending}>Enter HollywoodHeartbeats.com</Button>
             </CardContent>
           </Card>
         ) : null}

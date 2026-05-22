@@ -1,95 +1,59 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Image as ImageIcon, Link2, Newspaper, Plus, Save, Send, Sparkles, X } from "lucide-react";
 import {
-  Image as ImageIcon,
-  Link2,
-  Newspaper,
-  Plus,
-  Save,
-  Send,
-  SlidersHorizontal,
-  Sparkles,
-  Video,
-  X,
-} from "lucide-react";
-import {
+  getFeed,
   useCreateCustomFeed,
   useCreatePost,
-  useGetCustomFeeds,
-  getFeed,
   useFollowUser,
+  useGetCustomFeeds,
   useUnfollowUser,
 } from "@workspace/api-client-react";
-import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogDescription,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { FeedPostCard } from "@/components/feed-post-card";
 import { Input } from "@/components/ui/input";
+import { LoadMoreSentinel } from "@/components/load-more-sentinel";
 import { QueryErrorState } from "@/components/query-error-state";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { uploadImage } from "@/lib/upload-image";
 import { getEmbedDescriptor } from "@/lib/embeds";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { LoadMoreSentinel } from "@/components/load-more-sentinel";
-import { useActiveIdentity } from "@/hooks/useActiveIdentity";
-import { LocationInput } from "@/components/location-input";
 import { getTopicPath } from "@/lib/topics";
+import { uploadImage } from "@/lib/upload-image";
 
 const POST_DRAFT_KEY = "socialhub:post-draft";
-
-const FEED_MODES = [
-  { value: "following", label: "Following", helper: "People you chose to keep up with." },
-  { value: "local", label: "Local", helper: "Creators and scenes tied to a city." },
-  { value: "discovery", label: "Discovery", helper: "Fresh creators and tagged creative pockets." },
-];
-
-function activeFeedLabel(mode: string, selectedCustomFeedName?: string | null) {
-  if (selectedCustomFeedName) return selectedCustomFeedName;
-  return FEED_MODES.find((feed) => feed.value === mode)?.label || "Feed";
-}
-
-function getSuggestedCreatorReason(
-  artist: { location?: string | null; category: string; tags?: string[]; tagline?: string | null },
-  city: string,
-) {
-  if (city.trim() && artist.location?.toLowerCase().includes(city.trim().toLowerCase())) return `Near ${city.trim()}`;
-  if (artist.tags?.[0]) return `Tagged for ${artist.tags[0]}`;
-  if (artist.location?.trim()) return artist.location.trim();
-  if (artist.tagline?.trim()) return "Strong public page signal";
-  return artist.category;
-}
 
 function extractTopicTags(content: string) {
   const matches = content.match(/#[a-z0-9_]{2,32}/gi) || [];
   return [...new Set(matches.map((tag) => tag.toLowerCase()))];
 }
 
+function getSuggestedCreatorReason(
+  artist: { location?: string | null; category: string; tags?: string[]; tagline?: string | null },
+) {
+  if (artist.tags?.[0]) return artist.tags[0];
+  if (artist.location?.trim()) return artist.location.trim();
+  if (artist.tagline?.trim()) return artist.tagline.trim();
+  return artist.category;
+}
+
 export default function Home() {
   const [location] = useLocation();
   const { user } = useAuth();
-  const { activeIdentity, canUseArtistIdentity, setActiveIdentity } = useActiveIdentity();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [mode, setMode] = useState("following");
-  const [city, setCity] = useState("");
   const [selectedCustomFeed, setSelectedCustomFeed] = useState<number | null>(null);
-  const [postForm, setPostForm] = useState<{ content: string; imageUrl: string; linkUrl: string; visibility: "public" | "friends" | "private" }>({
+  const [postForm, setPostForm] = useState<{ content: string; imageUrls: string[]; linkUrl: string; visibility: "public" | "friends" | "private" }>({
     content: "",
-    imageUrl: "",
+    imageUrls: [],
     linkUrl: "",
     visibility: "public",
   });
@@ -100,8 +64,7 @@ export default function Home() {
   const [draftLoaded, setDraftLoaded] = useState(false);
 
   const feedParams = {
-    mode: (selectedCustomFeed ? "custom" : mode) as "following" | "local" | "discovery" | "custom",
-    city: city || undefined,
+    mode: (selectedCustomFeed ? "custom" : "following") as "following" | "custom",
     customFeedId: selectedCustomFeed || undefined,
   };
 
@@ -114,16 +77,20 @@ export default function Home() {
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ["feed", feedParams.mode, city, selectedCustomFeed],
+    queryKey: ["feed", feedParams.mode, selectedCustomFeed],
     enabled: !!user,
     initialPageParam: undefined as number | undefined,
-    queryFn: ({ pageParam, signal }) => getFeed({
-      ...feedParams,
-      cursor: pageParam,
-      limit: 10,
-    }, { signal }),
-    getNextPageParam: (lastPage) => lastPage.hasMore ? (lastPage.nextCursor ?? undefined) : undefined,
+    queryFn: ({ pageParam, signal }) => getFeed(
+      {
+        ...feedParams,
+        cursor: pageParam,
+        limit: 10,
+      },
+      { signal },
+    ),
+    getNextPageParam: (lastPage) => (lastPage.hasMore ? (lastPage.nextCursor ?? undefined) : undefined),
   });
+
   const { data: suggestedCreators } = useQuery({
     queryKey: ["suggested-creators", user?.id],
     enabled: !!user?.id,
@@ -131,12 +98,23 @@ export default function Home() {
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/users/${user!.id}/suggested-creators?limit=4`, {
         credentials: "include",
       });
-      if (!response.ok) {
-        throw new Error("Could not load suggested creators");
-      }
-      return response.json() as Promise<{ artists: Array<{ userId: number; displayName?: string | null; avatarUrl?: string | null; category: string; location?: string | null; tagline?: string | null; tags?: string[]; isFollowing?: boolean; user: { username: string; avatarUrl?: string | null } }> }>;
+      if (!response.ok) throw new Error("Could not load suggested creators");
+      return response.json() as Promise<{
+        artists: Array<{
+          userId: number;
+          displayName?: string | null;
+          avatarUrl?: string | null;
+          category: string;
+          location?: string | null;
+          tagline?: string | null;
+          tags?: string[];
+          isFollowing?: boolean;
+          user: { username: string; avatarUrl?: string | null };
+        }>;
+      }>;
     },
   });
+
   const { data: followingPreview, isLoading: isLoadingFollowingPreview } = useQuery({
     queryKey: ["/api/users", user?.id, "following"],
     enabled: !!user?.id,
@@ -144,50 +122,39 @@ export default function Home() {
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/users/${user!.id}/following`, {
         credentials: "include",
       });
-      if (!response.ok) {
-        throw new Error("Could not load following list");
-      }
-      return response.json() as Promise<Array<{
-        id: number;
-        username: string;
-        avatarUrl?: string | null;
-        hasArtistPage?: boolean;
-        location?: string | null;
-        city?: string | null;
-      }>>;
+      if (!response.ok) throw new Error("Could not load following list");
+      return response.json() as Promise<
+        Array<{ id: number; username: string; avatarUrl?: string | null; location?: string | null; city?: string | null }>
+      >;
     },
   });
+
   const { data: trendingTopics } = useQuery({
     queryKey: ["trending-topics"],
     queryFn: async () => {
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/trending-topics`, {
         credentials: "include",
       });
-      if (!response.ok) {
-        throw new Error("Could not load trending topics");
-      }
+      if (!response.ok) throw new Error("Could not load trending topics");
       return response.json() as Promise<{ topics: Array<{ tag: string; count: number }> }>;
     },
   });
 
   const { data: customFeeds } = useGetCustomFeeds({
-    query: {
-      queryKey: ["custom-feeds"],
-      enabled: !!user,
-    },
+    query: { queryKey: ["custom-feeds"], enabled: !!user },
   });
 
   const createPost = useCreatePost({
     mutation: {
       onSuccess: () => {
-        setPostForm({ content: "", imageUrl: "", linkUrl: "", visibility: "public" });
+        setPostForm({ content: "", imageUrls: [], linkUrl: "", visibility: "public" });
         setShowLinkField(false);
         setIsPostDialogOpen(false);
         queryClient.invalidateQueries({ queryKey: ["feed"] });
         queryClient.invalidateQueries({ queryKey: ["trending-topics"] });
         queryClient.invalidateQueries({ queryKey: ["/api/users", user?.id, "posts"] });
         queryClient.invalidateQueries({ queryKey: ["/api/users", user?.id, "posts", "artist"] });
-        toast({ title: "Post published", description: "Your update is now live in the feed." });
+        toast({ title: "Update published", description: "Your post is live." });
       },
       onError: () => {
         toast({ title: "Could not publish post", variant: "destructive" });
@@ -201,11 +168,9 @@ export default function Home() {
         setFeedForm({ name: "", description: "", categories: "", tags: "", locations: "", includedUserIds: "" });
         queryClient.invalidateQueries({ queryKey: ["custom-feeds"] });
         setSelectedCustomFeed(feed.id);
-        toast({ title: "Custom feed saved", description: "You can switch back to it anytime from the sidebar." });
+        toast({ title: "Saved feed ready" });
       },
-      onError: () => {
-        toast({ title: "Could not save custom feed", variant: "destructive" });
-      },
+      onError: () => toast({ title: "Could not save custom feed", variant: "destructive" }),
     },
   });
 
@@ -216,9 +181,7 @@ export default function Home() {
         queryClient.invalidateQueries({ queryKey: ["/api/users", user?.id, "following"] });
         queryClient.invalidateQueries({ queryKey: ["feed"] });
       },
-      onError: () => {
-        toast({ title: "Could not follow creator", variant: "destructive" });
-      },
+      onError: () => toast({ title: "Could not follow artist", variant: "destructive" }),
     },
   });
 
@@ -229,44 +192,38 @@ export default function Home() {
         queryClient.invalidateQueries({ queryKey: ["/api/users", user?.id, "following"] });
         queryClient.invalidateQueries({ queryKey: ["feed"] });
       },
-      onError: () => {
-        toast({ title: "Could not update follow", variant: "destructive" });
-      },
+      onError: () => toast({ title: "Could not update follow", variant: "destructive" }),
     },
   });
 
-  const selectedFeed = customFeeds?.find((feed) => feed.id === selectedCustomFeed) || null;
-  const feedPosts = useMemo(
-    () => data?.pages.flatMap((page) => page.posts) || [],
-    [data],
-  );
+  const feedPosts = useMemo(() => data?.pages.flatMap((page) => page.posts) || [], [data]);
   const fallbackTrendingTopics = useMemo(() => {
     const counts = new Map<string, number>();
     for (const post of feedPosts.slice(0, 40)) {
-      for (const tag of extractTopicTags(post.content || "")) {
-        counts.set(tag, (counts.get(tag) ?? 0) + 1);
-      }
+      for (const tag of extractTopicTags(post.content || "")) counts.set(tag, (counts.get(tag) ?? 0) + 1);
     }
     return [...counts.entries()]
       .sort((a, b) => b[1] - a[1])
       .slice(0, 8)
       .map(([tag, count]) => ({ tag, count }));
   }, [feedPosts]);
+
   const resolvedTrendingTopics = trendingTopics?.topics?.length ? trendingTopics.topics : fallbackTrendingTopics;
+  const selectedFeed = customFeeds?.find((feed) => feed.id === selectedCustomFeed) || null;
   const followingCount = followingPreview?.length || 0;
-  const currentPostingIdentity = canUseArtistIdentity && activeIdentity === "artist" ? "Artist Page" : "Personal";
-  const postingIdentityHelper = canUseArtistIdentity && activeIdentity === "artist"
-    ? "Posts publish into the main feed with your artist-page identity and also stay on your artist page."
-    : "Posts publish into the main feed as your personal profile.";
+  const suggestedArtists = suggestedCreators?.artists || [];
   const shouldNudgeDiscovery = followingCount === 0 && !selectedCustomFeed;
 
-  const handlePostImageUpload = async (file: File | null) => {
-    if (!file) return;
+  const handlePostImageUpload = async (files: FileList | null) => {
+    if (!files?.length) return;
     setIsUploadingPostImage(true);
     try {
-      const uploaded = await uploadImage(file, "post");
-      setPostForm((current) => ({ ...current, imageUrl: uploaded.url }));
-      toast({ title: "Image uploaded" });
+      const uploadedItems = await Promise.all(Array.from(files).map((file) => uploadImage(file, "post")));
+      setPostForm((current) => ({
+        ...current,
+        imageUrls: [...current.imageUrls, ...uploadedItems.map((item) => item.url)],
+      }));
+      toast({ title: uploadedItems.length > 1 ? `${uploadedItems.length} images uploaded` : "Image uploaded" });
     } catch (error) {
       toast({
         title: "Could not upload image",
@@ -282,35 +239,31 @@ export default function Home() {
     const linkMedia = postForm.linkUrl.trim() ? getEmbedDescriptor(postForm.linkUrl.trim()) : null;
     createPost.mutate({
       data: {
-        content: postForm.content,
-        imageUrl: postForm.imageUrl || undefined,
+        content: postForm.content.trim(),
+        imageUrl: postForm.imageUrls[0] || undefined,
         visibility: postForm.visibility,
-        actorSurface: canUseArtistIdentity && activeIdentity === "artist" ? "artist" : "personal",
+        actorSurface: "artist",
         media: [
-          postForm.imageUrl ? { type: "image", url: postForm.imageUrl } : null,
+          ...postForm.imageUrls.map((url) => ({ type: "image", url })),
           linkMedia ? { type: linkMedia.kind, url: linkMedia.href, title: linkMedia.label } : null,
-        ].filter(Boolean) as Array<{ type: string; url: string }>,
+        ].filter(Boolean) as Array<{ type: string; url: string; title?: string }>,
       },
     });
   };
 
   const clearComposer = () => {
-    setPostForm({ content: "", imageUrl: "", linkUrl: "", visibility: "public" });
+    setPostForm({ content: "", imageUrls: [], linkUrl: "", visibility: "public" });
     setShowLinkField(false);
     if (typeof window !== "undefined" && user?.id) {
       window.localStorage.removeItem(`${POST_DRAFT_KEY}:${user.id}`);
     }
   };
 
-  const openPostDialog = () => {
-    setIsPostDialogOpen(true);
-  };
-
+  const openPostDialog = () => setIsPostDialogOpen(true);
   const openPostDialogWithLink = () => {
     setShowLinkField(true);
     setIsPostDialogOpen(true);
   };
-
   const openPostDialogWithImage = () => {
     setShowLinkField(false);
     setIsPostDialogOpen(true);
@@ -320,7 +273,7 @@ export default function Home() {
   const saveDraft = () => {
     if (typeof window === "undefined" || !user?.id) return;
     window.localStorage.setItem(`${POST_DRAFT_KEY}:${user.id}`, JSON.stringify(postForm));
-    toast({ title: "Draft saved", description: "Your unfinished post is stored on this device." });
+    toast({ title: "Draft saved" });
   };
 
   useEffect(() => {
@@ -328,8 +281,13 @@ export default function Home() {
     const saved = window.localStorage.getItem(`${POST_DRAFT_KEY}:${user.id}`);
     if (saved) {
       try {
-        const parsed = JSON.parse(saved) as typeof postForm;
-        setPostForm((current) => ({ ...current, ...parsed }));
+        const parsed = JSON.parse(saved) as Partial<typeof postForm> & { imageUrl?: string };
+        const nextImageUrls = Array.isArray(parsed.imageUrls)
+          ? parsed.imageUrls
+          : parsed.imageUrl
+            ? [parsed.imageUrl]
+            : [];
+        setPostForm((current) => ({ ...current, ...parsed, imageUrls: nextImageUrls }));
         setShowLinkField(Boolean(parsed.linkUrl));
       } catch {
         window.localStorage.removeItem(`${POST_DRAFT_KEY}:${user.id}`);
@@ -340,7 +298,7 @@ export default function Home() {
 
   useEffect(() => {
     if (typeof window === "undefined" || !user?.id || !draftLoaded) return;
-    const hasContent = Boolean(postForm.content.trim() || postForm.imageUrl || postForm.linkUrl);
+    const hasContent = Boolean(postForm.content.trim() || postForm.imageUrls.length || postForm.linkUrl);
     if (!hasContent) {
       window.localStorage.removeItem(`${POST_DRAFT_KEY}:${user.id}`);
       return;
@@ -357,772 +315,200 @@ export default function Home() {
     window.history.replaceState({}, "", window.location.pathname);
   }, [location]);
 
-  useEffect(() => {
-    if (!shouldNudgeDiscovery) return;
-    if (mode === "following") {
-      setMode("discovery");
-    }
-  }, [mode, shouldNudgeDiscovery]);
-
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6 p-4 md:py-8">
-      <Card className="border-border/50 bg-card/60 md:hidden">
-        <CardContent className="space-y-4 p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[10px] uppercase tracking-[0.24em] text-primary">
-                <SlidersHorizontal className="h-3 w-3" /> Feed
-              </div>
-                <h1 className="mt-3 text-xl font-bold">ArtistHub</h1>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {activeFeedLabel(mode, selectedFeed?.name)} / {feedPosts.length || 0} posts loaded
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="icon" className="h-10 w-10 rounded-full">
-                    <SlidersHorizontal className="h-4 w-4" />
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>Feed Controls</DialogTitle>
-                    <DialogDescription>Switch feed modes, set a city, or save a custom feed.</DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div>
-                      <h2 className="mb-2 font-semibold">Feeds</h2>
-                      <div className="space-y-2">
-                        {FEED_MODES.map((feed) => (
-                          <button
-                            key={feed.value}
-                            className={`w-full rounded-2xl border px-3 py-3 text-left transition-colors ${mode === feed.value && !selectedCustomFeed ? "border-primary bg-primary/10" : "border-border/50 bg-card/40 hover:border-primary/30"}`}
-                            onClick={() => {
-                              setSelectedCustomFeed(null);
-                              setMode(feed.value);
-                            }}
-                          >
-                            <div className="font-medium">{feed.label}</div>
-                            <div className="mt-1 text-xs text-muted-foreground">{feed.helper}</div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="text-sm font-medium">Local city filter</div>
-                      <LocationInput placeholder="Los Angeles, California" value={city} onValueChange={setCity} />
-                      {city && (
-                        <div className="flex flex-wrap gap-2">
-                          <Badge variant="secondary">{city}</Badge>
-                          <Button variant="ghost" size="sm" onClick={() => setCity("")}>Clear city</Button>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-medium">Custom Feeds</h3>
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button size="icon" variant="ghost" className="h-8 w-8"><Plus className="h-4 w-4" /></Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Create Custom Feed</DialogTitle>
-                            </DialogHeader>
-                            <div className="space-y-3">
-                              <Input placeholder="Feed name" value={feedForm.name} onChange={(e) => setFeedForm({ ...feedForm, name: e.target.value })} />
-                              <Textarea placeholder="Description" value={feedForm.description} onChange={(e) => setFeedForm({ ...feedForm, description: e.target.value })} />
-                              <Input placeholder="Categories: DJ, photographer" value={feedForm.categories} onChange={(e) => setFeedForm({ ...feedForm, categories: e.target.value })} />
-                              <Input placeholder="Tags: techno, latex, darkwave" value={feedForm.tags} onChange={(e) => setFeedForm({ ...feedForm, tags: e.target.value })} />
-                              <Input placeholder="Locations: Los Angeles, San Diego" value={feedForm.locations} onChange={(e) => setFeedForm({ ...feedForm, locations: e.target.value })} />
-                              <Input placeholder="Specific user IDs: 4, 5, 8" value={feedForm.includedUserIds} onChange={(e) => setFeedForm({ ...feedForm, includedUserIds: e.target.value })} />
-                              <Button
-                                className="w-full"
-                                onClick={() =>
-                                  createCustomFeed.mutate({
-                                    data: {
-                                      name: feedForm.name,
-                                      description: feedForm.description,
-                                      categories: feedForm.categories.split(",").map((item) => item.trim()).filter(Boolean),
-                                      tags: feedForm.tags.split(",").map((item) => item.trim()).filter(Boolean),
-                                      locations: feedForm.locations.split(",").map((item) => item.trim()).filter(Boolean),
-                                      includedUserIds: feedForm.includedUserIds.split(",").map((item) => Number(item.trim())).filter(Boolean),
-                                    },
-                                  })
-                                }
-                                disabled={createCustomFeed.isPending || !feedForm.name.trim()}
-                              >
-                                Save Feed
-                              </Button>
-                            </div>
-                          </DialogContent>
-                        </Dialog>
-                      </div>
-                      <div className="space-y-2">
-                        {customFeeds?.length ? customFeeds.map((feed) => (
-                          <button
-                            key={feed.id}
-                            className={`w-full rounded-xl border px-3 py-3 text-left text-sm transition-colors ${selectedCustomFeed === feed.id ? "border-primary bg-primary/10" : "border-border/50 bg-card/40 hover:border-primary/30"}`}
-                            onClick={() => setSelectedCustomFeed(feed.id)}
-                          >
-                            <div className="font-medium">{feed.name}</div>
-                            {feed.description && <div className="mt-1 text-xs text-muted-foreground">{feed.description}</div>}
-                          </button>
-                        )) : (
-                          <div className="rounded-xl border border-dashed border-border/50 bg-card/30 p-4 text-sm text-muted-foreground">
-                            No custom feeds yet.
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
-              <Dialog
-                open={isPostDialogOpen}
-                onOpenChange={(open) => {
-                  setIsPostDialogOpen(open);
-                  if (!open) setShowLinkField(false);
-                }}
-              >
-                <DialogTrigger asChild>
-                  <Button size="icon" className="h-10 w-10 rounded-full">
-                    <Send className="h-4 w-4" />
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>Create Post</DialogTitle>
-                    <DialogDescription>
-                      Choose whether this publishes as Personal or Artist Page. Artist-page posts still appear in the main feed and stay attached to your creator page.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <div className="text-sm font-medium">What&apos;s happening?</div>
-                      <Textarea
-                        data-testid="post-composer-textarea"
-                        placeholder="Share a release, drop, collab, or update..."
-                        value={postForm.content}
-                        onChange={(e) => setPostForm({ ...postForm, content: e.target.value })}
-                        className="min-h-44 rounded-2xl border border-border bg-background px-4 py-4 text-base shadow-sm focus-visible:ring-2 focus-visible:ring-primary/25"
-                      />
-                    </div>
-                    <div className="space-y-3 rounded-2xl border border-border/60 bg-background/40 p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <div className="text-sm font-medium">Add media</div>
-                          <div className="mt-1 text-xs text-muted-foreground">Attach an image or paste a video or link.</div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button type="button" variant="ghost" size="icon" className="rounded-full" onClick={() => fileInputRef.current?.click()}>
-                            <ImageIcon className="h-5 w-5 text-primary" />
-                          </Button>
-                          <Button type="button" variant="ghost" size="icon" className="rounded-full" onClick={() => setShowLinkField(true)}>
-                            <Video className="h-5 w-5 text-foreground/70" />
-                          </Button>
-                          <Button type="button" variant="ghost" size="icon" className="rounded-full" onClick={() => setShowLinkField((current) => !current)}>
-                            <Link2 className="h-5 w-5 text-foreground/70" />
-                          </Button>
-                        </div>
-                      </div>
-                      {(postForm.imageUrl || postForm.linkUrl) ? (
-                        <div className="flex flex-wrap gap-2">
-                          {postForm.imageUrl ? (
-                            <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/50 px-3 py-2 text-xs">
-                              <ImageIcon className="h-3.5 w-3.5 text-primary" />
-                              Image attached
-                              <button type="button" onClick={() => setPostForm((current) => ({ ...current, imageUrl: "" }))}>
-                                <X className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          ) : null}
-                          {postForm.linkUrl ? (
-                            <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-border/60 bg-background/50 px-3 py-2 text-xs">
-                              <Link2 className="h-3.5 w-3.5 text-primary" />
-                              <span className="truncate">{postForm.linkUrl}</span>
-                              <button type="button" onClick={() => setPostForm((current) => ({ ...current, linkUrl: "" }))}>
-                                <X className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          ) : null}
-                        </div>
-                      ) : null}
-                      {showLinkField ? (
-                        <div className="space-y-2">
-                          <Input placeholder="Paste a video, article, audio, or link" value={postForm.linkUrl} onChange={(e) => setPostForm({ ...postForm, linkUrl: e.target.value })} />
-                          <div className="flex justify-end">
-                            <Button variant="ghost" size="sm" onClick={() => setShowLinkField(false)}>Done</Button>
-                          </div>
-                        </div>
-                      ) : null}
-                      <div className="text-xs text-muted-foreground">
-                        Paste a normal link. YouTube, Vimeo, Spotify, SoundCloud, and generic links are detected automatically.
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="text-sm font-medium">Post as</div>
-                      <div className="flex items-center gap-2 rounded-2xl border border-border/60 bg-background/40 p-2">
-                        <Button
-                          type="button"
-                          variant={activeIdentity === "personal" ? "default" : "ghost"}
-                          size="sm"
-                          className="rounded-full"
-                          onClick={() => setActiveIdentity("personal")}
-                        >
-                          Personal
-                        </Button>
-                        <Button
-                          type="button"
-                          variant={activeIdentity === "artist" ? "default" : "ghost"}
-                          size="sm"
-                          className="rounded-full"
-                          onClick={() => setActiveIdentity("artist")}
-                          disabled={!canUseArtistIdentity}
-                        >
-                          Artist Page
-                        </Button>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {postingIdentityHelper}
-                      </p>
-                    </div>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => handlePostImageUpload(e.target.files?.[0] || null)}
-                      disabled={isUploadingPostImage}
-                    />
-                    <div className="space-y-2 rounded-2xl border border-border/50 bg-background/25 p-4">
-                      <div className="text-sm font-medium">Who can see this?</div>
-                      <Select value={postForm.visibility} onValueChange={(value) => setPostForm((current) => ({ ...current, visibility: value as "public" | "friends" | "private" }))}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Choose post visibility" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="public">Public</SelectItem>
-                          <SelectItem value="friends">Friends only</SelectItem>
-                          <SelectItem value="private">Only me</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <div className="text-xs text-muted-foreground">
-                        Posting to {activeFeedLabel(mode, selectedFeed?.name)}{city ? ` / ${city}` : ""}.
-                      </div>
-                    </div>
-                    <div className="flex gap-3">
-                      <Button variant="outline" className="flex-1" onClick={saveDraft}>
-                        <Save className="mr-2 h-4 w-4" /> Save Draft
-                      </Button>
-                      <Button variant="outline" className="flex-1" onClick={clearComposer}>
-                        Reset
-                      </Button>
-                      <Button
-                        data-testid="submit-post"
-                        className="flex-1"
-                        onClick={submitPost}
-                        disabled={createPost.isPending || isUploadingPostImage || !(postForm.content.trim() || postForm.imageUrl || postForm.linkUrl.trim())}
-                      >
-                        <Send className="mr-2 h-4 w-4" /> Post
-                      </Button>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
+    <div className="space-y-6">
+      <section className="hh-panel hh-studio-banner">
+        <div className="grid gap-5 md:grid-cols-[1fr_auto] md:items-end">
+          <div>
+            <div className="hh-page-kicker">Home · Following feed</div>
+            <h1 className="hh-page-title !text-[clamp(2rem,4vw,3.2rem)]">
+              Good evening, <span className="hh-brand-wordmark-accent">{user?.username || "artist"}</span>
+            </h1>
+            <p className="hh-page-subtitle mt-3">
+              {followingCount
+                ? `${followingCount} people shape this stream. Home stays chronological and follow-based.`
+                : "Home is ready. Follow a few artists and scenes to bring the stream to life."}
+            </p>
+            <div className="mt-3 font-mono text-[0.68rem] uppercase tracking-[0.16em] text-[var(--hh-ink-muted)]">
+              {feedPosts.length} posts loaded · {resolvedTrendingTopics.length} active scene tags
             </div>
           </div>
-        </CardContent>
-      </Card>
+          <div className="hh-studio-banner-actions">
+            <Link href="/discover">
+              <Button variant="outline" className="rounded-none border-[var(--hh-rule)] bg-transparent text-[var(--hh-ink)] hover:bg-transparent">
+                Discover
+              </Button>
+            </Link>
+            <Button className="hh-solid-btn rounded-none" onClick={openPostDialog}>
+              <Plus className="mr-2 h-4 w-4" />
+              Publish
+            </Button>
+          </div>
+        </div>
+      </section>
 
-      {!isLoading && (
-        <Card className="overflow-hidden border-border/50 bg-card/60 md:hidden">
-          <CardContent className="space-y-4 p-4">
-            <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-base font-semibold">Suggested Creators</h2>
-                  <div className="mt-1 text-xs text-muted-foreground">Pulled forward from discovery so the feed never dead-ends.</div>
-                </div>
-              <Link href="/discover">
-                <Button variant="ghost" size="sm" className="shrink-0">See all</Button>
+      <div className="hh-studio-grid">
+        <aside className="hh-panel hidden md:flex md:flex-col md:p-5">
+          <div className="hh-studio-section">
+            <div className="hh-rail-title">Feed</div>
+            <div className="mt-3 hh-rail-list">
+              <button type="button" className="hh-rail-link is-active">
+                <span className="hh-rail-link-dot" />
+                <span>Following</span>
+                <span className="hh-rail-count">{feedPosts.length} live</span>
+              </button>
+              <Link href="/discover" className="hh-rail-link">
+                <Sparkles className="h-3.5 w-3.5" />
+                <span>Discover</span>
+                <span className="hh-rail-count">wander</span>
+              </Link>
+              <Link href="/groups" className="hh-rail-link">
+                <Newspaper className="h-3.5 w-3.5" />
+                <span>Scenes</span>
+                <span className="hh-rail-count">{resolvedTrendingTopics.length}</span>
               </Link>
             </div>
-            {suggestedCreators?.artists?.length ? (
-              <div className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-1">
-                {suggestedCreators.artists.map((artist) => {
-                  const artistName = artist.displayName || artist.user.username;
-                  const artistDescriptor = artist.tagline || artist.tags?.[0] || "";
-
-                  return (
-                    <Link
-                      key={artist.userId}
-                      href={`/artists/${artist.userId}`}
-                      className="min-w-[250px] snap-start rounded-2xl border border-border/50 bg-background/45 p-3 shadow-sm transition-colors hover:border-primary/30"
-                    >
-                      <div className="flex items-start gap-3">
-                        <Avatar className="h-12 w-12 shrink-0">
-                          <AvatarImage src={artist.avatarUrl || artist.user.avatarUrl || ""} />
-                          <AvatarFallback>{artistName.slice(0, 2).toUpperCase()}</AvatarFallback>
-                        </Avatar>
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm font-semibold">{artistName}</div>
-                          <div className="mt-1 text-xs text-muted-foreground">{artist.category}</div>
-                          <Badge variant="outline" className="mt-2 text-[10px] uppercase tracking-[0.18em]">
-                            {getSuggestedCreatorReason(artist, city)}
-                          </Badge>
-                          {artist.location ? <div className="mt-1 text-xs text-muted-foreground">{artist.location}</div> : null}
-                          {artistDescriptor ? <div className="mt-2 line-clamp-2 text-xs text-muted-foreground">{artistDescriptor}</div> : null}
-                        </div>
-                      </div>
-                      <div className="mt-3">
-                        <Button
-                          size="sm"
-                          variant={artist.isFollowing ? "outline" : "default"}
-                          className="w-full"
-                          onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            if (artist.isFollowing) {
-                              unfollowCreator.mutate({ userId: artist.userId });
-                            } else {
-                              followCreator.mutate({ userId: artist.userId });
-                            }
-                          }}
-                          disabled={followCreator.isPending || unfollowCreator.isPending}
-                        >
-                          {artist.isFollowing ? "Following" : "Follow"}
-                        </Button>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-dashed border-border/50 bg-background/35 p-4 text-sm text-muted-foreground">
-                Creator suggestions will appear here as more public pages join the network.
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      <Card className="hidden overflow-hidden border-border/50 bg-card/60 md:block">
-        <CardContent className="p-0">
-          <div className="relative px-6 py-8 md:px-8 md:py-10">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.18),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.14),transparent_28%)]" />
-            <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-              <div className="max-w-2xl">
-                <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs uppercase tracking-[0.24em] text-primary">
-                  <SlidersHorizontal className="h-3.5 w-3.5" /> Feed Control
-                </div>
-                <h1 className="mt-4 text-3xl font-bold md:text-4xl">Browse your social world without a black-box algorithm.</h1>
-                <p className="mt-3 text-sm text-muted-foreground md:text-base">
-                  Follow scenes, pin local cities, and build custom feed collections around real people, categories, and places.
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-3 text-sm md:min-w-80">
-                <div className="rounded-2xl border border-border/50 bg-background/50 p-4">
-                  <div className="text-muted-foreground">Current feed</div>
-                  <div className="mt-1 font-semibold">{activeFeedLabel(mode, selectedFeed?.name)}</div>
-                </div>
-                <div className="rounded-2xl border border-border/50 bg-background/50 p-4">
-                  <div className="text-muted-foreground">Posts loaded</div>
-                  <div className="mt-1 font-semibold">{feedPosts.length || 0}</div>
-                </div>
-              </div>
-            </div>
           </div>
-        </CardContent>
-      </Card>
 
-      <Card className="cursor-pointer border-border/70 bg-card/90 shadow-[0_10px_30px_rgba(15,23,42,0.08)] transition-colors hover:border-primary/35" onClick={openPostDialog}>
-        <CardContent className="p-4 md:p-5">
-          <div className="flex items-center gap-3">
-            <Avatar className="h-10 w-10 md:h-11 md:w-11">
-              <AvatarImage src={user?.avatarUrl || ""} />
-              <AvatarFallback>{user?.username?.slice(0, 2).toUpperCase()}</AvatarFallback>
-            </Avatar>
-            <button
-              type="button"
-              data-testid="open-post-composer"
-              className="flex-1 rounded-2xl border border-primary/40 bg-white px-4 py-4 text-left text-slate-900 shadow-[0_0_0_1px_rgba(139,92,246,0.16)] transition-colors hover:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-            >
-              <div className="text-sm font-medium text-slate-900">Create a post</div>
-              <div className="mt-1 text-sm text-slate-600">
-                What&apos;s happening? Share a release, drop, collab, or update...
-              </div>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <Badge variant="secondary">{currentPostingIdentity}</Badge>
-                <span className="text-xs text-slate-500">
-                  {canUseArtistIdentity ? "Switch identity before posting if you want this update to represent your artist page." : "Posts publish from your personal profile."}
-                </span>
-              </div>
-            </button>
-            <div className="hidden items-center gap-1 sm:flex">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="rounded-full"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  openPostDialogWithImage();
-                }}
-              >
-                <ImageIcon className="h-5 w-5 text-primary" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="rounded-full"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  openPostDialogWithLink();
-                }}
-              >
-                <Link2 className="h-5 w-5 text-primary" />
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="flex flex-col gap-6 lg:flex-row">
-        <div className="hidden space-y-4 md:block lg:w-80">
-          <Card className="border-border/50 bg-card/50">
-            <CardContent className="space-y-4 p-4">
+          <div className="hh-studio-section">
+            <div className="hh-rail-heading">
               <div>
-                <h2 className="font-semibold">Trending Topics</h2>
-                <div className="mt-1 text-xs text-muted-foreground">Recent hashtags gaining traction across public posts.</div>
+                <div className="hh-rail-title">Saved feeds</div>
+                <div className="mt-1 text-xs text-[var(--hh-ink-muted)]">Optional side collections</div>
               </div>
-              {resolvedTrendingTopics.length ? (
-                <div className="flex flex-wrap gap-2">
-                  {resolvedTrendingTopics.map((topic) => (
-                    <Link key={topic.tag} href={getTopicPath(topic.tag)}>
-                      <Badge variant="outline" className="cursor-pointer px-3 py-1 text-[11px] uppercase tracking-[0.18em]">
-                        {topic.tag}
-                        <span className="ml-2 text-muted-foreground">{topic.count}</span>
-                      </Badge>
-                    </Link>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-dashed border-border/50 bg-background/30 p-4 text-sm text-muted-foreground">
-                  Trending topics will appear as more public posts use hashtags.
+              <Dialog>
+                <DialogTrigger asChild>
+                  <button type="button" className="hh-rail-count text-[var(--hh-accent)]">+ New</button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Create Custom Feed</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-3">
+                    <Input placeholder="Feed name" value={feedForm.name} onChange={(e) => setFeedForm({ ...feedForm, name: e.target.value })} />
+                    <Textarea placeholder="Description" value={feedForm.description} onChange={(e) => setFeedForm({ ...feedForm, description: e.target.value })} />
+                    <Input placeholder="Categories: photographer, stylist" value={feedForm.categories} onChange={(e) => setFeedForm({ ...feedForm, categories: e.target.value })} />
+                    <Input placeholder="Tags: editorial, film, latex" value={feedForm.tags} onChange={(e) => setFeedForm({ ...feedForm, tags: e.target.value })} />
+                    <Input placeholder="Locations: Los Angeles, New York" value={feedForm.locations} onChange={(e) => setFeedForm({ ...feedForm, locations: e.target.value })} />
+                    <Input placeholder="Specific user IDs: 4, 5, 8" value={feedForm.includedUserIds} onChange={(e) => setFeedForm({ ...feedForm, includedUserIds: e.target.value })} />
+                    <Button
+                      className="w-full"
+                      onClick={() =>
+                        createCustomFeed.mutate({
+                          data: {
+                            name: feedForm.name,
+                            description: feedForm.description,
+                            categories: feedForm.categories.split(",").map((item) => item.trim()).filter(Boolean),
+                            tags: feedForm.tags.split(",").map((item) => item.trim()).filter(Boolean),
+                            locations: feedForm.locations.split(",").map((item) => item.trim()).filter(Boolean),
+                            includedUserIds: feedForm.includedUserIds.split(",").map((item) => Number(item.trim())).filter(Boolean),
+                          },
+                        })
+                      }
+                      disabled={createCustomFeed.isPending || !feedForm.name.trim()}
+                    >
+                      Save Feed
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+            <div className="hh-rail-list">
+              {customFeeds?.length ? customFeeds.map((feed) => (
+                <button
+                  key={feed.id}
+                  type="button"
+                  className={`hh-rail-link ${selectedCustomFeed === feed.id ? "is-active" : ""}`}
+                  onClick={() => setSelectedCustomFeed(feed.id)}
+                >
+                  <span className="hh-rail-count">◇</span>
+                  <span className="truncate">{feed.name}</span>
+                  <span className="hh-rail-count">{feed.tags?.length || 0}</span>
+                </button>
+              )) : (
+                <div className="border border-dashed border-[var(--hh-rule)] p-3 text-sm text-[var(--hh-ink-muted)]">
+                  No saved feeds yet.
                 </div>
               )}
-            </CardContent>
-          </Card>
-          {!isLoading && (
-            <Card className="border-border/50 bg-card/50">
-              <CardContent className="space-y-4 p-4">
-                <div>
-                  <h2 className="font-semibold">Suggested Creators</h2>
-                  <div className="mt-1 text-xs text-muted-foreground">Promoted from discovery so the feed can always branch into someone new.</div>
-                </div>
-                {suggestedCreators?.artists?.length ? (
-                  <div className="space-y-3">
-                    {suggestedCreators.artists.map((artist) => (
-                    <Link
-                      key={artist.userId}
-                      href={`/artists/${artist.userId}`}
-                      className="flex items-start gap-3 rounded-2xl border border-border/50 bg-background/30 p-3 transition-colors hover:border-primary/30"
-                    >
-                      <Avatar className="h-11 w-11">
-                        <AvatarImage src={artist.avatarUrl || artist.user.avatarUrl || ""} />
-                        <AvatarFallback>{(artist.displayName || artist.user.username).slice(0, 2).toUpperCase()}</AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate font-medium">{artist.displayName || artist.user.username}</div>
-                        <div className="text-xs text-muted-foreground">{[artist.category, artist.location].filter(Boolean).join(" · ")}</div>
-                        <div className="mt-2">
-                          <Badge variant="outline" className="text-[10px] uppercase tracking-[0.18em]">
-                            {getSuggestedCreatorReason(artist, city)}
-                          </Badge>
-                        </div>
-                        {artist.tagline ? <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">{artist.tagline}</div> : null}
-                      </div>
-                    </Link>
-                  ))}
-                  </div>
-                ) : (
-                  <div className="rounded-2xl border border-dashed border-border/50 bg-background/30 p-4 text-sm text-muted-foreground">
-                    No creator suggestions yet. Open Discover to browse public pages as more creators join.
-                  </div>
-                )}
-                <Link href="/discover">
-                  <Button variant="ghost" size="sm" className="w-full justify-center">See all</Button>
+            </div>
+          </div>
+
+          <div className="hh-studio-section">
+            <div className="hh-rail-title">Following</div>
+            <div className="mt-3 hh-rail-list">
+              {isLoadingFollowingPreview ? (
+                <div className="flex justify-center py-4"><Spinner /></div>
+              ) : followingPreview?.length ? followingPreview.slice(0, 5).map((person) => (
+                <Link key={person.id} href={`/artists/${person.id}`} className="hh-rail-link">
+                  <Avatar className="h-7 w-7 border border-border/50">
+                    <AvatarImage src={person.avatarUrl || ""} />
+                    <AvatarFallback>{person.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  <span className="truncate">{person.username}</span>
+                  <span className="hh-rail-count">{person.city || person.location || "live"}</span>
                 </Link>
-              </CardContent>
-            </Card>
-          )}
-          <Card className="border-border/50 bg-card/50">
-            <CardContent className="space-y-4 p-4">
-              <div>
-                <h2 className="mb-2 font-semibold">Feeds</h2>
-                <div className="space-y-2">
-                  {FEED_MODES.map((feed) => (
-                    <button
-                      key={feed.value}
-                      className={`w-full rounded-2xl border px-3 py-3 text-left transition-colors ${mode === feed.value && !selectedCustomFeed ? "border-primary bg-primary/10" : "border-border/50 bg-card/40 hover:border-primary/30"}`}
-                      onClick={() => {
-                        setSelectedCustomFeed(null);
-                        setMode(feed.value);
-                      }}
-                    >
-                      <div className="font-medium">{feed.label}</div>
-                      <div className="mt-1 text-xs text-muted-foreground">{feed.helper}</div>
-                    </button>
-                  ))}
+              )) : (
+                <div className="border border-dashed border-[var(--hh-rule)] p-3 text-sm text-[var(--hh-ink-muted)]">
+                  No follows yet.
                 </div>
-              </div>
+              )}
+            </div>
+          </div>
+        </aside>
 
-              <div className="space-y-2">
-                <div className="text-sm font-medium">Local city filter</div>
-                <LocationInput placeholder="Los Angeles, California" value={city} onValueChange={setCity} />
-                {city && (
-                  <div className="flex flex-wrap gap-2">
-                    <Badge variant="secondary">{city}</Badge>
-                    <Button variant="ghost" size="sm" onClick={() => setCity("")}>Clear city</Button>
+        <main className="space-y-5 md:border-x md:border-[var(--hh-rule)] md:px-7 md:py-5">
+          <div className="hh-tabstrip">
+            <button type="button" className="hh-tabstrip-item is-active">
+              Following
+              <span className="hh-tabstrip-badge">{feedPosts.length} live</span>
+            </button>
+            <button type="button" className="hh-tabstrip-item">
+              Saved feeds
+              {customFeeds?.length ? <span className="hh-tabstrip-badge">{customFeeds.length}</span> : null}
+            </button>
+            <button type="button" className="hh-tabstrip-item">Latest</button>
+            <span className="ml-auto hidden font-mono text-[0.65rem] uppercase tracking-[0.14em] text-[var(--hh-ink-muted)] md:inline">
+              no algorithm
+            </span>
+          </div>
+
+          {shouldNudgeDiscovery ? (
+            <div className="hh-panel p-5">
+              <div className="hh-rail-kicker">Start here</div>
+              <div className="mt-2 font-serif text-3xl text-[var(--hh-ink)]">Build the feed fast.</div>
+              <div className="mt-2 max-w-2xl text-sm leading-6 text-[var(--hh-ink-muted)]">
+                Follow a few artists and your scenes will start to speak. Discovery is where you roam; Home is where the people you chose show up.
+              </div>
+            </div>
+          ) : null}
+
+          <Card className="hh-panel cursor-pointer overflow-hidden rounded-none border-[var(--hh-rule)] bg-transparent shadow-none" onClick={openPostDialog}>
+            <CardContent className="p-4 md:p-5">
+              <div className="flex items-start gap-3">
+                <Avatar className="h-10 w-10 border border-border/50 md:h-11 md:w-11">
+                  <AvatarImage src={user?.avatarUrl || ""} />
+                  <AvatarFallback>{user?.username?.slice(0, 2).toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <button
+                  type="button"
+                  data-testid="open-post-composer"
+                  className="flex-1 border border-[var(--hh-rule)] bg-[color:color-mix(in_srgb,white_2%,transparent)] px-4 py-4 text-left transition-colors hover:border-[var(--hh-accent)]"
+                >
+                  <div className="font-serif text-xl text-[var(--hh-ink)]">Share a new post.</div>
+                  <div className="mt-2 text-sm leading-6 text-[var(--hh-ink-muted)]">
+                    Work, thoughts, references, a frame from set, a note from the night.
                   </div>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-medium">Custom Feeds</h3>
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button size="icon" variant="ghost" className="h-8 w-8"><Plus className="h-4 w-4" /></Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Create Custom Feed</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-3">
-                        <Input placeholder="Feed name" value={feedForm.name} onChange={(e) => setFeedForm({ ...feedForm, name: e.target.value })} />
-                        <Textarea placeholder="Description" value={feedForm.description} onChange={(e) => setFeedForm({ ...feedForm, description: e.target.value })} />
-                        <Input placeholder="Categories: DJ, photographer" value={feedForm.categories} onChange={(e) => setFeedForm({ ...feedForm, categories: e.target.value })} />
-                        <Input placeholder="Tags: techno, latex, darkwave" value={feedForm.tags} onChange={(e) => setFeedForm({ ...feedForm, tags: e.target.value })} />
-                        <Input placeholder="Locations: Los Angeles, San Diego" value={feedForm.locations} onChange={(e) => setFeedForm({ ...feedForm, locations: e.target.value })} />
-                        <Input placeholder="Specific user IDs: 4, 5, 8" value={feedForm.includedUserIds} onChange={(e) => setFeedForm({ ...feedForm, includedUserIds: e.target.value })} />
-                        <Button
-                          className="w-full"
-                          onClick={() =>
-                            createCustomFeed.mutate({
-                              data: {
-                                name: feedForm.name,
-                                description: feedForm.description,
-                                categories: feedForm.categories.split(",").map((item) => item.trim()).filter(Boolean),
-                                tags: feedForm.tags.split(",").map((item) => item.trim()).filter(Boolean),
-                                locations: feedForm.locations.split(",").map((item) => item.trim()).filter(Boolean),
-                                includedUserIds: feedForm.includedUserIds.split(",").map((item) => Number(item.trim())).filter(Boolean),
-                              },
-                            })
-                          }
-                          disabled={createCustomFeed.isPending || !feedForm.name.trim()}
-                        >
-                          Save Feed
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-                <div className="space-y-2">
-                  {customFeeds?.length ? customFeeds.map((feed) => (
-                    <button
-                      key={feed.id}
-                      className={`w-full rounded-xl border px-3 py-3 text-left text-sm transition-colors ${selectedCustomFeed === feed.id ? "border-primary bg-primary/10" : "border-border/50 bg-card/40 hover:border-primary/30"}`}
-                      onClick={() => setSelectedCustomFeed(feed.id)}
-                    >
-                      <div className="font-medium">{feed.name}</div>
-                      {feed.description && <div className="mt-1 text-xs text-muted-foreground">{feed.description}</div>}
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {feed.tags?.slice(0, 2).map((tag) => <Badge key={tag} variant="secondary">{tag}</Badge>)}
-                        {feed.locations?.slice(0, 1).map((location) => <Badge key={location} variant="outline">{location}</Badge>)}
-                      </div>
-                    </button>
-                  )) : (
-                    <div className="rounded-xl border border-dashed border-border/50 bg-card/30 p-4 text-sm text-muted-foreground">
-                      No custom feeds yet.
-                    </div>
-                  )}
+                </button>
+                <div className="hidden items-center gap-2 sm:flex">
+                  <Button type="button" variant="ghost" size="icon" className="rounded-none" onClick={(event) => { event.stopPropagation(); openPostDialogWithImage(); }}>
+                    <ImageIcon className="h-4 w-4" />
+                  </Button>
+                  <Button type="button" variant="ghost" size="icon" className="rounded-none" onClick={(event) => { event.stopPropagation(); openPostDialogWithLink(); }}>
+                    <Link2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             </CardContent>
-          </Card>
-        </div>
-
-        <div className="flex-1 space-y-5">
-          {shouldNudgeDiscovery && (
-            <Card className="border-primary/30 bg-primary/5">
-              <CardContent className="space-y-5 p-5">
-                <div>
-                  <div className="text-xs font-semibold uppercase tracking-[0.22em] text-primary/80">Start here</div>
-                  <div className="mt-2 text-lg font-semibold text-foreground">Build your feed fast</div>
-                  <div className="mt-1 text-sm text-muted-foreground">Follow creators or people you may know to unlock a living feed.</div>
-                </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-3 rounded-2xl border border-border/50 bg-background/60 p-4">
-                    <div className="text-sm font-semibold">Follow creators</div>
-                    {suggestedCreators?.artists?.length ? (
-                      <div className="space-y-3">
-                        {suggestedCreators.artists.slice(0, 3).map((artist) => (
-                          <div key={`follow-${artist.userId}`} className="flex items-center gap-3">
-                            <Link href={`/artists/${artist.userId}`} className="flex items-center gap-3 min-w-0">
-                              <Avatar className="h-10 w-10">
-                                <AvatarImage src={artist.avatarUrl || artist.user.avatarUrl || ""} />
-                                <AvatarFallback>{(artist.displayName || artist.user.username).slice(0, 2).toUpperCase()}</AvatarFallback>
-                              </Avatar>
-                              <div className="min-w-0">
-                                <div className="truncate text-sm font-medium">{artist.displayName || artist.user.username}</div>
-                                <div className="text-xs text-muted-foreground">{getSuggestedCreatorReason(artist, city)}</div>
-                              </div>
-                            </Link>
-                            <Button
-                              size="sm"
-                              className="ml-auto"
-                              variant={artist.isFollowing ? "outline" : "default"}
-                              onClick={() => {
-                                if (artist.isFollowing) {
-                                  unfollowCreator.mutate({ userId: artist.userId });
-                                } else {
-                                  followCreator.mutate({ userId: artist.userId });
-                                }
-                              }}
-                              disabled={followCreator.isPending || unfollowCreator.isPending}
-                            >
-                              {artist.isFollowing ? "Following" : "Follow"}
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="rounded-2xl border border-dashed border-border/50 bg-card/40 p-4 text-sm text-muted-foreground">
-                        Creator picks are warming up. Check Discover to browse public pages.
-                      </div>
-                    )}
-                    <Link href="/discover">
-                      <Button variant="ghost" size="sm" className="w-full">Browse creators</Button>
-                    </Link>
-                  </div>
-                  <div className="space-y-3 rounded-2xl border border-border/50 bg-background/60 p-4">
-                    <div className="text-sm font-semibold">People you may know</div>
-                    {suggestedCreators?.artists?.length ? (
-                      <div className="flex flex-wrap gap-3">
-                        {suggestedCreators.artists.slice(0, 6).map((artist) => (
-                          <Link
-                            key={`know-${artist.userId}`}
-                            href={`/profile/${artist.userId}`}
-                            className="flex flex-col items-center gap-2 rounded-xl border border-border/40 bg-card/60 p-2 text-center hover:border-primary/40"
-                          >
-                            <Avatar className="h-12 w-12">
-                              <AvatarImage src={artist.avatarUrl || artist.user.avatarUrl || ""} />
-                              <AvatarFallback>{(artist.displayName || artist.user.username).slice(0, 2).toUpperCase()}</AvatarFallback>
-                            </Avatar>
-                            <div className="text-[11px] font-medium truncate max-w-[72px]">{artist.displayName || artist.user.username}</div>
-                          </Link>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="rounded-2xl border border-dashed border-border/50 bg-card/40 p-4 text-sm text-muted-foreground">
-                        We&apos;ll populate this as more creators join.
-                      </div>
-                    )}
-                    <Link href="/discover">
-                      <Button variant="ghost" size="sm" className="w-full">Find people</Button>
-                    </Link>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-          <Card className="border-border/50 bg-card/40">
-            <CardHeader className="pb-3">
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <div className="flex items-center gap-2 text-lg font-semibold">
-                    <Newspaper className="h-5 w-5 text-primary" />
-                    {activeFeedLabel(mode, selectedFeed?.name)}
-                  </div>
-                  <div className="mt-1 text-sm text-muted-foreground">
-                    {selectedFeed?.description || FEED_MODES.find((feed) => feed.value === mode)?.helper || "Chronological social updates."}
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {selectedFeed ? (
-                    <>
-                      <Badge variant="outline">Custom feed</Badge>
-                      <Button variant="ghost" size="sm" onClick={() => setSelectedCustomFeed(null)}>Back to defaults</Button>
-                    </>
-                  ) : (
-                    <Badge variant="secondary">{FEED_MODES.find((feed) => feed.value === mode)?.label}</Badge>
-                  )}
-                  {city && <Badge variant="secondary">{city}</Badge>}
-                </div>
-              </div>
-            </CardHeader>
-            {!selectedFeed && mode === "following" ? (
-              <CardContent className="pt-0">
-                <div className="rounded-2xl border border-border/50 bg-background/35 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm text-muted-foreground">
-                      {followingCount
-                        ? `You are following ${followingCount} ${followingCount === 1 ? "person or page" : "people and pages"}.`
-                        : "You are not following anyone yet."}
-                    </div>
-                    <Link href="/discover">
-                      <Button variant="outline" size="sm">Find people to follow</Button>
-                    </Link>
-                  </div>
-                  {isLoadingFollowingPreview ? (
-                    <div className="mt-4 flex justify-center py-4"><Spinner /></div>
-                  ) : followingCount ? (
-                    <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-                      {followingPreview!.slice(0, 6).map((followedUser) => (
-                        <Link
-                          key={followedUser.id}
-                          href={followedUser.hasArtistPage ? `/artists/${followedUser.id}` : `/profile/${followedUser.id}`}
-                          className="flex flex-col items-center gap-2 rounded-2xl border border-border/50 bg-background/30 p-3 text-center transition-colors hover:border-primary/30"
-                        >
-                          <Avatar className="h-16 w-16 border-2 border-border/60 bg-card shadow-sm">
-                            <AvatarImage src={followedUser.avatarUrl || ""} />
-                            <AvatarFallback>{followedUser.username.slice(0, 2).toUpperCase()}</AvatarFallback>
-                          </Avatar>
-                          <div className="w-full">
-                            <div className="truncate text-xs font-semibold">{followedUser.username}</div>
-                            {followedUser.city || followedUser.location ? (
-                              <div className="mt-1 truncate text-[10px] text-muted-foreground">{followedUser.city || followedUser.location}</div>
-                            ) : null}
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 w-full text-xs"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              unfollowCreator.mutate({ userId: followedUser.id });
-                            }}
-                            disabled={unfollowCreator.isPending}
-                          >
-                            Following
-                          </Button>
-                        </Link>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="mt-4 rounded-2xl border border-dashed border-border/50 bg-card/30 p-4 text-sm text-muted-foreground">
-                      Follow a creator or person and they will appear here.
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            ) : null}
           </Card>
 
           {isLoading ? (
@@ -1130,34 +516,205 @@ export default function Home() {
           ) : isError ? (
             <QueryErrorState title="Could not load feed" description="The feed request failed. Check the API and retry." onRetry={() => refetch()} />
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-5">
               {feedPosts.map((post) => (
                 <FeedPostCard key={post.id} post={post} />
               ))}
-              {feedPosts.length === 0 && (
-                <Card className="border-dashed border-border/50 bg-card/40">
-                  <CardContent className="p-12 text-center text-muted-foreground">
-                    <Sparkles className="mx-auto mb-4 h-10 w-10 opacity-30" />
-                    <div className="text-foreground font-medium">No posts in this feed yet.</div>
-                    <div className="mt-2 text-sm">
-                      Try another feed mode, broaden the city filter, or publish the first post into this scene.
-                    </div>
+              {feedPosts.length === 0 ? (
+                <Card className="hh-panel rounded-none border-dashed border-[var(--hh-rule)] bg-transparent shadow-none">
+                  <CardContent className="p-12 text-center text-[var(--hh-ink-muted)]">
+                    <Sparkles className="mx-auto mb-4 h-10 w-10 opacity-40" />
+                    <div className="font-serif text-2xl text-[var(--hh-ink)]">No posts in this feed yet.</div>
+                    <div className="mt-2 text-sm">Follow more people or publish the first piece of work into your circle.</div>
                   </CardContent>
                 </Card>
-              )}
+              ) : null}
               <LoadMoreSentinel
                 enabled={Boolean(hasNextPage)}
                 isLoading={isFetchingNextPage}
                 onVisible={() => {
-                  if (hasNextPage && !isFetchingNextPage) {
-                    fetchNextPage();
-                  }
+                  if (hasNextPage && !isFetchingNextPage) fetchNextPage();
                 }}
               />
             </div>
           )}
-        </div>
+        </main>
+
+        <aside className="hh-studio-rail">
+          <div className="hh-panel p-5">
+            <div className="hh-rail-kicker">Open inquiries</div>
+            <div className="mt-2 font-serif text-2xl text-[var(--hh-ink)]">Keep it social, keep it moving.</div>
+            <div className="mt-2 text-sm leading-6 text-[var(--hh-ink-muted)]">
+              Messages stay simple. Inquiries stay visible when they arrive, but the feed stays the heart of the platform.
+            </div>
+            <Link href="/messages" className="mt-4 inline-block font-mono text-[0.68rem] uppercase tracking-[0.16em] text-[var(--hh-accent)]">
+              Open the desk →
+            </Link>
+          </div>
+
+          <div className="hh-panel p-5">
+            <div className="hh-display-title text-[1.15rem]">Suggested artists</div>
+            <div className="mt-3 space-y-3">
+              {suggestedArtists.length ? suggestedArtists.slice(0, 3).map((artist) => (
+                <div key={artist.userId} className="flex items-start gap-3 border-t border-[var(--hh-rule-soft)] pt-3 first:border-t-0 first:pt-0">
+                  <Avatar className="h-10 w-10 border border-border/50">
+                    <AvatarImage src={artist.avatarUrl || artist.user.avatarUrl || ""} />
+                    <AvatarFallback>{(artist.displayName || artist.user.username).slice(0, 2).toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <Link href={`/artists/${artist.userId}`} className="font-medium text-[var(--hh-ink)]">
+                      {artist.displayName || artist.user.username}
+                    </Link>
+                    <div className="mt-1 text-xs uppercase tracking-[0.12em] text-[var(--hh-ink-muted)]">
+                      {[artist.category, artist.location].filter(Boolean).join(" · ")}
+                    </div>
+                    <div className="mt-2 text-xs text-[var(--hh-ink-muted)]">{getSuggestedCreatorReason(artist)}</div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={artist.isFollowing ? "outline" : "default"}
+                    onClick={() => artist.isFollowing ? unfollowCreator.mutate({ userId: artist.userId }) : followCreator.mutate({ userId: artist.userId })}
+                    disabled={followCreator.isPending || unfollowCreator.isPending}
+                  >
+                    {artist.isFollowing ? "Following" : "Follow"}
+                  </Button>
+                </div>
+              )) : (
+                <div className="text-sm text-[var(--hh-ink-muted)]">Nothing surfaced here yet.</div>
+              )}
+            </div>
+          </div>
+
+          <div className="hh-panel p-5">
+            <div className="hh-display-title text-[1.15rem]">Trending in your scenes</div>
+            <div className="mt-3 space-y-3">
+              {resolvedTrendingTopics.length ? resolvedTrendingTopics.slice(0, 5).map((topic) => (
+                <Link key={topic.tag} href={getTopicPath(topic.tag)} className="flex items-center justify-between border-t border-[var(--hh-rule-soft)] pt-3 first:border-t-0 first:pt-0">
+                  <span className="font-serif text-lg text-[var(--hh-ink)]">{topic.tag}</span>
+                  <span className="hh-rail-count">{topic.count} new</span>
+                </Link>
+              )) : (
+                <div className="text-sm text-[var(--hh-ink-muted)]">Scene tags will show up as the public feed grows.</div>
+              )}
+            </div>
+          </div>
+        </aside>
       </div>
+
+      <Dialog
+        open={isPostDialogOpen}
+        onOpenChange={(open) => {
+          setIsPostDialogOpen(open);
+          if (!open) setShowLinkField(false);
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create Feed Update</DialogTitle>
+            <DialogDescription>
+              Just post. Save the hiring details and logistics for castings or direct inquiries.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Textarea
+              data-testid="post-composer-textarea"
+              placeholder="Share what you made, what you saw, what happened on set, what reference is stuck in your head..."
+              value={postForm.content}
+              onChange={(e) => setPostForm({ ...postForm, content: e.target.value })}
+              className="min-h-44 rounded-none border-border/60 bg-background/50 px-4 py-4 text-base"
+            />
+            <div className="space-y-3 border border-border/50 bg-background/30 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-medium">Add media</div>
+                  <div className="mt-1 text-xs text-muted-foreground">Attach one or more images, or drop in a link.</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button type="button" variant="ghost" size="icon" className="rounded-none" onClick={() => fileInputRef.current?.click()}>
+                    <ImageIcon className="h-4 w-4" />
+                  </Button>
+                  <Button type="button" variant="ghost" size="icon" className="rounded-none" onClick={() => setShowLinkField((current) => !current)}>
+                    <Link2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              {(postForm.imageUrls.length || postForm.linkUrl) ? (
+                <div className="space-y-3">
+                  {postForm.imageUrls.length ? (
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                      {postForm.imageUrls.map((url, index) => (
+                        <div key={`${url}-${index}`} className="relative overflow-hidden border border-border/60 bg-background/40">
+                          <img src={url} alt={`Upload ${index + 1}`} className="h-20 w-full object-cover" />
+                          <button
+                            type="button"
+                            className="absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-white"
+                            onClick={() => setPostForm((current) => ({ ...current, imageUrls: current.imageUrls.filter((_, imageIndex) => imageIndex !== index) }))}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                  {postForm.linkUrl ? (
+                    <div className="inline-flex max-w-full items-center gap-2 border border-border/60 px-3 py-2 text-xs">
+                      <Link2 className="h-3.5 w-3.5" />
+                      <span className="truncate">{postForm.linkUrl}</span>
+                      <button type="button" onClick={() => setPostForm((current) => ({ ...current, linkUrl: "" }))}>
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+              {showLinkField ? (
+                <Input placeholder="Paste a video, article, playlist, or reference link" value={postForm.linkUrl} onChange={(e) => setPostForm({ ...postForm, linkUrl: e.target.value })} />
+              ) : null}
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                void handlePostImageUpload(e.target.files);
+                e.currentTarget.value = "";
+              }}
+              disabled={isUploadingPostImage}
+            />
+            <div className="space-y-2">
+              <div className="text-sm font-medium">Who can see this?</div>
+              <Select value={postForm.visibility} onValueChange={(value) => setPostForm((current) => ({ ...current, visibility: value as "public" | "friends" | "private" }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose post visibility" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="public">Public</SelectItem>
+                  <SelectItem value="friends">Friends only</SelectItem>
+                  <SelectItem value="private">Only me</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={saveDraft}>
+                <Save className="mr-2 h-4 w-4" /> Save Draft
+              </Button>
+              <Button variant="outline" className="flex-1" onClick={clearComposer}>
+                Reset
+              </Button>
+              <Button
+                data-testid="submit-post"
+                className="flex-1"
+                onClick={submitPost}
+                disabled={createPost.isPending || isUploadingPostImage || !(postForm.content.trim() || postForm.imageUrls.length || postForm.linkUrl.trim())}
+              >
+                <Send className="mr-2 h-4 w-4" /> Publish
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

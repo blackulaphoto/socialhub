@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS "site_settings" (
   "id" integer PRIMARY KEY DEFAULT 1 NOT NULL,
-  "site_name" text DEFAULT 'ArtistHub' NOT NULL,
+  "site_name" text DEFAULT 'HollywoodHeartbeats.com' NOT NULL,
   "logo_url" text,
   "favicon_url" text,
   "updated_by_user_id" integer,
@@ -15,5 +15,5 @@ EXCEPTION
 END $$;
 
 INSERT INTO "site_settings" ("id", "site_name", "logo_url", "favicon_url")
-VALUES (1, 'ArtistHub', '/brand-mark.png', '/favicon.png')
+VALUES (1, 'HollywoodHeartbeats.com', '/brand-mark.svg', '/favicon.svg')
 ON CONFLICT ("id") DO NOTHING;

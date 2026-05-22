@@ -72,7 +72,7 @@ export default function Admin() {
   useEffect(() => {
     if (!siteSettingsQuery.data) return;
     setSiteForm({
-      siteName: siteSettingsQuery.data.siteName || "ArtistHub",
+      siteName: siteSettingsQuery.data.siteName || "HollywoodHeartbeats.com",
       logoUrl: siteSettingsQuery.data.logoUrl || "",
       faviconUrl: siteSettingsQuery.data.faviconUrl || "",
     });
@@ -127,11 +127,11 @@ export default function Admin() {
     <div className="mx-auto w-full max-w-6xl space-y-8 p-4 md:py-8">
       <div>
         <h1 className="flex items-center gap-2 text-3xl font-bold"><ShieldAlert className="h-8 w-8 text-primary" /> Admin Dashboard</h1>
-        <p className="text-muted-foreground">Moderation queue, platform analytics, and content controls.</p>
+        <p className="text-muted-foreground">Moderation queue, sitewide activity, and content controls.</p>
       </div>
 
       {analyticsQuery.isError ? (
-        <QueryErrorState title="Could not load analytics" description="Admin analytics failed to load." onRetry={() => analyticsQuery.refetch()} />
+        <QueryErrorState title="Could not load activity totals" description="Admin activity totals failed to load." onRetry={() => analyticsQuery.refetch()} />
       ) : (
         <>
           <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
@@ -270,10 +270,10 @@ export default function Admin() {
                         {siteForm.logoUrl ? (
                           <img src={siteForm.logoUrl} alt={siteForm.siteName || "Site logo"} className="h-14 w-14 rounded-2xl object-cover ring-1 ring-border/60" />
                         ) : (
-                          <div className="grid h-14 w-14 place-items-center rounded-2xl bg-primary text-primary-foreground">A</div>
+                          <div className="brand-monogram h-14 w-14 rounded-2xl">HH</div>
                         )}
                         <div>
-                          <div className="text-xl font-semibold">{siteForm.siteName || "ArtistHub"}</div>
+                          <div className="brand-wordmark text-[1rem] tracking-[0.28em] text-foreground">{(siteForm.siteName || "HollywoodHeartbeats.com").replace(".com", "")}</div>
                           <div className="text-sm text-muted-foreground">Sidebar, header, browser tab, and favicon</div>
                         </div>
                       </div>
@@ -283,7 +283,7 @@ export default function Admin() {
                           {siteForm.faviconUrl ? (
                             <img src={siteForm.faviconUrl} alt="Favicon preview" className="h-8 w-8 rounded-lg object-cover ring-1 ring-border/60" />
                           ) : (
-                            <div className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-xs font-bold text-primary-foreground">A</div>
+                            <div className="brand-monogram h-8 w-8 rounded-lg text-[0.62rem] tracking-[0.26em]">HH</div>
                           )}
                           <div className="text-sm text-muted-foreground">Shown in browser tabs and bookmarks.</div>
                         </div>

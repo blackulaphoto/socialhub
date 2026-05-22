@@ -112,7 +112,7 @@ export default function PendingWallPostsPage() {
         <CardHeader>
           <CardTitle>Pending Wall Posts</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Review posts that others have submitted to your artist page
+            Review posts that other people have submitted to your page
           </p>
         </CardHeader>
         <CardContent>

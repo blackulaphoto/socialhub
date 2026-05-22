@@ -1,0 +1,10 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="16" y="16" width="480" height="480" rx="96" fill="#111111"/>
+  <rect x="40" y="40" width="432" height="432" rx="72" stroke="rgba(255,248,240,0.24)" stroke-width="2"/>
+  <path d="M170 132V380" stroke="#FFF8F0" stroke-width="8" stroke-linecap="square"/>
+  <path d="M170 252H258" stroke="#FFF8F0" stroke-width="6" stroke-linecap="square"/>
+  <path d="M258 132V380" stroke="#FFF8F0" stroke-width="8" stroke-linecap="square"/>
+  <path d="M344 132V380" stroke="#FFF8F0" stroke-width="8" stroke-linecap="square"/>
+  <path d="M258 252H344" stroke="#FFF8F0" stroke-width="6" stroke-linecap="square"/>
+  <text x="256" y="435" text-anchor="middle" fill="#BBAE9E" font-family="'Tenor Sans', 'Cormorant Garamond', serif" font-size="28" letter-spacing="8">HOLLYWOODHEARTBEATS</text>
+</svg>

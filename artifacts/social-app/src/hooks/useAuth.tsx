@@ -26,20 +26,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const isAuthRoute = location === "/login" || location === "/register";
-  const isOnboardingRoute = location === "/onboarding";
-
   useEffect(() => {
     if (!isLoading) {
       if (isError && !isAuthRoute) {
         rememberReturnTo(location);
         setLocation("/login");
-      } else if (user && !user.onboardingCompleted && !isOnboardingRoute && !isAuthRoute) {
-        setLocation("/onboarding");
       } else if (user && isAuthRoute) {
         setLocation("/");
       }
     }
-  }, [isLoading, isError, user, location, isAuthRoute, isOnboardingRoute, setLocation]);
+  }, [isLoading, isError, user, location, isAuthRoute, setLocation]);
 
   if (isLoading) {
     return (

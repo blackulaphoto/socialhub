@@ -46,7 +46,7 @@ export default function EventDetail({ id }: { id: string }) {
           <CardHeader><CardTitle>Host</CardTitle></CardHeader>
           <CardContent>
             {data.host ? (
-              <Link href={`/profile/${data.host.id}`}>
+              <Link href={`/artists/${data.host.id}`}>
                 <div className="flex items-center gap-3 rounded-xl border border-border/50 bg-background/40 p-3">
                   <Avatar className="h-10 w-10">
                     <AvatarImage src={data.host.avatarUrl || ""} />
@@ -54,12 +54,12 @@ export default function EventDetail({ id }: { id: string }) {
                   </Avatar>
                   <div>
                     <div className="font-medium">{data.host.username}</div>
-                    <div className="text-xs text-muted-foreground">View profile</div>
+                    <div className="text-xs text-muted-foreground">View artist page</div>
                   </div>
                 </div>
               </Link>
             ) : (
-              <div className="text-sm text-muted-foreground">No host attached.</div>
+              <div className="text-sm text-muted-foreground">No host attached yet.</div>
             )}
           </CardContent>
         </Card>
@@ -82,7 +82,7 @@ export default function EventDetail({ id }: { id: string }) {
                 </div>
               </Link>
             )) : (
-              <div className="text-sm text-muted-foreground inline-flex items-center"><UserRound className="mr-2 h-4 w-4" /> No linked artists yet.</div>
+              <div className="text-sm text-muted-foreground inline-flex items-center"><UserRound className="mr-2 h-4 w-4" /> No lineup artists attached yet.</div>
             )}
           </CardContent>
         </Card>

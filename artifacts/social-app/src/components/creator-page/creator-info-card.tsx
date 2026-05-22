@@ -102,7 +102,7 @@ export function CreatorInfoCard({
 
           {creator.links?.length ? (
             <div className="space-y-2">
-              <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Links</div>
+              <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Elsewhere</div>
               <div className="space-y-2">
                 {creator.links.slice(0, compact ? 2 : 4).map((link) => (
                   <a
@@ -122,7 +122,7 @@ export function CreatorInfoCard({
 
           {(creator.phone || creator.email) ? (
             <div className="space-y-2">
-              <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Contact info</div>
+              <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Reach out</div>
               <div className="space-y-2 text-sm text-foreground/85">
                 {creator.phone ? (
                   <div className="inline-flex items-center gap-2">
@@ -143,7 +143,7 @@ export function CreatorInfoCard({
           {creator.services?.length ? (
             <div className="space-y-2">
               <div className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                <CheckCircle className="h-3.5 w-3.5" /> Focus
+                <CheckCircle className="h-3.5 w-3.5" /> Practice
               </div>
               <div className="flex flex-wrap gap-2">
                 {creator.services.slice(0, compact ? 3 : 5).map((service) => (

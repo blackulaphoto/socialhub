@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import {
   Heart,
   Globe2,
+  Mail,
   MapPin,
   MessageSquare,
   MoreHorizontal,
@@ -100,9 +101,34 @@ type FeedPost = {
   } | null;
 };
 
+type ParsedPostContext = {
+  postType?: string;
+  role?: string;
+  collaborators?: string;
+  location?: string;
+  shootType?: string;
+};
+
+const POST_CONTEXT_PATTERN = /\n?\[\[context:(.+?)\]\]\s*$/s;
+
 function extractPostHashtags(content: string) {
   const matches = content.match(/#[a-z0-9_]{2,32}/gi) || [];
   return [...new Set(matches.map((tag) => tag.toLowerCase()))];
+}
+
+function parsePostContext(content: string): ParsedPostContext | null {
+  const match = content.match(POST_CONTEXT_PATTERN);
+  if (!match) return null;
+  try {
+    const parsed = JSON.parse(match[1]) as ParsedPostContext;
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function stripPostContext(content: string) {
+  return content.replace(POST_CONTEXT_PATTERN, "").trimEnd();
 }
 
 export function FeedPostCard({
@@ -113,6 +139,8 @@ export function FeedPostCard({
   showAuthor?: boolean;
 }) {
   const { user } = useAuth();
+  const inquiryHref = post.author ? `/artists/${post.author.id}?inquiry=1` : null;
+  const canInquiry = Boolean(post.author && post.author.id !== user?.id);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { mutate: likePost, isPending: isLiking } = useLikePost();
@@ -246,7 +274,7 @@ export function FeedPostCard({
   };
 
   const handleShare = async () => {
-    const url = `${window.location.origin}/profile/${post.userId}`;
+    const url = `${window.location.origin}/artists/${post.userId}`;
     const shareText = `${url}#post-${post.id}`;
     try {
       if (navigator.share) {
@@ -358,7 +386,7 @@ export function FeedPostCard({
   const canDelete = user?.id === post.userId || user?.isAdmin;
   const authorHref = post.actorSurface === "artist"
     ? `/artists/${post.author?.id ?? post.userId}`
-    : `/profile/${post.author?.id ?? post.userId}`;
+    : `/artists/${post.author?.id ?? post.userId}`;
   const authorDisplayName = post.actorSurface === "artist"
     ? (post.author?.artistDisplayName || post.author?.username || "Unknown")
     : (post.author?.username || "Unknown");
@@ -370,11 +398,16 @@ export function FeedPostCard({
   const totalReactions = Object.values(reactionCounts).reduce((sum, value) => sum + Number(value || 0), 0);
   const comments = commentsData || post.comments || [];
   const fallbackLink = !post.media?.length ? extractFirstSupportedUrl(post.content) : null;
-  const cleanedContent = stripEmbeddedMarkup(post.content);
+  const postContext = parsePostContext(post.content);
+  const cleanedContent = stripEmbeddedMarkup(stripPostContext(post.content));
   const hashtags = post.hashtags?.length ? post.hashtags : extractPostHashtags(post.content);
+  const sceneTags = Array.from(new Set([
+    ...hashtags,
+    ...(post.author?.tags || []).slice(0, 2).map((tag) => tag.startsWith("#") ? tag : `#${tag}`),
+  ])).slice(0, 3);
   const visibilityLabel = post.visibility === "friends" ? "Friends" : post.visibility === "private" ? "Private" : "Public";
   const VisibilityIcon = post.visibility === "friends" ? UsersRound : post.visibility === "private" ? Lock : Globe2;
-  const surfaceLabel = post.actorSurface === "artist" ? "Artist Page" : "Personal";
+  const surfaceLabel = post.actorSurface === "artist" ? "Creator Profile" : "Profile";
   const postTimestamp = new Date(post.createdAt).toLocaleString([], {
     year: "numeric",
     month: "numeric",
@@ -390,11 +423,17 @@ export function FeedPostCard({
     : (post.originalPost?.author?.avatarUrl || "");
   const originalAuthorHref = post.originalPost?.actorSurface === "artist"
     ? `/artists/${post.originalPost.author?.id ?? post.originalPost.userId}`
-    : `/profile/${post.originalPost?.author?.id ?? post.originalPost?.userId ?? post.userId}`;
+    : `/artists/${post.originalPost?.author?.id ?? post.originalPost?.userId ?? post.userId}`;
+  const originalPostContext = post.originalPost ? parsePostContext(post.originalPost.content) : null;
+  const originalCleanedContent = post.originalPost ? stripEmbeddedMarkup(stripPostContext(post.originalPost.content)) : "";
   const showHeaderIdentity = Boolean(post.author);
 
   // Separate image media from video/audio media
-  const imageMedia = post.media?.filter((item) => item.type === "image") || [];
+  const imageMedia = (post.media?.filter((item) => item.type === "image") || []).length
+    ? (post.media?.filter((item) => item.type === "image") || [])
+    : post.imageUrl
+      ? [{ id: `legacy-image-${post.id}`, type: "image", url: post.imageUrl, title: null }]
+      : [];
   const otherMedia = post.media?.filter((item) => item.type !== "image") || [];
 
   // Convert image media to lightbox items
@@ -407,9 +446,13 @@ export function FeedPostCard({
   }));
 
   return (
-    <Card id={`post-${post.id}`} data-testid={`post-card-${post.id}`} className="overflow-hidden border-primary/45 bg-card/70 shadow-[0_0_0_2px_rgba(139,92,246,0.18)] ring-1 ring-primary/20">
+    <Card
+      id={`post-${post.id}`}
+      data-testid={`post-card-${post.id}`}
+      className="overflow-hidden rounded-[1.75rem] border-[color:var(--hh-rule)] bg-[color:var(--hh-bg-raised)] text-[color:var(--hh-ink)] shadow-[0_28px_80px_-56px_rgba(0,0,0,0.78)]"
+    >
       {showHeaderIdentity ? (
-        <CardHeader className="flex flex-row items-start gap-3 space-y-0 pb-3">
+        <CardHeader className="flex flex-row items-start gap-3 space-y-0 border-b border-[color:var(--hh-rule-soft)] px-5 pb-4 pt-5 md:px-6">
           <Link href={authorHref}>
             <Avatar className="h-10 w-10 cursor-pointer">
               <AvatarImage src={authorAvatar} />
@@ -419,10 +462,10 @@ export function FeedPostCard({
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <Link href={authorHref} className="block truncate font-semibold hover:text-primary">
+                <Link href={authorHref} className="block truncate font-semibold text-[color:var(--hh-ink)] hover:text-primary">
                   {authorDisplayName}
                 </Link>
-                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-[color:var(--hh-ink-muted)]">
                   <span>{postTimestamp}</span>
                   {post.updatedAt && new Date(post.updatedAt).getTime() - new Date(post.createdAt).getTime() > 60_000 ? (
                     <span>edited</span>
@@ -434,7 +477,7 @@ export function FeedPostCard({
                     </span>
                   )}
                   {post.actorSurface === "artist" ? (
-                    <span className="inline-flex items-center rounded-full border border-border/60 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-foreground/70">
+                    <span className="inline-flex items-center rounded-full border border-[color:var(--hh-rule)] px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-[color:var(--hh-ink-muted)]">
                       {surfaceLabel}
                     </span>
                   ) : null}
@@ -447,7 +490,7 @@ export function FeedPostCard({
               {canDelete && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" disabled={isDeleting}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-[color:var(--hh-ink-muted)]" disabled={isDeleting}>
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -463,7 +506,7 @@ export function FeedPostCard({
           </div>
         </CardHeader>
       ) : null}
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-5 px-5 py-5 md:px-6 md:py-6">
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
           <DialogContent>
             <DialogHeader>
@@ -498,8 +541,8 @@ export function FeedPostCard({
           </DialogContent>
         </Dialog>
         {post.repostOfPostId && post.originalPost ? (
-          <div className="rounded-2xl border border-dashed border-primary/35 bg-background/35 p-4 text-sm">
-            <div className="mb-3 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+          <div className="rounded-[1.35rem] border border-dashed border-[color:var(--hh-rule)] bg-black/10 p-4 text-sm">
+            <div className="mb-3 text-[11px] uppercase tracking-[0.18em] text-[color:var(--hh-ink-muted)]">
               Reposted from
             </div>
             <div className="mb-3 flex items-center gap-3">
@@ -510,12 +553,20 @@ export function FeedPostCard({
                 </Avatar>
               </Link>
               <div className="min-w-0">
-                <Link href={originalAuthorHref} className="block truncate font-semibold hover:text-primary">
+                <Link href={originalAuthorHref} className="block truncate font-semibold text-[color:var(--hh-ink)] hover:text-primary">
                   {originalAuthorDisplayName}
                 </Link>
               </div>
             </div>
-            <div className="whitespace-pre-wrap text-muted-foreground">{post.originalPost.content}</div>
+            {originalPostContext ? (
+              <div className="mb-3 flex flex-wrap gap-2">
+                {originalPostContext.postType ? <Badge variant="secondary">{originalPostContext.postType}</Badge> : null}
+                {originalPostContext.role ? <Badge variant="outline">Role: {originalPostContext.role}</Badge> : null}
+                {originalPostContext.shootType ? <Badge variant="outline">Type: {originalPostContext.shootType}</Badge> : null}
+                {originalPostContext.location ? <Badge variant="outline"><MapPin className="mr-1 h-3 w-3" />{originalPostContext.location}</Badge> : null}
+              </div>
+            ) : null}
+            <div className="whitespace-pre-wrap text-[color:var(--hh-ink-muted)]">{originalCleanedContent}</div>
             {(post.originalPost.hashtags?.length ? post.originalPost.hashtags : extractPostHashtags(post.originalPost.content)).length ? (
               <div className="mt-3 flex flex-wrap gap-2">
                 {(post.originalPost.hashtags?.length ? post.originalPost.hashtags : extractPostHashtags(post.originalPost.content)).map((tag) => (
@@ -529,7 +580,22 @@ export function FeedPostCard({
             ) : null}
           </div>
         ) : null}
-        {cleanedContent ? <p className="whitespace-pre-wrap text-sm leading-6">{cleanedContent}</p> : null}
+        {postContext ? (
+          <div className="rounded-[1.35rem] border border-[color:var(--hh-rule)] bg-black/10 p-4">
+            <div className="flex flex-wrap gap-2">
+              {postContext.postType ? <Badge>{postContext.postType}</Badge> : null}
+              {postContext.role ? <Badge variant="secondary">Role: {postContext.role}</Badge> : null}
+              {postContext.shootType ? <Badge variant="outline">Shoot type: {postContext.shootType}</Badge> : null}
+              {postContext.location ? <Badge variant="outline"><MapPin className="mr-1 h-3 w-3" />{postContext.location}</Badge> : null}
+            </div>
+            {postContext.collaborators ? (
+              <div className="mt-3 text-sm text-[color:var(--hh-ink-muted)]">
+                <span className="font-medium text-[color:var(--hh-ink)]">Collaborators:</span> {postContext.collaborators}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+        {cleanedContent ? <p className="whitespace-pre-wrap text-[15px] leading-7 text-[color:var(--hh-ink)]">{cleanedContent}</p> : null}
         {hashtags.length ? (
           <div className="flex flex-wrap gap-2">
             {hashtags.map((tag) => (
@@ -541,24 +607,97 @@ export function FeedPostCard({
             ))}
           </div>
         ) : null}
+        {sceneTags.length ? (
+          <div className="rounded-[1.35rem] border border-[color:var(--hh-rule)] bg-black/10 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--hh-ink-muted)]">Scene entry points</div>
+                <div className="mt-1 text-sm text-[color:var(--hh-ink-muted)]">Take this post into the related scenes and topic threads where the conversation is already happening.</div>
+              </div>
+              <UsersRound className="h-4 w-4 text-primary" />
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {sceneTags.map((tag) => (
+                <Link key={`scene-${post.id}-${tag}`} href={getTopicPath(tag, "groups")}>
+                  <Badge variant="secondary" className="cursor-pointer text-[11px] uppercase tracking-[0.16em]">
+                    {tag} scene
+                  </Badge>
+                </Link>
+              ))}
+            </div>
+          </div>
+        ) : null}
         {imageMedia.length > 0 || otherMedia.length > 0 ? (
-          <div className="-mx-4 space-y-4 md:-mx-6">
-            {imageMedia.map((item) => (
+          <div className="-mx-4 space-y-4 md:-mx-4">
+            {imageMedia.length === 1 ? (
               <button
-                key={item.id}
                 type="button"
-                onClick={() => openLightbox(item.id)}
-                className="block w-full overflow-hidden border-y border-border/50 bg-background shadow-sm transition-opacity hover:opacity-90 sm:rounded-[1.5rem] sm:border sm:border-border/60 md:mx-4"
+                onClick={() => openLightbox(imageMedia[0].id)}
+                className="block w-full overflow-hidden border-y border-[color:var(--hh-rule)] bg-black/10 transition-opacity hover:opacity-95 sm:rounded-[1.5rem] sm:border md:mx-1"
               >
                 <img
-                  src={item.url}
-                  alt={item.title || "Post image"}
+                  src={imageMedia[0].url}
+                  alt={imageMedia[0].title || "Post image"}
                   className="w-full max-h-[44rem] object-cover"
                 />
               </button>
-            ))}
+            ) : imageMedia.length === 2 ? (
+              <div className="grid grid-cols-2 gap-2 sm:mx-1">
+                {imageMedia.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => openLightbox(item.id)}
+                    className="overflow-hidden border-y border-[color:var(--hh-rule)] bg-black/10 transition-opacity hover:opacity-95 sm:rounded-[1.5rem] sm:border"
+                  >
+                    <img src={item.url} alt={item.title || "Post image"} className="h-[18rem] w-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            ) : imageMedia.length === 3 ? (
+              <div className="grid gap-2 sm:mx-1 sm:grid-cols-[1.35fr_0.85fr]">
+                <button
+                  type="button"
+                  onClick={() => openLightbox(imageMedia[0].id)}
+                  className="overflow-hidden border-y border-[color:var(--hh-rule)] bg-black/10 transition-opacity hover:opacity-95 sm:row-span-2 sm:rounded-[1.5rem] sm:border"
+                >
+                  <img src={imageMedia[0].url} alt={imageMedia[0].title || "Post image"} className="h-[22rem] w-full object-cover sm:h-full" />
+                </button>
+                {imageMedia.slice(1).map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => openLightbox(item.id)}
+                    className="overflow-hidden border-y border-[color:var(--hh-rule)] bg-black/10 transition-opacity hover:opacity-95 sm:rounded-[1.5rem] sm:border"
+                  >
+                    <img src={item.url} alt={item.title || "Post image"} className="h-[10.75rem] w-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 sm:mx-1">
+                {imageMedia.slice(0, 4).map((item, index) => {
+                  const remaining = imageMedia.length - 4;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => openLightbox(item.id)}
+                      className="relative overflow-hidden border-y border-[color:var(--hh-rule)] bg-black/10 transition-opacity hover:opacity-95 sm:rounded-[1.5rem] sm:border"
+                    >
+                      <img src={item.url} alt={item.title || "Post image"} className="h-[12rem] w-full object-cover" />
+                      {index === 3 && remaining > 0 ? (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/55 font-serif text-3xl text-white">
+                          +{remaining}
+                        </div>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             {otherMedia.map((item) => (
-              <div key={item.id} className="overflow-hidden border-y border-border/50 bg-background shadow-sm sm:rounded-[1.5rem] sm:border sm:border-border/60 md:mx-4">
+              <div key={item.id} className="overflow-hidden border-y border-[color:var(--hh-rule)] bg-black/10 sm:rounded-[1.5rem] sm:border md:mx-1">
                 <MediaEmbed
                   type={item.type}
                   url={item.url}
@@ -568,11 +707,11 @@ export function FeedPostCard({
             ))}
           </div>
         ) : fallbackLink ? (
-          <div className="-mx-4 overflow-hidden border-y border-border/50 bg-background/35 sm:rounded-[1.5rem] sm:border sm:border-border/60 md:mx-4">
+          <div className="-mx-4 overflow-hidden border-y border-[color:var(--hh-rule)] bg-black/10 sm:rounded-[1.5rem] sm:border md:mx-1">
             <MediaEmbed type="link" url={fallbackLink} />
           </div>
         ) : null}
-        <div className="space-y-3 border-t border-border/50 pt-3">
+        <div className="space-y-3 border-t border-[color:var(--hh-rule-soft)] pt-4">
           <div className="flex items-center gap-2 sm:hidden">
             <div className="grid min-w-0 flex-1 grid-cols-4 gap-2">
               <DropdownMenu>
@@ -631,6 +770,16 @@ export function FeedPostCard({
                   <Share2 className="mr-2 h-4 w-4" />
                   Share
                 </DropdownMenuItem>
+                {canInquiry ? (
+                  <DropdownMenuItem asChild>
+                    <Link href={inquiryHref!}>
+                      <span className="flex items-center">
+                        <Mail className="mr-2 h-4 w-4" />
+                        Inquiry
+                      </span>
+                    </Link>
+                  </DropdownMenuItem>
+                ) : null}
                 {post.author ? (
                   <DropdownMenuItem asChild>
                     <Link href={`/messages`}>
@@ -701,6 +850,14 @@ export function FeedPostCard({
               <Share2 className="mr-2 h-4 w-4" />
               Share
             </Button>
+            {canInquiry && (
+              <Link href={inquiryHref!}>
+                <Button variant="ghost" size="sm" className="rounded-full">
+                  <Mail className="mr-2 h-4 w-4" />
+                  Inquiry
+                </Button>
+              </Link>
+            )}
             {post.author && (
               <Link href={`/messages`}>
                 <Button variant="ghost" size="sm" className="rounded-full">

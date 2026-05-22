@@ -50,9 +50,12 @@ export default function Login() {
       
       <Card className="w-full max-w-md relative z-10 border-border/60 bg-background/80 backdrop-blur-2xl shadow-2xl">
         <CardHeader className="space-y-3 text-center pb-6">
-          <CardTitle className="text-3xl font-bold tracking-tight">ArtistHub</CardTitle>
+          <CardTitle className="space-y-2 text-center">
+            <div className="brand-wordmark text-[1.55rem] tracking-[0.34em] text-foreground">HollywoodHeartbeats</div>
+            <div className="brand-submark text-muted-foreground">.com</div>
+          </CardTitle>
           <CardDescription className="text-muted-foreground text-base">
-            Enter the underground. Discover the scene.
+            Step back into your feed, your scenes, and the people making things around you.
           </CardDescription>
         </CardHeader>
         <CardContent>

@@ -66,8 +66,8 @@ export default function Notifications() {
     <div className="max-w-4xl mx-auto p-4 md:py-8 w-full space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Notification Center</h1>
-          <p className="text-muted-foreground">Recent follows, likes, mentions, messages, lineup tags, and event reminders.</p>
+          <h1 className="text-3xl font-bold">Activity</h1>
+          <p className="text-muted-foreground">Recent follows, likes, mentions, messages, lineup tags, and reminders from the scenes around you.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <Card className="bg-card/50 border-border/50"><CardContent className="px-4 py-3"><div className="text-xs text-muted-foreground">Unread messages</div><div className="text-2xl font-bold">{summary?.unreadMessages || 0}</div></CardContent></Card>
@@ -119,7 +119,7 @@ export default function Notifications() {
                       {item.isUnread && <Badge>New</Badge>}
                     </div>
                     <div className="font-medium">
-                      {item.actor?.username || "Platform"} · {item.title}
+                      {[item.actor?.username || "HollywoodHeartbeats.com", item.title].filter(Boolean).join(" - ")}
                     </div>
                     <div className="text-sm text-muted-foreground line-clamp-2">{item.body}</div>
                     <div className="text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleString()}</div>
@@ -135,7 +135,7 @@ export default function Notifications() {
           <Card className="bg-card/40 border-dashed border-border/50">
             <CardContent className="p-12 text-center text-muted-foreground">
               <Bell className="w-10 h-10 mx-auto mb-3 opacity-25" />
-              No notifications yet.
+              No activity yet.
             </CardContent>
           </Card>
         )}

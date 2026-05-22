@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useFollowUser, useUnfollowUser } from "@workspace/api-client-react";
-import { CalendarRange, MapPin, Search as SearchIcon, SlidersHorizontal, Sparkles, Users } from "lucide-react";
+import { CalendarRange, Mail, MapPin, Search as SearchIcon, SlidersHorizontal, Sparkles, Users } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -46,6 +46,11 @@ type SearchArtist = {
   location?: string | null;
   tagline?: string | null;
   tags?: string[];
+  availabilityStatus?: string | null;
+  acceptsCollaborations?: boolean;
+  bookingEmail?: string | null;
+  pricingSummary?: string | null;
+  turnaroundInfo?: string | null;
   isFollowing?: boolean;
   user: {
     username: string;
@@ -168,7 +173,7 @@ export default function Search() {
     <div className="max-w-6xl mx-auto p-4 md:py-8 w-full space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Search</h1>
-        <p className="text-muted-foreground">Search people, creator pages, groups, and events across the whole platform.</p>
+        <p className="text-muted-foreground">Search artists, scenes, happenings, and people across the whole app.</p>
       </div>
 
       {activeTopics.length > 0 ? (
@@ -184,7 +189,7 @@ export default function Search() {
                   {activeTopics.join(" ")}
                 </h2>
                 <p className="mt-3 text-sm text-muted-foreground md:text-base">
-                  Use topic focus to move between creators, events, groups, and people without rebuilding the query every time.
+                  Use topic focus to move between artist pages, events, scenes, and people without rebuilding the query every time.
                 </p>
                 <div className="mt-4 flex flex-wrap gap-2">
                   {activeTopics.map((topic) => (
@@ -199,13 +204,13 @@ export default function Search() {
                       <Button variant={type === "all" ? "default" : "outline"}>All Activity</Button>
                     </Link>
                     <Link href={getTopicPath(singleTopic, "artists")}>
-                      <Button variant={type === "artists" ? "default" : "outline"}>Creator Pages</Button>
+                      <Button variant={type === "artists" ? "default" : "outline"}>Portfolios</Button>
                     </Link>
                     <Link href={getTopicPath(singleTopic, "events")}>
                       <Button variant={type === "events" ? "default" : "outline"}>Events</Button>
                     </Link>
                     <Link href={getTopicPath(singleTopic, "groups")}>
-                      <Button variant={type === "groups" ? "default" : "outline"}>Groups</Button>
+                      <Button variant={type === "groups" ? "default" : "outline"}>Scenes</Button>
                     </Link>
                   </>
                 ) : (
@@ -214,13 +219,13 @@ export default function Search() {
                       <Button variant={type === "all" ? "default" : "outline"}>All Results</Button>
                     </Link>
                     <Link href={`/search?tags=${encodeURIComponent(tags)}&type=artists`}>
-                      <Button variant={type === "artists" ? "default" : "outline"}>Creator Pages</Button>
+                      <Button variant={type === "artists" ? "default" : "outline"}>Portfolios</Button>
                     </Link>
                     <Link href={`/search?tags=${encodeURIComponent(tags)}&type=events`}>
                       <Button variant={type === "events" ? "default" : "outline"}>Events</Button>
                     </Link>
                     <Link href={`/search?tags=${encodeURIComponent(tags)}&type=groups`}>
-                      <Button variant={type === "groups" ? "default" : "outline"}>Groups</Button>
+                      <Button variant={type === "groups" ? "default" : "outline"}>Scenes</Button>
                     </Link>
                   </>
                 )}
@@ -229,7 +234,7 @@ export default function Search() {
             {data ? (
               <div className="grid gap-3 md:grid-cols-4">
                 <div className="rounded-2xl border border-border/50 bg-background/70 p-4">
-                  <div className="text-sm text-muted-foreground">Creators</div>
+                  <div className="text-sm text-muted-foreground">Portfolios</div>
                   <div className="mt-1 text-2xl font-semibold">{data.artistsTotal}</div>
                 </div>
                 <div className="rounded-2xl border border-border/50 bg-background/70 p-4">
@@ -254,14 +259,14 @@ export default function Search() {
         <CardContent className="p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
           <div className="md:col-span-2 relative">
             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input className="pl-9" placeholder="Search people, groups, events, creators..." value={query} onChange={(e) => setQuery(e.target.value)} />
+            <Input className="pl-9" placeholder="Search artists, scenes, events, people..." value={query} onChange={(e) => setQuery(e.target.value)} />
           </div>
           <Select value={type} onValueChange={(value) => setType(value as SearchType)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Everything</SelectItem>
               <SelectItem value="users">People</SelectItem>
-              <SelectItem value="artists">Creator Pages</SelectItem>
+              <SelectItem value="artists">Portfolios</SelectItem>
               <SelectItem value="groups">Groups</SelectItem>
               <SelectItem value="events">Events</SelectItem>
             </SelectContent>
@@ -277,14 +282,14 @@ export default function Search() {
           <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <SlidersHorizontal className="h-4 w-4 text-primary" />
-              Sitewide results across people, creator pages, groups, and events.
+              Sitewide results across artists, scenes, people, and events.
             </div>
             {data ? (
               <div className="flex flex-wrap gap-2">
                 <Badge variant="secondary">{data.total} total</Badge>
                 <Badge variant="outline">{data.usersTotal} people</Badge>
-                <Badge variant="outline">{data.artistsTotal} creators</Badge>
-                <Badge variant="outline">{data.groupsTotal} groups</Badge>
+                <Badge variant="outline">{data.artistsTotal} portfolios</Badge>
+                <Badge variant="outline">{data.groupsTotal} scenes</Badge>
                 <Badge variant="outline">{data.eventsTotal} events</Badge>
               </div>
             ) : null}
@@ -300,7 +305,7 @@ export default function Search() {
         <div className="space-y-8">
           {data.artists?.length > 0 && (
             <section className="space-y-4">
-              <h2 className="text-xl font-bold">Creator Pages</h2>
+              <h2 className="text-xl font-bold">Portfolios</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                 {data.artists.map((artist) => (
                   <Card key={artist.id} className="bg-card/60 border-border/50 overflow-hidden">
@@ -320,9 +325,24 @@ export default function Search() {
                       {artist.tagline ? <div className="text-xs text-muted-foreground line-clamp-2">{artist.tagline}</div> : null}
                       <div className="flex flex-wrap gap-2">
                         {artist.tags?.slice(0, 3).map((tag) => <Badge key={tag} variant="secondary">{tag}</Badge>)}
+                        {artist.availabilityStatus ? <Badge variant="outline">{artist.availabilityStatus}</Badge> : null}
+                        {artist.acceptsCollaborations ? <Badge variant="outline">Open to collaborate</Badge> : null}
                       </div>
+                      {(artist.pricingSummary || artist.turnaroundInfo || artist.bookingEmail) ? (
+                        <div className="rounded-2xl border border-border/50 bg-background/35 px-3 py-2 text-xs text-muted-foreground">
+                          {artist.pricingSummary ? `Rates: ${artist.pricingSummary}` : artist.turnaroundInfo ? `Turnaround: ${artist.turnaroundInfo}` : "Booking available"}
+                        </div>
+                      ) : null}
                       <div className="flex flex-wrap gap-2">
-                        <Link href={`/artists/${artist.userId}`}><Button variant="outline" size="sm">View Page</Button></Link>
+                        <Link href={`/artists/${artist.userId}`}><Button variant="outline" size="sm">View Dossier</Button></Link>
+                        {artist.userId !== user?.id ? (
+                          <Link href={`/artists/${artist.userId}?inquiry=1`}>
+                            <Button variant="secondary" size="sm">
+                              <Mail className="mr-2 h-4 w-4" />
+                              Inquiry
+                            </Button>
+                          </Link>
+                        ) : null}
                         <Button size="sm" onClick={() => (artist.isFollowing ? unfollow : follow).mutate({ userId: artist.userId })}>
                           {artist.isFollowing ? "Following" : "Follow"}
                         </Button>
@@ -348,13 +368,21 @@ export default function Search() {
                         </Avatar>
                         <div className="min-w-0 flex-1">
                           <div className="font-semibold truncate">{person.username}</div>
-                          <div className="text-xs text-muted-foreground">{person.hasArtistPage ? "Personal profile + artist page" : "Personal profile"}</div>
+                          <div className="text-xs text-muted-foreground">Artist page</div>
                           {person.location && <div className="text-xs text-muted-foreground mt-1">{person.location}</div>}
                         </div>
                       </div>
                       {person.about ? <div className="line-clamp-2 text-xs text-muted-foreground">{person.about}</div> : null}
                       <div className="flex flex-wrap gap-2">
-                        <Link href={`/profile/${person.id}`}><Button variant="outline" size="sm">View Profile</Button></Link>
+                        <Link href={`/artists/${person.id}`}><Button variant="outline" size="sm">View Dossier</Button></Link>
+                        {person.id !== user?.id ? (
+                          <Link href={`/artists/${person.id}?inquiry=1`}>
+                            <Button variant="secondary" size="sm">
+                              <Mail className="mr-2 h-4 w-4" />
+                              Inquiry
+                            </Button>
+                          </Link>
+                        ) : null}
                         <FriendActionButton userId={person.id} friendship={person.friendship} invalidateKeys={[["site-search"], ["/api/users", person.id]]} />
                       </div>
                     </CardContent>
@@ -366,7 +394,7 @@ export default function Search() {
 
           {data.groups?.length > 0 && (
             <section className="space-y-4">
-              <h2 className="text-xl font-bold">Groups</h2>
+              <h2 className="text-xl font-bold">Scenes</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                 {data.groups.map((group) => (
                   <Card key={group.id} className="bg-card/60 border-border/50">
@@ -420,7 +448,7 @@ export default function Search() {
         <Card className="bg-card/40 border-dashed border-border/50">
           <CardContent className="p-12 text-center text-muted-foreground">
             <Sparkles className="w-10 h-10 mx-auto mb-3 opacity-25" />
-            Search the whole site by person, creator, group, event, city, or tag.
+            Search the whole site by collaborator, portfolio, group, event, city, or tag.
           </CardContent>
         </Card>
       )}
