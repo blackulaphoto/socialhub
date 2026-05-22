@@ -21,6 +21,7 @@ import {
   Tag,
   Users,
   Video,
+  X,
 } from "lucide-react";
 import {
   getUserPosts,
@@ -62,6 +63,7 @@ import { BuilderEventCarousel } from "@/components/page-builder-blocks/builder-e
 import { BuilderLinksShowcase } from "@/components/page-builder-blocks/builder-links-showcase";
 import { BuilderMediaGallery } from "@/components/page-builder-blocks/builder-media-gallery";
 import { BuilderVideoPlaylist } from "@/components/page-builder-blocks/builder-video-playlist";
+import { PortfolioMosaic } from "@/components/portfolio-mosaic";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
@@ -81,7 +83,6 @@ import { uploadImage } from "@/lib/upload-image";
 import { getEmbedDescriptor } from "@/lib/embeds";
 import { groupItemsByFolder, readMediaFolderState } from "@/lib/media-folders";
 import { LoadMoreSentinel } from "@/components/load-more-sentinel";
-import { MosaicLightboxGallery } from "@/components/mosaic-lightbox-gallery";
 import { useTheme } from "next-themes";
 
 const ACTION_HELPERS: Record<string, { title: string; fields: string[]; hint: string }> = {
@@ -181,6 +182,28 @@ type SectionConfig = {
   density?: string | null;
 };
 
+type ArtistGalleryContributor = {
+  id: number;
+  username: string;
+  artistDisplayName?: string | null;
+  avatarUrl?: string | null;
+  artistAvatarUrl?: string | null;
+};
+
+type ArtistGalleryItem = {
+  id: number;
+  type?: string | null;
+  url: string;
+  thumbnailUrl?: string | null;
+  caption?: string | null;
+  createdAt?: string;
+  contributorUserIds?: number[];
+  contributors?: ArtistGalleryContributor[];
+  likeCount?: number;
+  commentCount?: number;
+  isLiked?: boolean;
+};
+
 function useSavedCreatorPages() {
   const storageKey = "artist-page-favorites";
   const [savedIds, setSavedIds] = useState<number[]>([]);
@@ -229,12 +252,13 @@ export default function ArtistProfile({ id }: { id: string }) {
   const [requestedInquiryOpen, setRequestedInquiryOpen] = useState(() => (
     typeof window !== "undefined" && new URLSearchParams(window.location.search).get("inquiry") === "1"
   ));
+  const [primarySurfaceOverride, setPrimarySurfaceOverride] = useState<"portfolio" | "updates" | "dossier" | "community" | null>(null);
   const [mobileTabOverride, setMobileTabOverride] = useState<"posts" | "gallery" | "about" | "trust" | "events" | "contact" | null>(null);
   const [trustView, setTrustView] = useState<"references" | "vouches" | "history" | "verified" | "safety">("references");
   const [collaborationCardView, setCollaborationCardView] = useState<"public" | "confirmed">("public");
   const [artistPostForm, setArtistPostForm] = useState({
     content: "",
-    imageUrl: "",
+    imageUrls: [] as string[],
     linkUrl: "",
     visibility: "public" as "public" | "friends" | "private",
   });
@@ -369,7 +393,7 @@ export default function ArtistProfile({ id }: { id: string }) {
   const createPost = useCreatePost({
     mutation: {
       onSuccess: () => {
-        setArtistPostForm({ content: "", imageUrl: "", linkUrl: "", visibility: "public" });
+        setArtistPostForm({ content: "", imageUrls: [], linkUrl: "", visibility: "public" });
         queryClient.invalidateQueries({ queryKey: ["feed"] });
         queryClient.invalidateQueries({ queryKey: ["/api/users", userId, "posts", "artist"] });
         queryClient.invalidateQueries({ queryKey: ["profile", userId] });
@@ -423,6 +447,10 @@ export default function ArtistProfile({ id }: { id: string }) {
     () => artistPostsData?.pages.flatMap((page) => page.posts) || [],
     [artistPostsData],
   );
+  const communityPosts = useMemo(
+    () => artistPosts.filter((post) => post.userId !== userId || post.actorSurface !== "artist"),
+    [artistPosts, userId],
+  );
   const showcaseFolderState = useMemo(() => readMediaFolderState("showcase", userId), [userId]);
 
   if (isLoading) return <div className="flex justify-center py-20"><Spinner size="lg" /></div>;
@@ -468,7 +496,7 @@ export default function ArtistProfile({ id }: { id: string }) {
     if (inferred?.kind === "video") return "video";
     return item.type || "image";
   };
-  const gallery = (artist.gallery || []).map((item) => ({
+  const gallery = ((artist.gallery || []) as ArtistGalleryItem[]).map((item) => ({
     ...item,
     effectiveType: getGalleryEffectiveType(item),
   }));
@@ -832,13 +860,16 @@ export default function ArtistProfile({ id }: { id: string }) {
     showcaseFolderState.assignments,
   );
 
-  const handleArtistImageUpload = async (file: File | null) => {
-    if (!file) return;
+  const handleArtistImageUpload = async (files: FileList | null) => {
+    if (!files?.length) return;
     setIsUploadingArtistImage(true);
     try {
-      const uploaded = await uploadImage(file, "post");
-      setArtistPostForm((current) => ({ ...current, imageUrl: uploaded.url }));
-      toast({ title: "Artist post image uploaded" });
+      const uploadedItems = await Promise.all(Array.from(files).map((file) => uploadImage(file, "post")));
+      setArtistPostForm((current) => ({
+        ...current,
+        imageUrls: [...current.imageUrls, ...uploadedItems.map((item) => item.url)],
+      }));
+      toast({ title: uploadedItems.length > 1 ? `${uploadedItems.length} artist images uploaded` : "Artist post image uploaded" });
     } catch (error) {
       toast({
         title: "Could not upload image",
@@ -855,16 +886,21 @@ export default function ArtistProfile({ id }: { id: string }) {
     createPost.mutate({
       data: {
         content: artistPostForm.content.trim(),
-        imageUrl: artistPostForm.imageUrl || undefined,
+        imageUrl: artistPostForm.imageUrls[0] || undefined,
         visibility: artistPostForm.visibility,
         actorSurface: "artist",
         media: [
-          artistPostForm.imageUrl ? { type: "image", url: artistPostForm.imageUrl } : null,
+          ...artistPostForm.imageUrls.map((url) => ({ type: "image", url })),
           linkMedia ? { type: linkMedia.kind, url: linkMedia.href, title: linkMedia.label } : null,
         ].filter(Boolean) as Array<{ type: string; url: string; title?: string }>,
       },
     });
   };
+  const communityWorkedWithItems = [
+    ...profileSceneCards.slice(0, 3).map((scene) => scene.name),
+    ...pastEvents.slice(0, 2).map((event) => event.title),
+    ...generalLinks.slice(0, 2).map((link) => link.label),
+  ].filter(Boolean).slice(0, 5);
 
   const handleFollowToggle = () => {
     const mutation = profile.isFollowing ? unfollow : follow;
@@ -1445,18 +1481,25 @@ export default function ArtistProfile({ id }: { id: string }) {
             <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">Selected Work</h3>
             <span className="text-xs text-muted-foreground">{assignedGalleryImages.length} items</span>
           </div>
-          {groupedAssignedGalleryImages.map((group) => (
-            <div key={group.folder} className="space-y-3">
-              <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{group.folder}</div>
-              <BuilderMediaGallery items={group.items.map((item) => ({
+          <PortfolioMosaic
+            userId={userId}
+            groups={groupedAssignedGalleryImages.map((group) => ({
+              label: group.folder,
+              items: group.items.map((item) => ({
                 id: String(item.id),
-                title: item.caption || artistPageName,
+                galleryItemId: Number(item.id),
                 imageUrl: item.url,
-                mediaUrl: item.url,
-                description: item.caption || null,
-              }))} />
-            </div>
-          ))}
+                title: item.caption || artistPageName,
+                caption: item.caption || null,
+                meta: item.createdAt ? new Date(item.createdAt).toLocaleDateString() : null,
+                likeCount: item.likeCount ?? 0,
+                commentCount: item.commentCount ?? 0,
+                isLiked: Boolean(item.isLiked),
+                contributors: (item.contributors || []) as ArtistGalleryContributor[],
+              })),
+            }))}
+            emptyMessage="No selected portfolio images yet."
+          />
         </section>
       )}
 
@@ -1549,26 +1592,46 @@ export default function ArtistProfile({ id }: { id: string }) {
               <div className="flex flex-wrap items-center gap-3">
                 <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isUploadingArtistImage}>
                   <ImageIcon className="mr-2 h-4 w-4" />
-                  {artistPostForm.imageUrl ? "Replace image" : "Add image"}
+                  {artistPostForm.imageUrls.length ? "Add more images" : "Add images"}
                 </Button>
-                {artistPostForm.imageUrl ? (
-                  <Badge variant="secondary">Image attached</Badge>
+                {artistPostForm.imageUrls.length ? (
+                  <Badge variant="secondary">{artistPostForm.imageUrls.length} image{artistPostForm.imageUrls.length === 1 ? "" : "s"} attached</Badge>
                 ) : null}
               </div>
               <Button
                 onClick={submitArtistPost}
-                disabled={createPost.isPending || isUploadingArtistImage || !artistPostForm.content.trim()}
+                disabled={createPost.isPending || isUploadingArtistImage || !(artistPostForm.content.trim() || artistPostForm.imageUrls.length || artistPostForm.linkUrl.trim())}
                 className="w-full sm:w-auto"
               >
                 Post to profile
               </Button>
             </div>
+            {artistPostForm.imageUrls.length ? (
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                {artistPostForm.imageUrls.map((url, index) => (
+                  <div key={`${url}-${index}`} className="relative overflow-hidden rounded-[1rem] border border-border/50 bg-background/28">
+                    <img src={url} alt={`Artist post upload ${index + 1}`} className="h-24 w-full object-cover" />
+                    <button
+                      type="button"
+                      className="absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-white"
+                      onClick={() => setArtistPostForm((current) => ({ ...current, imageUrls: current.imageUrls.filter((_, imageIndex) => imageIndex !== index) }))}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
             <input
               ref={fileInputRef}
               type="file"
               accept="image/*"
+              multiple
               className="hidden"
-              onChange={(e) => handleArtistImageUpload(e.target.files?.[0] || null)}
+              onChange={(e) => {
+                void handleArtistImageUpload(e.target.files);
+                e.currentTarget.value = "";
+              }}
             />
           </div>
         </section>
@@ -1609,6 +1672,82 @@ export default function ArtistProfile({ id }: { id: string }) {
         </Card>
       )}
     </div>
+  );
+
+  const renderCommunity = () => (
+    <section className="space-y-5 rounded-[2rem] border border-border/40 bg-background/18 p-5 md:p-7">
+      <div className="space-y-2">
+        <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Community proof</div>
+        <div className="flex items-center gap-2">
+          <Users className="h-5 w-5 text-primary" />
+          <h2 className="text-2xl font-bold tracking-tight md:text-[2rem]">Worked With and Page Notes</h2>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          The people, scenes, and public notes around this page. This is where collaboration history starts to feel real.
+        </p>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-[0.95fr_1.05fr]">
+        <div className="rounded-[1.5rem] border border-border/50 bg-background/30 p-4 md:p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Worked with</div>
+              <div className="mt-2 text-lg font-semibold">Creative circle</div>
+            </div>
+            <Badge variant="outline">{communityWorkedWithItems.length || referenceCount} names</Badge>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {(communityWorkedWithItems.length ? communityWorkedWithItems : ["References available on request"]).map((item) => (
+              <Badge key={item} variant="secondary" className="px-3 py-1 text-xs uppercase tracking-[0.12em]">
+                {item}
+              </Badge>
+            ))}
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            {friendPlacementCards.slice(0, 4).map((friend, index) => (
+              <div key={friend.id} className="flex items-center gap-3 rounded-2xl border border-border/50 bg-background/35 p-3">
+                <Avatar className="h-11 w-11 border border-border/50">
+                  <AvatarImage src={friend.imageUrl || ""} />
+                  <AvatarFallback>{String(index + 1).padStart(2, "0")}</AvatarFallback>
+                </Avatar>
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium">{friend.name}</div>
+                  <div className="truncate text-xs uppercase tracking-[0.14em] text-muted-foreground">{friend.subtitle}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-4 rounded-[1.5rem] border border-border/50 bg-background/30 p-4 md:p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Page notes</div>
+              <div className="mt-2 text-lg font-semibold">What others left here</div>
+            </div>
+            <Badge variant="outline">{communityPosts.length} visible</Badge>
+          </div>
+          {!isOwnArtistPage && currentUser ? (
+            <WallPostComposer
+              targetUserId={userId}
+              targetUserName={artist.displayName || profile.user.username}
+              onSuccess={() => refetchArtistPosts()}
+            />
+          ) : null}
+          {communityPosts.length ? (
+            <div className="space-y-4">
+              {communityPosts.slice(0, 2).map((post) => (
+                <FeedPostCard key={post.id} post={post} />
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-border/50 bg-background/22 p-4 text-sm text-muted-foreground">
+              No public notes on this page yet.
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
   );
 
   const renderEvents = () => {
@@ -1952,6 +2091,7 @@ export default function ArtistProfile({ id }: { id: string }) {
   const sections: Record<string, ReactNode> = {
     featured: renderFeatured(),
     about: renderAbout(),
+    community: renderCommunity(),
     verified: renderVerifiedWork(),
     trust: renderTrust(),
     gallery: renderMedia(),
@@ -1996,7 +2136,7 @@ export default function ArtistProfile({ id }: { id: string }) {
     "verified",
     "trust",
   ]));
-  const sectionPriority = ["posts", "featured", "gallery", "video", "audio", "links", "about", "verified", "trust", "events", "contact"];
+  const sectionPriority = ["featured", "gallery", "video", "audio", "links", "verified", "posts", "community", "about", "trust", "events", "contact"];
   const visibleSections = [
     ...sectionPriority.filter((key) => dedupedVisibleSections.includes(key)),
     ...dedupedVisibleSections.filter((key) => !sectionPriority.includes(key)),
@@ -2006,11 +2146,7 @@ export default function ArtistProfile({ id }: { id: string }) {
     : heroTags.length
       ? heroTags.slice(0, 5)
       : [artist.category || "Creative practice", artist.location || "Based where the work happens"].filter(Boolean);
-  const hhWorkedWithItems = [
-    ...profileSceneCards.slice(0, 3).map((scene) => scene.name),
-    ...pastEvents.slice(0, 2).map((event) => event.title),
-    ...generalLinks.slice(0, 2).map((link) => link.label),
-  ].filter(Boolean).slice(0, 5);
+  const hhWorkedWithItems = communityWorkedWithItems;
   const hhStatsRow = [
     { label: "Portfolio", value: String(Math.max(assignedGalleryImages.length + assignedVideoPlaylistItems.length + assignedAudioItems.length, 1)) },
     { label: "Recent work", value: String(Math.max(artistPosts.length, 1)) },
@@ -2027,52 +2163,32 @@ export default function ArtistProfile({ id }: { id: string }) {
     { label: "Code of conduct", value: profile.canInteract ? "Signed preview" : "Interaction restricted" },
     { label: "Vouched by", value: `${vouchCount} active vouches` },
   ];
-  const hhSectionLabels: Record<string, string> = {
-    posts: "Posts",
-    featured: "Work",
-    gallery: "Portfolio",
-    about: "Dossier",
-    trust: "Trust",
-    events: "Happenings",
-    contact: "Contact",
-  };
-  const hhDesktopTabs = visibleSections
-    .filter((key) => ["featured", "posts", "trust", "events", "gallery", "about"].includes(key))
-    .map((key) => ({
-      key,
-      label: hhSectionLabels[key] || key,
-      count:
-        key === "posts" ? artistPosts.length :
-        key === "trust" ? referenceCount :
-        key === "events" ? upcomingEvents.length :
-        key === "gallery" ? assignedGalleryImages.length :
-        key === "featured" ? Math.max(1, assignedFeaturedGalleryImages.length + assignedFeaturedVideos.length + assignedFeaturedAudio.length) :
-        null,
-    }));
-  const mobileTabSectionMap = {
-    posts: ["posts", "featured", "audio"],
-    gallery: ["gallery", "video", "audio", "links", "verified"],
-    about: ["about"],
-    trust: ["trust"],
-    events: ["events"],
-    contact: ["contact"],
+  const hasPortfolioSurface = ["featured", "gallery", "video", "audio", "links", "verified"].some((key) => visibleSections.includes(key));
+  const primarySurfaceSections = {
+    portfolio: ["featured", "gallery", "video", "audio", "links", "verified"],
+    updates: ["posts", "events"],
+    dossier: ["about", "contact"],
+    community: ["community", "trust"],
   } as const;
-  type MobileHeaderTabKey = keyof typeof mobileTabSectionMap;
-  const mobileHeaderTabsSource: Array<{ key: MobileHeaderTabKey; label: string }> = [
-    { key: "posts", label: "Posts" },
-    { key: "gallery", label: "Portfolio" },
-    { key: "about", label: "Dossier" },
-    { key: "trust", label: "Trust" },
-    { key: "events", label: "Events" },
-    { key: "contact", label: "Contact" },
-  ];
-  const hasCreatorGallery = groupedCreatorGalleryImages.some((group) => group.items.length > 0);
-  const mobileHeaderTabs = mobileHeaderTabsSource.filter((item) => {
-    if (item.key === "gallery") {
-      return hasCreatorGallery || mobileTabSectionMap[item.key].some((sectionKey) => visibleSections.includes(sectionKey));
-    }
-    return mobileTabSectionMap[item.key].some((sectionKey) => visibleSections.includes(sectionKey));
-  });
+  type PrimarySurfaceKey = keyof typeof primarySurfaceSections;
+  const primarySurfaceTabs = [
+    { key: "updates" as const, label: "Updates", count: artistPosts.length },
+    { key: "portfolio" as const, label: "Portfolio", count: assignedGalleryImages.length + assignedVideoPlaylistItems.length + assignedAudioItems.length },
+    { key: "dossier" as const, label: "Dossier", count: null },
+    { key: "community" as const, label: "Community", count: communityPosts.length + referenceCount },
+  ].filter((tab) => primarySurfaceSections[tab.key].some((sectionKey) => visibleSections.includes(sectionKey)));
+  const defaultPrimarySurface: PrimarySurfaceKey =
+    requestedGalleryView && hasPortfolioSurface
+      ? "portfolio"
+      : artistPosts.length > 0 && primarySurfaceTabs.some((tab) => tab.key === "updates")
+        ? "updates"
+        : primarySurfaceTabs.some((tab) => tab.key === "portfolio")
+        ? "portfolio"
+        : (primarySurfaceTabs[0]?.key || "updates");
+  const activePrimarySurface: PrimarySurfaceKey = primarySurfaceOverride && primarySurfaceTabs.some((tab) => tab.key === primarySurfaceOverride)
+    ? primarySurfaceOverride
+    : defaultPrimarySurface;
+  const activeSurfaceSections = primarySurfaceSections[activePrimarySurface].filter((key) => visibleSections.includes(key));
   const scrollToArtistSection = (key: string) => {
     if (typeof document === "undefined") return;
     const target = document.getElementById(`artist-section-${key}`) || document.getElementById(`artist-mobile-panel-${key}`);
@@ -2090,15 +2206,21 @@ export default function ArtistProfile({ id }: { id: string }) {
           A full archive of portfolio images gathered in one place, separate from the featured page layout.
         </p>
       </div>
-      <MosaicLightboxGallery
+      <PortfolioMosaic
+        userId={userId}
         groups={groupedCreatorGalleryImages.map((group) => ({
           label: group.folder,
           items: group.items.map((item) => ({
             id: String(item.id),
+            galleryItemId: Number(item.id),
             imageUrl: item.url,
             title: item.caption || artistPageName,
             caption: item.caption || null,
             meta: item.createdAt ? new Date(item.createdAt).toLocaleDateString() : null,
+            likeCount: item.likeCount ?? 0,
+            commentCount: item.commentCount ?? 0,
+            isLiked: Boolean(item.isLiked),
+            contributors: (item.contributors || []) as ArtistGalleryContributor[],
           })),
         }))}
         emptyMessage="No artist page images yet."
@@ -2130,18 +2252,6 @@ export default function ArtistProfile({ id }: { id: string }) {
       </div>
     );
   };
-  const requestedMobileTab: MobileHeaderTabKey | null = requestedGalleryView ? "gallery" : null;
-  const firstVisibleMobileTab: MobileHeaderTabKey = mobileHeaderTabs[0]?.key || "posts";
-  const activeMobileTab: MobileHeaderTabKey = mobileTabOverride && mobileHeaderTabs.some((tab) => tab.key === mobileTabOverride)
-    ? mobileTabOverride
-    : requestedMobileTab && mobileHeaderTabs.some((tab) => tab.key === requestedMobileTab)
-      ? requestedMobileTab
-      : firstVisibleMobileTab;
-  const mobileHeroOwnerTab: MobileHeaderTabKey = mobileHeaderTabs.some((tab) => tab.key === "gallery")
-    ? "gallery"
-    : mobileHeaderTabs.some((tab) => tab.key === "about")
-      ? "about"
-      : (mobileHeaderTabs[0]?.key || "posts");
   const heroDisplayName = (artist.displayName || artistPageName).trim();
   const heroTitleParts = heroDisplayName.split(/\s+/).filter(Boolean);
   const heroPrimaryName = heroTitleParts[0] || heroDisplayName;
@@ -2156,8 +2266,8 @@ export default function ArtistProfile({ id }: { id: string }) {
     );
   };
 
-  const mobileVisibleSections = (mobileTabSectionMap[activeMobileTab] || []).filter((key) => visibleSections.includes(key));
-  const showHeroRowInActiveMobileTab = activeMobileTab === mobileHeroOwnerTab;
+  const mobileVisibleSections = activeSurfaceSections;
+  const showHeroRowInActiveMobileTab = activePrimarySurface === "portfolio";
 
   return (
     <div className={cn("w-full pb-20", fontClass)}>
@@ -2204,6 +2314,19 @@ export default function ArtistProfile({ id }: { id: string }) {
             </div>
 
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:flex md:flex-wrap md:justify-end">
+              {hasPortfolioSurface ? (
+                <Button
+                  variant="outline"
+                  className="h-11 w-full rounded-[1.1rem] border-primary/35 bg-background/20 px-4 md:w-auto"
+                  onClick={() => {
+                    setPrimarySurfaceOverride("portfolio");
+                    setRequestedGalleryView(true);
+                    setMobileTabOverride(null);
+                  }}
+                >
+                  <ImageIcon className="mr-2 h-4 w-4" /> Open Portfolio
+                </Button>
+              ) : null}
               {isOwnArtistPage ? (
                 <Link href="/settings?tab=creator">
                   <Button variant="outline" className="h-11 w-full rounded-[1.1rem] border-border/60 bg-background/20 px-4 md:w-auto">
@@ -2374,12 +2497,20 @@ export default function ArtistProfile({ id }: { id: string }) {
 
           <div className="hidden items-center justify-between border-y border-border/50 py-3 md:flex">
             <div className="flex items-center gap-2">
-              {hhDesktopTabs.map((tab) => (
+              {primarySurfaceTabs.map((tab) => (
                 <button
                   key={tab.key}
                   type="button"
-                  onClick={() => scrollToArtistSection(tab.key)}
-                  className="inline-flex items-center gap-2 border-b border-transparent px-1 py-2 font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
+                  onClick={() => {
+                    setPrimarySurfaceOverride(tab.key);
+                    setRequestedGalleryView(tab.key === "portfolio");
+                  }}
+                  className={cn(
+                    "inline-flex items-center gap-2 border-b px-1 py-2 font-mono text-[11px] uppercase tracking-[0.14em] transition-colors",
+                    activePrimarySurface === tab.key
+                      ? "border-primary text-foreground"
+                      : "border-transparent text-muted-foreground hover:border-primary hover:text-foreground",
+                  )}
                 >
                   <span>{tab.label}</span>
                   {tab.count !== null ? <span className="text-muted-foreground/70">{tab.count}</span> : null}
@@ -2416,23 +2547,23 @@ export default function ArtistProfile({ id }: { id: string }) {
                 <div className="mt-1 text-sm font-semibold leading-6">{recommendationStatus}</div>
               </div>
             </div>
-            {mobileHeaderTabs.length ? (
+            {primarySurfaceTabs.length ? (
               <div className="overflow-x-auto rounded-[1.4rem] border border-border/50 bg-background/30 p-1.5" role="tablist" aria-label="Artist page sections">
                 <div className="flex min-w-max items-center gap-1.5">
-                  {mobileHeaderTabs.map((tab) => (
+                  {primarySurfaceTabs.map((tab) => (
                     <button
                       key={tab.key}
                       type="button"
                       role="tab"
-                      aria-selected={activeMobileTab === tab.key}
+                      aria-selected={activePrimarySurface === tab.key}
                       aria-controls={`artist-mobile-panel-${tab.key}`}
                       onClick={() => {
-                        setMobileTabOverride(tab.key);
-                        setRequestedGalleryView(tab.key === "gallery");
+                        setPrimarySurfaceOverride(tab.key);
+                        setRequestedGalleryView(tab.key === "portfolio");
                       }}
                       className={cn(
                         "rounded-[1.1rem] px-4 py-2.5 text-sm font-medium transition-colors",
-                        activeMobileTab === tab.key
+                        activePrimarySurface === tab.key
                           ? "bg-primary/12 text-foreground"
                           : "text-muted-foreground hover:text-foreground",
                       )}
@@ -2458,12 +2589,12 @@ export default function ArtistProfile({ id }: { id: string }) {
           <div
             className="space-y-6 md:hidden"
             role="tabpanel"
-            id={`artist-mobile-panel-${activeMobileTab}`}
-            aria-label={`${activeMobileTab} section`}
+            id={`artist-mobile-panel-${activePrimarySurface}`}
+            aria-label={`${activePrimarySurface} section`}
           >
-            {activeMobileTab === "gallery" ? (
+            {activePrimarySurface === "portfolio" ? (
               <>
-                {renderCreatorGalleryTab()}
+                {requestedGalleryView ? renderCreatorGalleryTab() : null}
                 {mobileVisibleSections.map((key) => renderSectionBlock(key))}
               </>
             ) : (
@@ -2471,8 +2602,8 @@ export default function ArtistProfile({ id }: { id: string }) {
             )}
           </div>
           <div className="hidden space-y-8 md:space-y-10 md:block">
-            {requestedMobileTab === "gallery" ? renderCreatorGalleryTab() : null}
-            {visibleSections.map((key) => renderSectionBlock(key))}
+            {activePrimarySurface === "portfolio" && requestedGalleryView ? renderCreatorGalleryTab() : null}
+            {activeSurfaceSections.map((key) => renderSectionBlock(key))}
           </div>
         </div>
       </div>

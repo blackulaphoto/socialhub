@@ -429,7 +429,11 @@ export function FeedPostCard({
   const showHeaderIdentity = Boolean(post.author);
 
   // Separate image media from video/audio media
-  const imageMedia = post.media?.filter((item) => item.type === "image") || [];
+  const imageMedia = (post.media?.filter((item) => item.type === "image") || []).length
+    ? (post.media?.filter((item) => item.type === "image") || [])
+    : post.imageUrl
+      ? [{ id: `legacy-image-${post.id}`, type: "image", url: post.imageUrl, title: null }]
+      : [];
   const otherMedia = post.media?.filter((item) => item.type !== "image") || [];
 
   // Convert image media to lightbox items
@@ -625,20 +629,73 @@ export function FeedPostCard({
         ) : null}
         {imageMedia.length > 0 || otherMedia.length > 0 ? (
           <div className="-mx-4 space-y-4 md:-mx-4">
-            {imageMedia.map((item) => (
+            {imageMedia.length === 1 ? (
               <button
-                key={item.id}
                 type="button"
-                onClick={() => openLightbox(item.id)}
+                onClick={() => openLightbox(imageMedia[0].id)}
                 className="block w-full overflow-hidden border-y border-[color:var(--hh-rule)] bg-black/10 transition-opacity hover:opacity-95 sm:rounded-[1.5rem] sm:border md:mx-1"
               >
                 <img
-                  src={item.url}
-                  alt={item.title || "Post image"}
+                  src={imageMedia[0].url}
+                  alt={imageMedia[0].title || "Post image"}
                   className="w-full max-h-[44rem] object-cover"
                 />
               </button>
-            ))}
+            ) : imageMedia.length === 2 ? (
+              <div className="grid grid-cols-2 gap-2 sm:mx-1">
+                {imageMedia.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => openLightbox(item.id)}
+                    className="overflow-hidden border-y border-[color:var(--hh-rule)] bg-black/10 transition-opacity hover:opacity-95 sm:rounded-[1.5rem] sm:border"
+                  >
+                    <img src={item.url} alt={item.title || "Post image"} className="h-[18rem] w-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            ) : imageMedia.length === 3 ? (
+              <div className="grid gap-2 sm:mx-1 sm:grid-cols-[1.35fr_0.85fr]">
+                <button
+                  type="button"
+                  onClick={() => openLightbox(imageMedia[0].id)}
+                  className="overflow-hidden border-y border-[color:var(--hh-rule)] bg-black/10 transition-opacity hover:opacity-95 sm:row-span-2 sm:rounded-[1.5rem] sm:border"
+                >
+                  <img src={imageMedia[0].url} alt={imageMedia[0].title || "Post image"} className="h-[22rem] w-full object-cover sm:h-full" />
+                </button>
+                {imageMedia.slice(1).map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => openLightbox(item.id)}
+                    className="overflow-hidden border-y border-[color:var(--hh-rule)] bg-black/10 transition-opacity hover:opacity-95 sm:rounded-[1.5rem] sm:border"
+                  >
+                    <img src={item.url} alt={item.title || "Post image"} className="h-[10.75rem] w-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 sm:mx-1">
+                {imageMedia.slice(0, 4).map((item, index) => {
+                  const remaining = imageMedia.length - 4;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => openLightbox(item.id)}
+                      className="relative overflow-hidden border-y border-[color:var(--hh-rule)] bg-black/10 transition-opacity hover:opacity-95 sm:rounded-[1.5rem] sm:border"
+                    >
+                      <img src={item.url} alt={item.title || "Post image"} className="h-[12rem] w-full object-cover" />
+                      {index === 3 && remaining > 0 ? (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/55 font-serif text-3xl text-white">
+                          +{remaining}
+                        </div>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             {otherMedia.map((item) => (
               <div key={item.id} className="overflow-hidden border-y border-[color:var(--hh-rule)] bg-black/10 sm:rounded-[1.5rem] sm:border md:mx-1">
                 <MediaEmbed

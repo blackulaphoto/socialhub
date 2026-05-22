@@ -8,6 +8,8 @@ import {
   followsTable,
   friendshipsTable,
   userBlocksTable,
+  galleryItemCommentsTable,
+  galleryItemLikesTable,
   groupPostsTable,
   galleryItemsTable,
   groupMembersTable,
@@ -410,6 +412,32 @@ export async function formatArtistProfile(profile: typeof artistProfilesTable.$i
   const gallery = await db.select().from(galleryItemsTable)
     .where(eq(galleryItemsTable.artistId, profile.id))
     .orderBy(desc(galleryItemsTable.createdAt));
+  const galleryIds = gallery.map((item) => item.id);
+  const [galleryLikes, galleryComments] = galleryIds.length
+    ? await Promise.all([
+      db.select().from(galleryItemLikesTable).where(inArray(galleryItemLikesTable.galleryItemId, galleryIds)),
+      db.select().from(galleryItemCommentsTable).where(inArray(galleryItemCommentsTable.galleryItemId, galleryIds)),
+    ])
+    : [[], []];
+  const contributorIds = [...new Set(
+    gallery.flatMap((item) => Array.isArray(item.contributorUserIds) ? item.contributorUserIds : []),
+  )];
+  const contributorMap = await getUserSummaryMap(contributorIds, currentUserId);
+  const likeCountsByGalleryId = new Map<number, number>();
+  const commentCountsByGalleryId = new Map<number, number>();
+  const likedGalleryIds = new Set<number>();
+
+  for (const like of galleryLikes) {
+    likeCountsByGalleryId.set(like.galleryItemId, (likeCountsByGalleryId.get(like.galleryItemId) ?? 0) + 1);
+    if (currentUserId && like.userId === currentUserId) {
+      likedGalleryIds.add(like.galleryItemId);
+    }
+  }
+
+  for (const comment of galleryComments) {
+    commentCountsByGalleryId.set(comment.galleryItemId, (commentCountsByGalleryId.get(comment.galleryItemId) ?? 0) + 1);
+  }
+
   const summary = await getUserSummary(user, currentUserId);
   const settings = await ensureCreatorSettingsRecord(user.id);
   const pinnedPost = settings?.pinnedPostId
@@ -418,7 +446,16 @@ export async function formatArtistProfile(profile: typeof artistProfilesTable.$i
 
   return {
     ...profile,
-    gallery,
+    gallery: gallery.map((item) => ({
+      ...item,
+      contributorUserIds: Array.isArray(item.contributorUserIds) ? item.contributorUserIds : [],
+      contributors: (Array.isArray(item.contributorUserIds) ? item.contributorUserIds : [])
+        .map((contributorId) => contributorMap.get(contributorId))
+        .filter(Boolean),
+      likeCount: likeCountsByGalleryId.get(item.id) ?? 0,
+      commentCount: commentCountsByGalleryId.get(item.id) ?? 0,
+      isLiked: likedGalleryIds.has(item.id),
+    })),
     avatarUrl: profile.avatarUrl ?? null,
     bannerUrl: profile.bannerUrl ?? null,
     user: summary,

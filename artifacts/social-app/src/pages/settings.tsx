@@ -402,10 +402,11 @@ export default function Settings() {
     moduleOrder: ["featured", "posts", "media", "about", "events", "contact"],
   });
   const [showcaseCategory, setShowcaseCategory] = useState<"photos" | "videos" | "audio">("photos");
-  const [gallery, setGallery] = useState<{ type: GalleryItemRequestType; url: string; caption: string }>({
+  const [gallery, setGallery] = useState<{ type: GalleryItemRequestType; url: string; caption: string; contributors: string }>({
     type: GalleryItemRequestType.image,
     url: "",
     caption: "",
+    contributors: "",
   });
   const [creatorBuilderView, setCreatorBuilderView] = useState<"edit" | "preview">("edit");
   const [photoForm, setPhotoForm] = useState({ imageUrl: "", caption: "" });
@@ -651,7 +652,7 @@ export default function Settings() {
   const addGalleryItem = useAddGalleryItem({
     mutation: {
       onSuccess: () => {
-        setGallery({ type: GalleryItemRequestType.image, url: "", caption: "" });
+        setGallery({ type: GalleryItemRequestType.image, url: "", caption: "", contributors: "" });
         queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
       },
     },
@@ -770,6 +771,7 @@ export default function Settings() {
             url: uploaded.url,
             thumbnailUrl: uploaded.thumbnailUrl || undefined,
             caption: gallery.caption || undefined,
+            contributorUsernames: gallery.contributors.split(",").map((value) => value.trim()).filter(Boolean),
           } as never,
         });
         if (typeof created?.id === "number") {
@@ -803,7 +805,7 @@ export default function Settings() {
       }
 
       setShowcaseFiles([]);
-      setGallery((current) => ({ ...current, url: "", caption: "" }));
+      setGallery((current) => ({ ...current, url: "", caption: "", contributors: "" }));
       toast({
         title: "Showcase updated",
         description: `${showcaseFiles.length} ${gallery.type === GalleryItemRequestType.video ? "video" : "image"}${showcaseFiles.length === 1 ? "" : "s"} added to your creator showcase.`,
@@ -836,9 +838,11 @@ export default function Settings() {
     const created = await addGalleryItem.mutateAsync({
       userId: user.id,
       data: {
-        ...gallery,
         type: normalizedType,
-      },
+        url: gallery.url,
+        caption: gallery.caption || undefined,
+        contributorUsernames: gallery.contributors.split(",").map((value) => value.trim()).filter(Boolean),
+      } as never,
     });
     if (creatorPickerTarget && typeof created?.id === "number") {
       if (creatorPickerTarget === "hero-slider" && normalizedType === GalleryItemRequestType.image) {
@@ -4111,6 +4115,11 @@ export default function Settings() {
                     )}
                   </div>
                   <Input placeholder="Caption" value={gallery.caption} onChange={(e) => setGallery({ ...gallery, caption: e.target.value })} />
+                  <Input
+                    placeholder="Optional contributors: @luna_frames, @admin"
+                    value={gallery.contributors}
+                    onChange={(e) => setGallery({ ...gallery, contributors: e.target.value })}
+                  />
                   <div className="space-y-2">
                     <Label>Folders</Label>
                     <div className="flex gap-2">

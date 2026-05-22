@@ -51,9 +51,9 @@ export default function Home() {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedCustomFeed, setSelectedCustomFeed] = useState<number | null>(null);
-  const [postForm, setPostForm] = useState<{ content: string; imageUrl: string; linkUrl: string; visibility: "public" | "friends" | "private" }>({
+  const [postForm, setPostForm] = useState<{ content: string; imageUrls: string[]; linkUrl: string; visibility: "public" | "friends" | "private" }>({
     content: "",
-    imageUrl: "",
+    imageUrls: [],
     linkUrl: "",
     visibility: "public",
   });
@@ -147,7 +147,7 @@ export default function Home() {
   const createPost = useCreatePost({
     mutation: {
       onSuccess: () => {
-        setPostForm({ content: "", imageUrl: "", linkUrl: "", visibility: "public" });
+        setPostForm({ content: "", imageUrls: [], linkUrl: "", visibility: "public" });
         setShowLinkField(false);
         setIsPostDialogOpen(false);
         queryClient.invalidateQueries({ queryKey: ["feed"] });
@@ -214,13 +214,16 @@ export default function Home() {
   const suggestedArtists = suggestedCreators?.artists || [];
   const shouldNudgeDiscovery = followingCount === 0 && !selectedCustomFeed;
 
-  const handlePostImageUpload = async (file: File | null) => {
-    if (!file) return;
+  const handlePostImageUpload = async (files: FileList | null) => {
+    if (!files?.length) return;
     setIsUploadingPostImage(true);
     try {
-      const uploaded = await uploadImage(file, "post");
-      setPostForm((current) => ({ ...current, imageUrl: uploaded.url }));
-      toast({ title: "Image uploaded" });
+      const uploadedItems = await Promise.all(Array.from(files).map((file) => uploadImage(file, "post")));
+      setPostForm((current) => ({
+        ...current,
+        imageUrls: [...current.imageUrls, ...uploadedItems.map((item) => item.url)],
+      }));
+      toast({ title: uploadedItems.length > 1 ? `${uploadedItems.length} images uploaded` : "Image uploaded" });
     } catch (error) {
       toast({
         title: "Could not upload image",
@@ -237,19 +240,19 @@ export default function Home() {
     createPost.mutate({
       data: {
         content: postForm.content.trim(),
-        imageUrl: postForm.imageUrl || undefined,
+        imageUrl: postForm.imageUrls[0] || undefined,
         visibility: postForm.visibility,
         actorSurface: "artist",
         media: [
-          postForm.imageUrl ? { type: "image", url: postForm.imageUrl } : null,
+          ...postForm.imageUrls.map((url) => ({ type: "image", url })),
           linkMedia ? { type: linkMedia.kind, url: linkMedia.href, title: linkMedia.label } : null,
-        ].filter(Boolean) as Array<{ type: string; url: string }>,
+        ].filter(Boolean) as Array<{ type: string; url: string; title?: string }>,
       },
     });
   };
 
   const clearComposer = () => {
-    setPostForm({ content: "", imageUrl: "", linkUrl: "", visibility: "public" });
+    setPostForm({ content: "", imageUrls: [], linkUrl: "", visibility: "public" });
     setShowLinkField(false);
     if (typeof window !== "undefined" && user?.id) {
       window.localStorage.removeItem(`${POST_DRAFT_KEY}:${user.id}`);
@@ -278,8 +281,13 @@ export default function Home() {
     const saved = window.localStorage.getItem(`${POST_DRAFT_KEY}:${user.id}`);
     if (saved) {
       try {
-        const parsed = JSON.parse(saved) as typeof postForm;
-        setPostForm((current) => ({ ...current, ...parsed }));
+        const parsed = JSON.parse(saved) as Partial<typeof postForm> & { imageUrl?: string };
+        const nextImageUrls = Array.isArray(parsed.imageUrls)
+          ? parsed.imageUrls
+          : parsed.imageUrl
+            ? [parsed.imageUrl]
+            : [];
+        setPostForm((current) => ({ ...current, ...parsed, imageUrls: nextImageUrls }));
         setShowLinkField(Boolean(parsed.linkUrl));
       } catch {
         window.localStorage.removeItem(`${POST_DRAFT_KEY}:${user.id}`);
@@ -290,7 +298,7 @@ export default function Home() {
 
   useEffect(() => {
     if (typeof window === "undefined" || !user?.id || !draftLoaded) return;
-    const hasContent = Boolean(postForm.content.trim() || postForm.imageUrl || postForm.linkUrl);
+    const hasContent = Boolean(postForm.content.trim() || postForm.imageUrls.length || postForm.linkUrl);
     if (!hasContent) {
       window.localStorage.removeItem(`${POST_DRAFT_KEY}:${user.id}`);
       return;
@@ -619,7 +627,7 @@ export default function Home() {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-sm font-medium">Add media</div>
-                  <div className="mt-1 text-xs text-muted-foreground">Attach an image or drop in a link.</div>
+                  <div className="mt-1 text-xs text-muted-foreground">Attach one or more images, or drop in a link.</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <Button type="button" variant="ghost" size="icon" className="rounded-none" onClick={() => fileInputRef.current?.click()}>
@@ -630,15 +638,22 @@ export default function Home() {
                   </Button>
                 </div>
               </div>
-              {(postForm.imageUrl || postForm.linkUrl) ? (
-                <div className="flex flex-wrap gap-2">
-                  {postForm.imageUrl ? (
-                    <div className="inline-flex items-center gap-2 border border-border/60 px-3 py-2 text-xs">
-                      <ImageIcon className="h-3.5 w-3.5" />
-                      Image attached
-                      <button type="button" onClick={() => setPostForm((current) => ({ ...current, imageUrl: "" }))}>
-                        <X className="h-3.5 w-3.5" />
-                      </button>
+              {(postForm.imageUrls.length || postForm.linkUrl) ? (
+                <div className="space-y-3">
+                  {postForm.imageUrls.length ? (
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                      {postForm.imageUrls.map((url, index) => (
+                        <div key={`${url}-${index}`} className="relative overflow-hidden border border-border/60 bg-background/40">
+                          <img src={url} alt={`Upload ${index + 1}`} className="h-20 w-full object-cover" />
+                          <button
+                            type="button"
+                            className="absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-white"
+                            onClick={() => setPostForm((current) => ({ ...current, imageUrls: current.imageUrls.filter((_, imageIndex) => imageIndex !== index) }))}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   ) : null}
                   {postForm.linkUrl ? (
@@ -660,8 +675,12 @@ export default function Home() {
               ref={fileInputRef}
               type="file"
               accept="image/*"
+              multiple
               className="hidden"
-              onChange={(e) => handlePostImageUpload(e.target.files?.[0] || null)}
+              onChange={(e) => {
+                void handlePostImageUpload(e.target.files);
+                e.currentTarget.value = "";
+              }}
               disabled={isUploadingPostImage}
             />
             <div className="space-y-2">
@@ -688,7 +707,7 @@ export default function Home() {
                 data-testid="submit-post"
                 className="flex-1"
                 onClick={submitPost}
-                disabled={createPost.isPending || isUploadingPostImage || !(postForm.content.trim() || postForm.imageUrl || postForm.linkUrl.trim())}
+                disabled={createPost.isPending || isUploadingPostImage || !(postForm.content.trim() || postForm.imageUrls.length || postForm.linkUrl.trim())}
               >
                 <Send className="mr-2 h-4 w-4" /> Publish
               </Button>
