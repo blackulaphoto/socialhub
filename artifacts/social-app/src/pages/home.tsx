@@ -325,9 +325,7 @@ export default function Home() {
               Good evening, <span className="hh-brand-wordmark-accent">{user?.username || "artist"}</span>
             </h1>
             <p className="hh-page-subtitle mt-3">
-              {followingCount
-                ? `${followingCount} people shape this stream. Home stays chronological and follow-based.`
-                : "Home is ready. Follow a few artists and scenes to bring the stream to life."}
+              Share work. Discover creatives. Book collaborations. Build your portfolio.
             </p>
             <div className="mt-3 font-mono text-[0.68rem] uppercase tracking-[0.16em] text-[var(--hh-ink-muted)]">
               {feedPosts.length} posts loaded · {resolvedTrendingTopics.length} active scene tags

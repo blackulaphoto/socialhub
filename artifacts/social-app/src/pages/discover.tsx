@@ -197,6 +197,8 @@ export default function Discover() {
         <h1 className="hh-page-title mt-3 !text-[clamp(2.4rem,6vw,4.4rem)]">
           Find the right people <span className="hh-brand-wordmark-accent">for the shoot.</span>
         </h1>
+        <p className="hh-page-subtitle mt-4 max-w-3xl">Where photographers, models, and visual artists build their scene.</p>
+        <p className="mt-2 max-w-3xl text-sm text-[var(--hh-ink-muted)]">Share work. Discover creatives. Book collaborations. Build your portfolio.</p>
       </section>
 
       <section className="hh-search-stage">

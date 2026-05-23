@@ -1,3 +1,5 @@
+import { getApiBaseUrl } from "@/lib/api";
+
 export type UploadScope =
   | "avatar"
   | "banner"
@@ -20,10 +22,6 @@ type UploadImageResponse = {
   width?: number | null;
   height?: number | null;
 };
-
-function getApiBaseUrl() {
-  return (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
-}
 
 export async function uploadImage(file: File, scope: UploadScope): Promise<UploadImageResponse> {
   return uploadMedia(file, scope, "images");

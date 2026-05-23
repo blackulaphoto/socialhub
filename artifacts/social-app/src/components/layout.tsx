@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   Bell,
@@ -41,20 +42,21 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useActiveIdentity } from "@/hooks/useActiveIdentity";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { InviteFriendsDialog } from "@/components/invite-friends-dialog";
 
 function getPageMeta(location: string) {
-  if (location === "/") return { title: "Following Feed", subtitle: "Recent updates from people you follow, in chronological order." };
+  if (location === "/") return { title: "Following Feed", subtitle: "Share work. Discover creatives. Book collaborations. Build your portfolio." };
   if (location.startsWith("/messages")) return { title: "Messages", subtitle: "Direct conversation, inquiries, and collaboration threads." };
   if (location.startsWith("/notifications")) return { title: "Activity", subtitle: "Fresh follows, replies, scene movement, and collaboration notes." };
   if (location.startsWith("/artists/")) return null;
-  if (location.startsWith("/artists")) return { title: "Discover", subtitle: "Browse artists, portfolios, scenes, and creative circles." };
+  if (location.startsWith("/artists")) return { title: "Discover", subtitle: "Where photographers, models, and visual artists build their scene." };
   if (location.startsWith("/groups")) return { title: "Scenes", subtitle: "Scene-based forums, collective chatter, and open creative threads." };
   if (location.startsWith("/events")) return { title: "Happenings", subtitle: "Appearances, local events, and public creative gatherings." };
   if (location.startsWith("/search")) return { title: "Search", subtitle: "Find artists, scenes, tags, projects, and cities." };
   if (location.startsWith("/settings")) return { title: "Artist Page Settings", subtitle: "Shape your page, story, and public creative presence." };
   if (location.startsWith("/insights")) return { title: "Insights", subtitle: "Track visits, follows, and responses to your work." };
   if (location.startsWith("/admin")) return { title: "Admin", subtitle: "Platform moderation and operational controls." };
-  return { title: "HollywoodHeartbeats.com", subtitle: "A creative social network for artists, scenes, and collaboration." };
+  return { title: "HollywoodHeartbeats.com", subtitle: "Where photographers, models, and visual artists build their scene." };
 }
 
 function topNavItems(userId?: number) {
@@ -88,6 +90,7 @@ function HeaderActions() {
   const { mutate: readNotification } = useReadNotification();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
   const { data: activity } = useGetActivitySummary({
     query: {
       enabled: !!user,
@@ -124,6 +127,7 @@ function HeaderActions() {
   };
 
   return (
+    <>
     <div className="flex items-center gap-2">
       <Link href="/?compose=1">
         <Button className="hh-solid-btn hidden h-10 rounded-none px-5 md:inline-flex">
@@ -221,6 +225,13 @@ function HeaderActions() {
           <DropdownMenuItem asChild>
             <Link href={`/artists/${user?.id}`}>Artist Page</Link>
           </DropdownMenuItem>
+          <DropdownMenuItem onSelect={(event) => {
+            event.preventDefault();
+            setIsInviteOpen(true);
+          }}>
+            <Users className="h-4 w-4" />
+            Invite Friends
+          </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <Link href="/settings?tab=creator">Edit Artist Page</Link>
           </DropdownMenuItem>
@@ -239,6 +250,8 @@ function HeaderActions() {
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
+    <InviteFriendsDialog open={isInviteOpen} onOpenChange={setIsInviteOpen} />
+    </>
   );
 }
 

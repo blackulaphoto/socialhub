@@ -256,3 +256,16 @@ export const siteSettingsTable = pgTable("site_settings", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+export const invitesTable = pgTable("invites", {
+  id: serial("id").primaryKey(),
+  inviterUserId: integer("inviter_user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  label: text("label"),
+  code: text("code").notNull().unique(),
+  status: text("status").notNull().default("pending"),
+  expiresAt: timestamp("expires_at"),
+  acceptedUserId: integer("accepted_user_id").references(() => usersTable.id, { onDelete: "set null" }),
+  acceptedAt: timestamp("accepted_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});

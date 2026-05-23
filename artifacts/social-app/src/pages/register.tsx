@@ -1,6 +1,5 @@
-import { useState } from "react";
-import { Link, useLocation } from "wouter";
-import { useRegister } from "@workspace/api-client-react";
+import { useEffect, useState } from "react";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,37 +7,96 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { consumeReturnTo, navigateAfterAuth } from "@/lib/auth-redirect";
+import { Badge } from "@/components/ui/badge";
+import { getApiBaseUrl, parseApiError } from "@/lib/api";
 
 export default function Register() {
-  const [, setLocation] = useLocation();
-  const { mutate: register, isPending } = useRegister();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [inviteCode, setInviteCode] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return new URLSearchParams(window.location.search).get("invite") || "";
+  });
+  const [inviteMeta, setInviteMeta] = useState<{ label?: string | null; inviter?: { username: string } | null; isValid?: boolean; status?: string } | null>(null);
+  const [isPending, setIsPending] = useState(false);
+  const [isCheckingInvite, setIsCheckingInvite] = useState(false);
+
+  useEffect(() => {
+    const trimmedCode = inviteCode.trim();
+    if (!trimmedCode) {
+      setInviteMeta(null);
+      return;
+    }
+
+    let active = true;
+    setIsCheckingInvite(true);
+    const handle = window.setTimeout(async () => {
+      try {
+        const response = await fetch(`${getApiBaseUrl()}/api/invites/by-code/${encodeURIComponent(trimmedCode)}`, {
+          credentials: "include",
+        });
+        if (!response.ok) {
+          throw new Error(await parseApiError(response, "This invite link could not be verified."));
+        }
+        const data = await response.json();
+        if (!active) return;
+        setInviteMeta(data.invite ?? null);
+      } catch {
+        if (!active) return;
+        setInviteMeta({ isValid: false, status: "invalid" });
+      } finally {
+        if (active) setIsCheckingInvite(false);
+      }
+    }, 250);
+
+    return () => {
+      active = false;
+      window.clearTimeout(handle);
+    };
+  }, [inviteCode]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    register(
-      { data: { username, email, password } },
-      {
-        onSuccess: (data) => {
+    setIsPending(true);
+    fetch(`${getApiBaseUrl()}/api/auth/register`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        username,
+        email,
+        password,
+        inviteCode: inviteCode.trim() || undefined,
+      }),
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(await parseApiError(response, "Could not create account"));
+        }
+        return response.json();
+      })
+      .then((data) => {
           queryClient.setQueryData(["/api/auth/me"], data.user);
           queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
           toast({ title: "Welcome to HollywoodHeartbeats.com!", description: "Your account has been created." });
           navigateAfterAuth(consumeReturnTo());
-        },
-        onError: (err: any) => {
-          toast({ 
-            title: "Registration failed", 
-            description: err?.message || "Could not create account", 
-            variant: "destructive" 
-          });
-        }
-      }
-    );
+      })
+      .catch((err: any) => {
+        toast({ 
+          title: "Registration failed", 
+          description: err?.message || "Could not create account", 
+          variant: "destructive" 
+        });
+      })
+      .finally(() => {
+        setIsPending(false);
+      });
   };
 
   return (
@@ -56,8 +114,9 @@ export default function Register() {
             <div className="brand-submark text-muted-foreground">Join the scene</div>
           </CardTitle>
           <CardDescription className="text-muted-foreground text-base">
-            Create your account and you will get a public artist page with editing tools from the start.
+            Where photographers, models, and visual artists build their scene.
           </CardDescription>
+          <p className="text-sm text-muted-foreground">Share work. Discover creatives. Book collaborations. Build your portfolio.</p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -92,6 +151,31 @@ export default function Register() {
                 required
                 className="bg-input/50"
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="invite-code">Invite code</Label>
+              <Input
+                id="invite-code"
+                value={inviteCode}
+                onChange={(e) => setInviteCode(e.target.value)}
+                placeholder="Optional invite link code"
+                className="bg-input/50"
+              />
+              <div className="flex min-h-5 items-center gap-2 text-xs text-muted-foreground">
+                {isCheckingInvite ? <span>Checking invite...</span> : null}
+                {!isCheckingInvite && inviteMeta?.isValid && inviteMeta?.inviter ? (
+                  <>
+                    <Badge variant="secondary">Invite ready</Badge>
+                    <span>
+                      {inviteMeta.label ? `${inviteMeta.label} · ` : ""}
+                      invited by {inviteMeta.inviter.username}
+                    </span>
+                  </>
+                ) : null}
+                {!isCheckingInvite && inviteCode.trim() && inviteMeta?.isValid === false ? (
+                  <span className="text-destructive">This invite code is not valid right now.</span>
+                ) : null}
+              </div>
             </div>
             <Button type="submit" className="w-full mt-6" disabled={isPending}>
               {isPending ? "Creating Account..." : "Create Account"}

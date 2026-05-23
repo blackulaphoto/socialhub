@@ -14,6 +14,7 @@ import reportsRouter from "./reports.js";
 import analyticsRouter from "./analytics.js";
 import uploadsRouter from "./uploads.js";
 import siteRouter from "./site.js";
+import invitesRouter from "./invites.js";
 
 const router = Router();
 
@@ -23,6 +24,7 @@ router.use("/users", usersRouter);
 router.use(postsRouter);
 router.use(artistsRouter);
 router.use("/messages", messagesRouter);
+router.use(invitesRouter);
 router.use(searchRouter);
 router.use(activityRouter);
 router.use(groupsRouter);

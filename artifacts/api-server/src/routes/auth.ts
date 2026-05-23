@@ -1,6 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { db, userProfileDetailsTable, usersTable } from "@workspace/db";
+import { db, invitesTable, notificationsTable, userProfileDetailsTable, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { RegisterBody, LoginBody } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth.js";
@@ -15,6 +15,7 @@ router.post("/register", async (req, res) => {
     return;
   }
   const { username, email, password } = parseResult.data;
+  const inviteCode = typeof req.body?.inviteCode === "string" ? req.body.inviteCode.trim().slice(0, 120) : "";
 
   const existing = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
   if (existing.length > 0) {
@@ -28,23 +29,62 @@ router.post("/register", async (req, res) => {
     return;
   }
 
+  let invite: typeof invitesTable.$inferSelect | undefined;
+  if (inviteCode) {
+    const [foundInvite] = await db.select().from(invitesTable).where(eq(invitesTable.code, inviteCode)).limit(1);
+    if (!foundInvite || foundInvite.status !== "pending") {
+      res.status(400).json({ error: "Invalid invite", message: "This invite link is no longer valid." });
+      return;
+    }
+    if (foundInvite.expiresAt && foundInvite.expiresAt.getTime() < Date.now()) {
+      await db.update(invitesTable).set({ status: "expired", updatedAt: new Date() }).where(eq(invitesTable.id, foundInvite.id));
+      res.status(400).json({ error: "Invite expired", message: "This invite link has expired." });
+      return;
+    }
+    invite = foundInvite;
+  }
+
   const passwordHash = await bcrypt.hash(password, 10);
-  const [user] = await db.insert(usersTable).values({
-    username,
-    email,
-    passwordHash,
-    profileType: "artist",
-  }).returning();
+  const user = await db.transaction(async (tx) => {
+    const [createdUser] = await tx.insert(usersTable).values({
+      username,
+      email,
+      passwordHash,
+      profileType: "artist",
+    }).returning();
 
-  const [details] = await db.insert(userProfileDetailsTable).values({
-    userId: user.id,
-    themeName: "nocturne",
-    accentColor: "#8b5cf6",
-    onboardingCompleted: false,
-    onboardingStep: "profile",
-    links: [],
-  }).onConflictDoNothing().returning();
+    const [details] = await tx.insert(userProfileDetailsTable).values({
+      userId: createdUser.id,
+      themeName: "nocturne",
+      accentColor: "#8b5cf6",
+      onboardingCompleted: false,
+      onboardingStep: "profile",
+      links: [],
+    }).onConflictDoNothing().returning();
 
+    if (invite) {
+      await tx.update(invitesTable).set({
+        status: "accepted",
+        acceptedUserId: createdUser.id,
+        acceptedAt: new Date(),
+        updatedAt: new Date(),
+      }).where(eq(invitesTable.id, invite.id));
+
+      await tx.insert(notificationsTable).values({
+        userId: invite.inviterUserId,
+        actorUserId: createdUser.id,
+        type: "invite.accepted",
+        title: "Invite accepted",
+        body: `${createdUser.username} joined through your invite link.`,
+        href: `/artists/${createdUser.id}`,
+        entityType: "invite",
+        entityId: invite.id,
+      });
+    }
+    return createdUser;
+  });
+
+  const [details] = await db.select().from(userProfileDetailsTable).where(eq(userProfileDetailsTable.userId, user.id)).limit(1);
   await ensureArtistProfileRecord(user, details);
   await ensureCreatorSettingsRecord(user.id);
 

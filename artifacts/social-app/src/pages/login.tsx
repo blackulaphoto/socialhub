@@ -55,8 +55,9 @@ export default function Login() {
             <div className="brand-submark text-muted-foreground">.com</div>
           </CardTitle>
           <CardDescription className="text-muted-foreground text-base">
-            Step back into your feed, your scenes, and the people making things around you.
+            Where photographers, models, and visual artists build their scene.
           </CardDescription>
+          <p className="text-sm text-muted-foreground">Share work. Discover creatives. Book collaborations. Build your portfolio.</p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

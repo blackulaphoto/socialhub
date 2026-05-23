@@ -34,6 +34,7 @@ import { BuilderAudioPlayer } from "@/components/page-builder-blocks/builder-aud
 import { BuilderMediaGallery } from "@/components/page-builder-blocks/builder-media-gallery";
 import { BuilderVideoPlaylist } from "@/components/page-builder-blocks/builder-video-playlist";
 import { CreatorPageBuilder } from "@/components/creator-page-builder";
+import { InviteFriendsDialog } from "@/components/invite-friends-dialog";
 import { LocationInput } from "@/components/location-input";
 import { WorkTypePicker } from "@/components/work-type-picker";
 import { useToast } from "@/hooks/use-toast";
@@ -1927,8 +1928,20 @@ export default function Settings() {
   return (
     <div className="mx-auto w-full max-w-[1180px] p-4 md:py-8 2xl:max-w-[1240px]">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold">Settings</h1>
-        <p className="text-muted-foreground">Tune your public profile, showcase presentation, and collaboration presence.</p>
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Settings</h1>
+            <p className="text-muted-foreground">Tune your public profile, showcase presentation, and collaboration presence.</p>
+          </div>
+          <InviteFriendsDialog
+            trigger={(
+              <Button variant="outline" className="self-start">
+                <Plus className="mr-2 h-4 w-4" />
+                Invite Friends
+              </Button>
+            )}
+          />
+        </div>
       </div>
 
       <div className="mb-8 overflow-hidden rounded-3xl border border-border/50">
